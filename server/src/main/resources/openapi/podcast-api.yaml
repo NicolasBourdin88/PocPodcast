@@ -1,0 +1,610 @@
+openapi: 3.1.0
+info:
+  title: Podcast API
+  version: "1"
+  description: |
+    API hypermédia du service de podcasts.
+
+    - Conventions (liens, actions, pagination, erreurs) : `docs/api/conventions.md`.
+    - Chaque réponse JSON existe en `application/hal+json` (lecture seule) et en
+      `application/prs.hal-forms+json` (avec les actions possibles dans `_templates`).
+    - Un client ne connaît que la racine `/` et suit les liens.
+
+    Les tests de contrat de `:server` vérifient que cette spécification et les routes
+    réelles correspondent, et valident chaque réponse contre son schéma.
+servers:
+  - url: http://localhost:8080
+    description: Serveur de développement
+tags:
+  - name: racine
+  - name: authentification
+  - name: abonnements
+  - name: podcasts
+  - name: épisodes
+security:
+  - bearer: []
+  - session: []
+
+paths:
+  /:
+    get:
+      tags: [racine]
+      operationId: getRoot
+      summary: Point d'entrée et Accueil
+      description: |
+        Anonyme : nom du serveur et moyen de se connecter (`tokens`, template `create-token`).
+        Connecté : liens vers les collections de l'utilisateur et état de l'Accueil embarqué.
+        Un navigateur (`text/html`) non connecté est redirigé vers `/login`.
+      security: [{}, { bearer: [] }, { session: [] }]
+      responses:
+        "200":
+          description: Racine
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Root" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Root" }
+            text/html:
+              schema: { type: string }
+        "303":
+          description: Navigateur non connecté, redirigé vers `/login`.
+
+  /auth/tokens:
+    post:
+      tags: [authentification]
+      operationId: createToken
+      summary: Échanger identifiant et mot de passe contre un jeton d'appareil
+      security: [{}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TokenRequest" }
+      responses:
+        "201":
+          description: Jeton créé. Sa valeur n'est renvoyée qu'une fois.
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Token" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /auth/tokens/current:
+    delete:
+      tags: [authentification]
+      operationId: revokeCurrentToken
+      summary: Révoquer le jeton utilisé pour cette requête (déconnexion de l'appareil)
+      security: [{ bearer: [] }]
+      responses:
+        "204": { description: Jeton révoqué }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me:
+    get:
+      tags: [authentification]
+      operationId: getMe
+      summary: Utilisateur connecté
+      responses:
+        "200":
+          description: Utilisateur
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/User" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /subscriptions:
+    get:
+      tags: [abonnements]
+      operationId: listSubscriptions
+      summary: Abonnements de l'utilisateur
+      responses:
+        "200":
+          description: Abonnements, par titre de podcast
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/SubscriptionCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/SubscriptionCollection" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /subscriptions/{subscriptionId}:
+    parameters:
+      - $ref: "#/components/parameters/subscriptionId"
+    get:
+      tags: [abonnements]
+      operationId: getSubscription
+      summary: Un abonnement
+      responses:
+        "200":
+          description: Abonnement
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /podcasts/{podcastId}:
+    parameters:
+      - $ref: "#/components/parameters/podcastId"
+    get:
+      tags: [podcasts]
+      operationId: getPodcast
+      summary: Un podcast du catalogue
+      responses:
+        "200":
+          description: Podcast
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Podcast" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Podcast" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /podcasts/{podcastId}/episodes:
+    parameters:
+      - $ref: "#/components/parameters/podcastId"
+    get:
+      tags: [podcasts]
+      operationId: listPodcastEpisodes
+      summary: Épisodes d'un podcast, du plus récent au plus ancien, avec l'état de l'utilisateur
+      parameters:
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Page d'épisodes
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/EpisodeCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/EpisodeCollection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /episodes:
+    get:
+      tags: [épisodes]
+      operationId: listEpisodes
+      summary: Épisodes des abonnements de l'utilisateur, du plus récent au plus ancien
+      parameters:
+        - name: status
+          in: query
+          description: Ne garder que les épisodes dans cet état (pour l'utilisateur).
+          schema: { $ref: "#/components/schemas/EpisodeStatus" }
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Page d'épisodes
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/EpisodeCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/EpisodeCollection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /episodes/{episodeId}:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    get:
+      tags: [épisodes]
+      operationId: getEpisode
+      summary: Un épisode, avec l'état de l'utilisateur et les actions possibles
+      responses:
+        "200":
+          description: Épisode
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Episode" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Episode" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /episodes/{episodeId}/progress:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [épisodes]
+      operationId: updateProgress
+      summary: Enregistrer la position d'écoute (template `update-progress`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProgressRequest" }
+      responses:
+        "204": { description: Position enregistrée, l'épisode est en cours d'écoute }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /episodes/{episodeId}/played:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    post:
+      tags: [épisodes]
+      operationId: markPlayed
+      summary: Marquer comme écouté (template `mark-played`)
+      responses:
+        "204": { description: Épisode écouté }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [épisodes]
+      operationId: markUnplayed
+      summary: Marquer comme non écouté (template `mark-unplayed`)
+      responses:
+        "204": { description: Épisode remis à l'état nouveau }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /episodes/{episodeId}/audio:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    get:
+      tags: [épisodes]
+      operationId: getEpisodeAudio
+      summary: Fichier audio de l'épisode
+      description: |
+        Redirige vers le fichier d'origine (enclosure RSS). À partir de l'étape 4, sert
+        le fichier mutualisé du serveur quand il est téléchargé. Les clients utilisent
+        toujours ce lien, jamais l'URL d'origine.
+      responses:
+        "302":
+          description: Redirection vers le fichier audio
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: Jeton d'appareil obtenu par `POST /auth/tokens`.
+    session:
+      type: apiKey
+      in: cookie
+      name: podcast_session
+      description: Session du client léger (formulaire `/login`).
+
+  parameters:
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    episodeId:
+      name: episodeId
+      in: path
+      required: true
+      schema: { type: string }
+    podcastId:
+      name: podcastId
+      in: path
+      required: true
+      schema: { type: string }
+    subscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Paramètre invalide
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Authentification absente, invalide ou révoquée
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Ressource inexistante ou non visible pour l'utilisateur
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ValidationError:
+      description: Corps de requête invalide
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href: { type: string }
+        templated: { type: boolean }
+      additionalProperties: false
+
+    Template:
+      description: Action HAL-FORMS.
+      type: object
+      required: [method, target]
+      properties:
+        method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE] }
+        target: { type: string }
+        contentType: { type: string, const: application/json }
+        properties:
+          type: array
+          items: { $ref: "#/components/schemas/TemplateProperty" }
+      additionalProperties: false
+
+    TemplateProperty:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        required: { type: boolean }
+        readOnly: { type: boolean }
+        type: { type: string }
+        value: {}
+        min: { type: number }
+        max: { type: number }
+        regex: { type: string }
+        prompt: { type: string }
+        options: { type: object }
+      additionalProperties: false
+
+    Problem:
+      description: Problem Details (RFC 9457).
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+            additionalProperties: false
+      additionalProperties: false
+
+    Root:
+      type: object
+      required: [name, apiVersion, _links]
+      properties:
+        name: { type: string, description: Nom affiché du serveur }
+        apiVersion: { type: integer, const: 1 }
+        _links:
+          type: object
+          required: [self, tokens]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            tokens: { $ref: "#/components/schemas/Link" }
+            me: { $ref: "#/components/schemas/Link" }
+            subscriptions: { $ref: "#/components/schemas/Link" }
+            episodes: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          description: Accueil de l'utilisateur connecté.
+          type: object
+          required: [resume, latest]
+          properties:
+            resume:
+              description: Épisodes en cours, du plus récemment écouté au plus ancien.
+              type: array
+              items: { $ref: "#/components/schemas/Episode" }
+            latest:
+              description: Derniers épisodes des abonnements.
+              type: array
+              items: { $ref: "#/components/schemas/Episode" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            create-token: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    TokenRequest:
+      type: object
+      required: [username, password, deviceName]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+        deviceName: { type: string, minLength: 1, maxLength: 100 }
+      additionalProperties: false
+
+    Token:
+      type: object
+      required: [token, deviceName, createdAt, _links]
+      properties:
+        token: { type: string, description: "À envoyer dans `Authorization: Bearer`." }
+        deviceName: { type: string }
+        createdAt: { type: string, format: date-time }
+        _links:
+          type: object
+          required: [self, me]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            me: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+      additionalProperties: false
+
+    User:
+      type: object
+      required: [id, username, displayName, role, _links]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        role: { type: string, enum: [USER, ADMIN] }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            logout: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    Podcast:
+      type: object
+      required: [id, title, author, feedUrl, artworkUrl, description, _links]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        author: { type: string }
+        feedUrl: { type: string, format: uri }
+        artworkUrl: { type: [string, "null"], format: uri }
+        description: { type: string }
+        _links:
+          type: object
+          required: [self, episodes, feed]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            episodes: { $ref: "#/components/schemas/Link" }
+            feed: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+      additionalProperties: false
+
+    Subscription:
+      type: object
+      required: [id, note, subscribedAt, _links, _embedded]
+      properties:
+        id: { type: string }
+        note: { type: [string, "null"], description: Annotation de l'utilisateur }
+        subscribedAt: { type: string, format: date-time }
+        _links:
+          type: object
+          required: [self, podcast]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            podcast: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [podcast]
+          properties:
+            podcast: { $ref: "#/components/schemas/Podcast" }
+          additionalProperties: false
+      additionalProperties: false
+
+    SubscriptionCollection:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [subscriptions]
+          properties:
+            subscriptions:
+              type: array
+              items: { $ref: "#/components/schemas/Subscription" }
+          additionalProperties: false
+      additionalProperties: false
+
+    EpisodeStatus:
+      type: string
+      enum: [NEW, IN_PROGRESS, PLAYED]
+
+    Episode:
+      description: Un épisode tel que le voit l'utilisateur connecté (catalogue + état d'écoute).
+      type: object
+      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, _links, _embedded]
+      properties:
+        id: { type: string }
+        podcastId: { type: string }
+        title: { type: string }
+        description: { type: string }
+        publishedAt: { type: string, format: date-time }
+        durationSeconds: { type: integer, minimum: 0 }
+        positionSeconds: { type: integer, minimum: 0 }
+        status: { $ref: "#/components/schemas/EpisodeStatus" }
+        _links:
+          type: object
+          required: [self, podcast, audio]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            podcast: { $ref: "#/components/schemas/Link" }
+            audio: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [podcast]
+          properties:
+            podcast: { $ref: "#/components/schemas/Podcast" }
+          additionalProperties: false
+        _templates:
+          description: "Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté, `mark-unplayed` s'il n'est pas nouveau."
+          type: object
+          properties:
+            update-progress: { $ref: "#/components/schemas/Template" }
+            mark-played: { $ref: "#/components/schemas/Template" }
+            mark-unplayed: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    EpisodeCollection:
+      type: object
+      required: [count, total, offset, limit, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0, description: Nombre d'épisodes dans cette page }
+        total: { type: integer, minimum: 0 }
+        offset: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            next: { $ref: "#/components/schemas/Link" }
+            prev: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [episodes]
+          properties:
+            episodes:
+              type: array
+              items: { $ref: "#/components/schemas/Episode" }
+          additionalProperties: false
+      additionalProperties: false
+
+    ProgressRequest:
+      type: object
+      required: [positionSeconds]
+      properties:
+        positionSeconds:
+          type: integer
+          minimum: 0
+          description: Ne doit pas dépasser la durée de l'épisode.
+      additionalProperties: false
