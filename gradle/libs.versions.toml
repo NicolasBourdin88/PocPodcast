@@ -23,6 +23,7 @@ logback = "1.6.5"
 mosaic = "0.18.0"
 password4j = "1.8.4"
 postgresql = "42.7.14"
+slf4j = "2.0.20"
 sqldelight = "2.4.1"
 
 [libraries]
@@ -64,6 +65,7 @@ logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version.ref = "mosaic" }
 password4j = { module = "com.password4j:password4j", version.ref = "password4j" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 sqldelight-jdbc-driver = { module = "app.cash.sqldelight:jdbc-driver", version.ref = "sqldelight" }
 sqldelight-postgresql-dialect = { module = "app.cash.sqldelight:postgresql-dialect", version.ref = "sqldelight" }
 
