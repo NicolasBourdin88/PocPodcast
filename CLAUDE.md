@@ -16,7 +16,7 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 - `:shared` (KMP : JVM, Android, iOS) : modèles, `PodcastRepository`, états d'écran (`LoadHomeState`). Toute modification de modèle passe par ce module.
 - `:server` : **Ktor**. Une seule API hypermédia, deux représentations selon `Accept` : **HAL JSON** pour les clients riches, **HTML** pour le client léger.
 - **Client léger = HTML rendu côté serveur + htmx**, pas Compose Wasm (Compose Web est en bêta, et le CORS empêche de lire les flux RSS depuis le navigateur).
-- `:composeApp` : **Compose Multiplatform** pour mobile (Android, iOS) et client riche (desktop JVM, y compris macOS). UI **responsive par taille de fenêtre, pas par plateforme**.
+- `:composeApp` : **Compose Multiplatform** pour mobile (Android, iOS) et client riche (desktop JVM, y compris macOS). UI **responsive par taille de fenêtre, pas par plateforme**. C'est une bibliothèque KMP ; l'APK est produit par `:androidApp`, car AGP 9 interdit `com.android.application` dans un module KMP (ADR 0001).
 - `:cli` : **Clikt** pour les commandes, **Mosaic** (runtime Compose dans le terminal) pour la TUI.
 - Interop : **API gPodder** en priorité (synchro de l'état de lecture avec AntennaPod), **Open Podcast API** pour les abonnements (sa spec cœur ne couvre encore que ça), **flux RSS par playlist** (enclosures vers les fichiers hébergés), OPML.
 - Lecture audio : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop).
@@ -36,7 +36,7 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 
 ## État actuel et façon de travailler
 
-Le code n'est pas encore commencé. Le travail suit les étapes de `plan.md`, dans l'ordre. **Première étape : le POC d'architecture** (étape 1) — chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend.
+Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'architecture) faite** : chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend. Il reste seulement à créer le dépôt GitHub et à protéger `main`. Prochaine étape : les études techniques (étape 2) et le contrat (étape 3). Les commandes de lancement sont dans `README.md`.
 
 - Avant de coder une étape, relire sa section dans `plan.md` et cocher les cases au fur et à mesure.
 - Utiliser les versions les plus récentes des dépendances (Kotlin, Compose Multiplatform, Ktor, Clikt, Mosaic) et les vérifier plutôt que de les supposer ; l'API de Mosaic a changé plusieurs fois.
@@ -47,3 +47,6 @@ Le code n'est pas encore commencé. Le travail suit les étapes de `plan.md`, da
 - Code en anglais, documentation en français.
 - Décisions importantes dans `docs/adr/`.
 - Ne pas faire dépendre `:shared` d'une plateforme ; le code spécifique passe par `expect/actual` ou par des interfaces injectées.
+- Package racine `fr.podcast` (provisoire tant que le projet n'a pas de nom).
+- Commits logiques et petits, au format Conventional Commits (`feat(module): …`, `build: …`, `docs: …`) ; chaque commit doit compiler.
+- `:composeApp:desktopTest` rend l'Accueil à chaque taille de fenêtre dans `composeApp/build/snapshots/` : à regarder après toute modification d'UI.

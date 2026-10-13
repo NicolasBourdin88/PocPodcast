@@ -65,55 +65,55 @@ Le plan est découpé en **étapes**. Chaque étape a un objectif, des tâches e
 
 ### 1.1 Initialiser le projet
 
-- [ ] Générer le projet avec le **Kotlin Multiplatform wizard** (kmp.jetbrains.com) : Android, iOS (UI partagée), Desktop, Server. Récupérer notamment le projet Xcode `iosApp/`.
-- [ ] Renommer / réorganiser les modules en `:shared`, `:composeApp`, `:server`, et ajouter `:cli`.
-- [ ] Centraliser les versions dans `gradle/libs.versions.toml` (versions les plus récentes au moment de la création).
-- [ ] Activer les accesseurs typés (`projects.shared`).
-- [ ] Créer le dépôt Git, protéger `main`, ajouter une CI GitHub Actions qui build JVM + Android.
+- [x] Générer le projet avec le **Kotlin Multiplatform wizard** (kmp.jetbrains.com) : Android, iOS (UI partagée), Desktop, Server. Récupérer notamment le projet Xcode `iosApp/`. *(Squelette écrit à la main ; `iosApp/` repris du KMP-App-Template officiel.)*
+- [x] Renommer / réorganiser les modules en `:shared`, `:composeApp`, `:server`, et ajouter `:cli`. *(Plus `:androidApp`, imposé par AGP 9 : voir ADR 0001.)*
+- [x] Centraliser les versions dans `gradle/libs.versions.toml` (versions les plus récentes au moment de la création).
+- [x] Activer les accesseurs typés (`projects.shared`).
+- [ ] Créer le dépôt Git, protéger `main`, ajouter une CI GitHub Actions qui build JVM + Android. *(Dépôt local et CI faits ; reste à créer le dépôt GitHub et protéger `main`.)*
 
 ### 1.2 Module partagé `:shared`
 
-- [ ] Modèles sérialisables : `Podcast` (id, titre, auteur, URL du flux, pochette) et `Episode` (id, podcastId, titre, date affichable, durée, position, statut `NEW / IN_PROGRESS / PLAYED`), avec des propriétés calculées `progress`, `remainingMinutes`, `durationLabel`.
-- [ ] Interface `PodcastRepository` : `subscriptions()`, `podcast(id)`, `latestEpisodes(limit)`, `inProgress()`.
-- [ ] Implémentation `FakePodcastRepository` : 4 podcasts et 5 épisodes en dur, dont 2 en cours.
-- [ ] Cas d'usage `LoadHomeState` qui produit un `HomeState(resume, latest)` : **le même état pour tous les clients**, seul le rendu change.
-- [ ] Un test unitaire commun sur `LoadHomeState`.
+- [x] Modèles sérialisables : `Podcast` (id, titre, auteur, URL du flux, pochette) et `Episode` (id, podcastId, titre, date affichable, durée, position, statut `NEW / IN_PROGRESS / PLAYED`), avec des propriétés calculées `progress`, `remainingMinutes`, `durationLabel`.
+- [x] Interface `PodcastRepository` : `subscriptions()`, `podcast(id)`, `latestEpisodes(limit)`, `inProgress()`.
+- [x] Implémentation `FakePodcastRepository` : 4 podcasts et 5 épisodes en dur, dont 2 en cours.
+- [x] Cas d'usage `LoadHomeState` qui produit un `HomeState(resume, latest)` : **le même état pour tous les clients**, seul le rendu change.
+- [x] Un test unitaire commun sur `LoadHomeState`.
 
 ### 1.3 Client mobile et riche `:composeApp`
 
-- [ ] Écran Accueil Compose dans `commonMain` : « Reprendre l'écoute » (carte avec progression) + « Nouveaux épisodes » (liste) + mini-lecteur factice.
-- [ ] Classes de taille de fenêtre calculées depuis l'espace disponible (voir tableau responsive dans `CLAUDE.md`) :
+- [x] Écran Accueil Compose dans `commonMain` : « Reprendre l'écoute » (carte avec progression) + « Nouveaux épisodes » (liste) + mini-lecteur factice.
+- [x] Classes de taille de fenêtre calculées depuis l'espace disponible (voir tableau responsive dans `CLAUDE.md`) :
   - compact → barre de navigation en bas, une colonne ;
   - hauteur compacte (téléphone paysage) → rail, deux colonnes ;
   - moyen / étendu → rail, deux colonnes, file d'attente à partir d'étendu ;
   - large → tiroir permanent.
-- [ ] Points d'entrée : `MainActivity` (Android), `main()` avec `Window` (desktop), `MainViewController()` + `iOSApp.swift` (iOS).
+- [x] Points d'entrée : `MainActivity` (Android, module `:androidApp`), `main()` avec `Window` (desktop), `MainViewController()` + `iOSApp.swift` (iOS).
 
 ### 1.4 Service et client léger `:server`
 
-- [ ] Ktor avec une route `/` qui négocie selon l'en-tête `Accept` :
+- [x] Ktor avec une route `/` qui négocie selon l'en-tête `Accept` :
   - `text/html` → page Accueil en HTML (kotlinx.html), responsive en CSS (barre en bas sur mobile, barre latérale à partir de 840 px) ;
   - `application/hal+json` → même contenu en HAL : `_links` (self, podcasts, episodes) et `_embedded` (resume, latest), chaque épisode ayant ses propres liens (self, podcast, play).
-- [ ] Une route fragment `/fragments/latest` et un bouton **htmx** qui recharge la liste sans recharger la page.
-- [ ] Routes `/podcasts` et `/episodes` en HAL.
-- [ ] Deux tests Ktor (`testApplication`) : HTML pour un navigateur, HAL pour un client d'API.
+- [x] Une route fragment `/fragments/latest` et un bouton **htmx** qui recharge la liste sans recharger la page.
+- [x] Routes `/podcasts` et `/episodes` en HAL.
+- [x] Deux tests Ktor (`testApplication`) : HTML pour un navigateur, HAL pour un client d'API.
 
 ### 1.5 CLI / TUI `:cli`
 
-- [ ] `podcast list` (Clikt) : affiche en texte « Reprendre l'écoute » et « Nouveaux épisodes ».
-- [ ] `podcast tui` (Mosaic) : même écran, avec une barre de progression en caractères.
+- [x] `podcast list` (Clikt) : affiche en texte « Reprendre l'écoute » et « Nouveaux épisodes ».
+- [x] `podcast tui` (Mosaic) : même écran, avec une barre de progression en caractères.
 
 ### Définition de « terminé »
 
 | # | Vérification | Commande |
 |---|---|---|
 | P1 | `:shared` compile pour JVM, Android, iOS ; test vert | `./gradlew :shared:allTests` |
-| P2 | Accueil sur Android, barre en portrait, rail en paysage | `./gradlew :composeApp:installDebug` |
+| P2 | Accueil sur Android, barre en portrait, rail en paysage | `./gradlew :androidApp:installDebug` |
 | P3 | Accueil sur desktop ; en redimensionnant : barre → rail → tiroir | `./gradlew :composeApp:run` |
 | P4 | Accueil dans le simulateur iOS | Xcode sur `iosApp` |
 | P5 | Accueil HTML + rafraîchissement htmx | `./gradlew :server:run`, http://localhost:8080 |
 | P6 | Même contenu en HAL | `curl -H "Accept: application/hal+json" localhost:8080/` |
-| P7 | Liste texte puis TUI | `./gradlew :cli:run --args="list"`, puis `tui` |
+| P7 | Liste texte puis TUI | `./gradlew :cli:run --args="list"`, puis `:cli:installDist` et `cli/build/install/podcast/bin/podcast tui` |
 
 Et : le même objet `Episode` de `:shared` est visible dans les 5 rendus, le README explique comment lancer chaque cible, et une démo de 5 minutes est possible en séance.
 
