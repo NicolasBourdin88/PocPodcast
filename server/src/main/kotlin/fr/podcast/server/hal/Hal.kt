@@ -122,7 +122,7 @@ fun podcastResource(podcast: Podcast, forms: Boolean = false): JsonObject = buil
     fields(Podcast.serializer(), podcast)
     links(
         "self" to "/podcasts/${podcast.id}",
-        "episodes" to "/podcasts/${podcast.id}/episodes",
+        "episodes" to "/podcasts/${podcast.id}/episodes{?offset,limit}",
         "feed" to podcast.feedUrl,
     )
     templates(forms, Affordances.forPodcast(podcast))

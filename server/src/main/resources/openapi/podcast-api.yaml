@@ -740,7 +740,9 @@ components:
           required: [self, episodes, feed]
           properties:
             self: { $ref: "#/components/schemas/Link" }
-            episodes: { $ref: "#/components/schemas/Link" }
+            episodes:
+              description: "Gabarit `/podcasts/{id}/episodes{?offset,limit}`."
+              $ref: "#/components/schemas/Link"
             feed: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
         _templates:
