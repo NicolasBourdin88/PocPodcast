@@ -90,12 +90,13 @@ class ContractTest {
         suspend fun check(
             method: HttpMethod, path: String, documentedPath: String, expected: HttpStatusCode,
             token: String? = alice, body: String? = null, accept: ContentType = HalForms, http: HttpClient = client,
+            bodyType: ContentType = ContentType.Application.Json,
         ) {
             val response = http.request(path) {
                 this.method = method
                 token?.let { bearerAuth(it) }
                 accept(accept)
-                body?.let { contentType(ContentType.Application.Json); setBody(it) }
+                body?.let { contentType(bodyType); setBody(it) }
             }
             val operation = Operation(method, documentedPath)
             assertEquals(expected, response.status, "$operation ($path)")
@@ -170,6 +171,11 @@ class ContractTest {
         check(patch, "/subscriptions/999", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound, body = """{"note":null}""")
         check(post, "/podcasts/5/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.OK)
         check(post, "/podcasts/999/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.NotFound)
+        val opml = ContentType("text", "x-opml")
+        check(get, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.OK)
+        check(post, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.OK, bodyType = opml,
+            body = javaClass.getResourceAsStream("/feeds/import.opml")!!.readBytes().decodeToString())
+        check(post, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.UnprocessableEntity, bodyType = opml, body = "<rss/>")
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NoContent)
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
 

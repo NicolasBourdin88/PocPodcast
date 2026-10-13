@@ -22,9 +22,12 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
 import kotlin.system.exitProcess
 import kotlin.time.Duration
@@ -66,9 +69,25 @@ fun outgoingHttpClient(): HttpClient = HttpClient(CIO) {
 }
 
 /** The server's services, built once and shared by the routes and the background jobs. */
-class ServerServices(val config: ServerConfig, val database: ServerDatabase, val outgoing: HttpClient) {
+class ServerServices(
+    val config: ServerConfig,
+    val database: ServerDatabase,
+    val outgoing: HttpClient,
+    /** Lives as long as the application: background work started by requests. */
+    private val scope: CoroutineScope,
+) {
     val accounts = Accounts(database)
-    val refresher = FeedRefresher(database, FeedFetcher(outgoing, UrlGuard(config.allowPrivateFeeds)))
+    val guard = UrlGuard(config.allowPrivateFeeds)
+    val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard))
+
+    /** Reads new feeds (e.g. after an OPML import) without making the request wait. */
+    fun refreshSoon(podcastIds: List<Long>) {
+        if (podcastIds.isEmpty() || !config.backgroundJobs) return
+        scope.launch {
+            val permits = Semaphore(4)
+            podcastIds.map { id -> launch { permits.withPermit { refresher.refresh(id) } } }
+        }
+    }
 
     /** A subscription changed (e.g. automatic download turned on). */
     @Suppress("UnusedParameter")
@@ -96,7 +115,7 @@ fun startServer(config: ServerConfig, database: ServerDatabase) {
 }
 
 fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing: HttpClient = outgoingHttpClient()) {
-    val services = ServerServices(config, database, outgoing)
+    val services = ServerServices(config, database, outgoing, scope = this)
     installAuthentication(services.accounts, database, config.secureCookies)
     // Every resource is negotiated on these two headers (docs/api/conventions.md).
     install(createApplicationPlugin("Vary") { onCall { it.response.headers.append(HttpHeaders.Vary, "Accept, Accept-Language") } })

@@ -145,6 +145,54 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/FeedRejected" }
 
+  /subscriptions/opml:
+    get:
+      tags: [abonnements]
+      operationId: exportOpml
+      summary: Exporter les abonnements en OPML 2.0
+      responses:
+        "200":
+          description: Fichier OPML, en pièce jointe `podcasts.opml`
+          content:
+            text/x-opml:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [abonnements]
+      operationId: importOpml
+      summary: Importer un fichier OPML (AntennaPod, Apple Podcasts…)
+      description: |
+        Instantané : les podcasts inconnus sont créés avec le titre de l'OPML (`refreshStatus: PENDING`)
+        et leur flux est lu en arrière-plan. Les adresses refusées (schéma, réseau privé) sont listées
+        dans `failed`. Au plus 1 000 flux et 5 Mo.
+      requestBody:
+        required: true
+        content:
+          text/x-opml:
+            schema: { type: string }
+          application/xml:
+            schema: { type: string }
+          text/xml:
+            schema: { type: string }
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                opml: { type: string, format: binary }
+      responses:
+        "200":
+          description: Rapport d'import
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/OpmlImportReport" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422":
+          description: "Pas un fichier OPML lisible (`type` : `/problems/not-an-opml`)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
   /subscriptions/{subscriptionId}:
     parameters:
       - $ref: "#/components/parameters/subscriptionId"
@@ -680,9 +728,12 @@ components:
         count: { type: integer, minimum: 0 }
         _links:
           type: object
-          required: [self]
+          required: [self, opml]
           properties:
             self: { $ref: "#/components/schemas/Link" }
+            opml:
+              description: Export (GET) et import (POST) OPML.
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _embedded:
           type: object
@@ -696,6 +747,29 @@ components:
           type: object
           properties:
             subscribe: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    OpmlImportReport:
+      type: object
+      required: [imported, alreadySubscribed, failed, _links]
+      properties:
+        imported: { type: integer, minimum: 0 }
+        alreadySubscribed: { type: integer, minimum: 0 }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [feedUrl, reason]
+            properties:
+              feedUrl: { type: string }
+              reason: { type: string, description: "Code du refus : `invalid-feed-url`, `forbidden-feed-address`…" }
+            additionalProperties: false
+        _links:
+          type: object
+          required: [subscriptions]
+          properties:
+            subscriptions: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
       additionalProperties: false
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <head><title>Exported from AntennaPod</title></head>
+  <body>
+    <outline text="Tech">
+      <outline text="Talking Kotlin" type="rss" xmlUrl="https://feeds.test/tk.xml"/>
+      <outline text="Le Podcast de Test" type="rss" xmlUrl="https://feeds.test/podcast20.xml"/>
+    </outline>
+    <outline text="Doublon" type="rss" xmlUrl="https://feeds.test/podcast20.xml"/>
+    <outline title="Sans schéma" type="rss" xmlUrl="feeds.test/unknown.xml"/>
+    <outline text="FTP" type="rss" xmlUrl="ftp://feeds.test/old.xml"/>
+    <outline text="Pas un flux, juste une catégorie"/>
+  </body>
+</opml>

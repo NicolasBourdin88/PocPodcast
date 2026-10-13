@@ -44,13 +44,9 @@ val ApplicationCall.isHtmx: Boolean get() = request.header("HX-Request") == "tru
 
 data class FieldError(val field: String, val message: String)
 
-/** Problem types the clients recognize (docs/api/conventions.md). */
+/** Problem types the clients recognize, besides the feed refusals (docs/api/conventions.md). */
 object ProblemTypes {
-    const val INVALID_FEED_URL = "/problems/invalid-feed-url"
-    const val FORBIDDEN_FEED_ADDRESS = "/problems/forbidden-feed-address"
-    const val FEED_UNREACHABLE = "/problems/feed-unreachable"
-    const val NOT_A_FEED = "/problems/not-a-feed"
-    const val FEED_TOO_LARGE = "/problems/feed-too-large"
+    const val NOT_AN_OPML = "/problems/not-an-opml"
     const val SEARCH_FAILED = "/problems/search-failed"
 }
 

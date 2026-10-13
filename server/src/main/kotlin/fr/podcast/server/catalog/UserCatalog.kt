@@ -3,19 +3,31 @@ package fr.podcast.server.catalog
 import fr.podcast.server.db.PodcastDb
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.db.toKotlinInstant
+import fr.podcast.server.feeds.FeedException
+import fr.podcast.server.feeds.UrlGuard
+import fr.podcast.server.feeds.code
+import fr.podcast.server.feeds.withScheme
+import fr.podcast.server.opml.OpmlEntry
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.OpmlFailure
+import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.RefreshStatus
 import fr.podcast.shared.model.Subscription
 import fr.podcast.shared.model.SubscriptionItem
 import fr.podcast.shared.model.Transcript
 import fr.podcast.shared.repository.PodcastRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.OffsetDateTime
 
 data class Page<T>(val items: List<T>, val total: Long, val offset: Int, val limit: Int)
+
+/** Result of an OPML import, plus the podcasts whose feed must now be read. */
+data class OpmlImport(val report: OpmlImportReport, val newPodcasts: List<Long>)
 
 /**
  * The catalog as seen by one user: shared podcasts and episodes plus that user's own state.
@@ -125,6 +137,42 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
             val podcastId = catalogQueries.deleteSubscription(subscriptionId, userId).executeAsOneOrNull() ?: return@transaction null
             if (catalogQueries.countSubscribers(podcastId).executeAsOne() == 0L) podcastId else 0L
         }
+    }
+
+    /**
+     * Subscribes to the feeds of an OPML file. Known podcasts are reused; new ones are created
+     * as PENDING with the OPML title and read later by the feed refresh.
+     */
+    suspend fun importFeeds(entries: List<OpmlEntry>, guard: UrlGuard): OpmlImport {
+        val failed = mutableListOf<OpmlFailure>()
+        val accepted = withContext(Dispatchers.IO) {
+            entries.mapNotNull { entry ->
+                val url = withScheme(entry.feedUrl)
+                try {
+                    guard.check(url) // same SSRF rule as a subscription by address
+                    entry.copy(feedUrl = url)
+                } catch (refused: FeedException) {
+                    failed += OpmlFailure(url, refused.code)
+                    null
+                }
+            }.distinctBy { it.feedUrl }
+        }
+        var imported = 0
+        var alreadySubscribed = 0
+        val newPodcasts = mutableListOf<Long>()
+        database.transaction {
+            for (entry in accepted) {
+                val podcastId = catalogQueries.podcastIdByFeedUrl(entry.feedUrl).executeAsOneOrNull()
+                    ?: catalogQueries.insertPendingPodcast(entry.feedUrl, entry.title.ifBlank { entry.feedUrl }).executeAsOne().also(newPodcasts::add)
+                if (catalogQueries.subscriptionIdFor(userId, podcastId).executeAsOneOrNull() != null) {
+                    alreadySubscribed++
+                } else {
+                    catalogQueries.insertSubscription(userId, podcastId, null).executeAsOne()
+                    imported++
+                }
+            }
+        }
+        return OpmlImport(OpmlImportReport(imported, alreadySubscribed, failed), newPodcasts)
     }
 
     suspend fun subscribedFeedUrls(): Set<String> =

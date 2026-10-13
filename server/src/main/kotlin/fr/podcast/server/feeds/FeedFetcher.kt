@@ -29,6 +29,19 @@ sealed class FeedException(message: String, cause: Throwable? = null) : Exceptio
     class TooLarge(limit: Long) : FeedException("Larger than $limit bytes")
 }
 
+/** Short reason, also the last segment of the API Problem type (`/problems/<code>`). */
+val FeedException.code: String
+    get() = when (this) {
+        is FeedException.InvalidUrl -> "invalid-feed-url"
+        is FeedException.ForbiddenAddress -> "forbidden-feed-address"
+        is FeedException.Unreachable -> "feed-unreachable"
+        is FeedException.NotAFeed -> "not-a-feed"
+        is FeedException.TooLarge -> "feed-too-large"
+    }
+
+/** Users often paste "example.org/feed": HTTPS is assumed when the scheme is missing. */
+fun withScheme(url: String): String = url.trim().let { if ("://" in it) it else "https://$it" }
+
 /**
  * The server fetches URLs given by users: without this check, anyone could make it call
  * internal services (SSRF), e.g. the database or a cloud metadata endpoint. Only http(s)

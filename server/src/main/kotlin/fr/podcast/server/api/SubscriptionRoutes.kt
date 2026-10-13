@@ -5,16 +5,33 @@ import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.SESSION_AUTH
 import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.server.feeds.FeedException
+import fr.podcast.server.feeds.code
+import fr.podcast.server.feeds.withScheme
+import fr.podcast.server.opml.Opml
+import fr.podcast.server.opml.OpmlException
+import fr.podcast.server.hal.opmlImportResource
 import fr.podcast.server.hal.subscriptionCollection
 import fr.podcast.server.hal.subscriptionResource
 import fr.podcast.server.http.FieldError
+import fr.podcast.server.http.HalJson
 import fr.podcast.server.http.ProblemTypes
+import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
+import io.ktor.http.ContentDisposition
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.request.contentType
+import io.ktor.server.request.receiveChannel
+import io.ktor.server.request.receiveMultipart
+import io.ktor.server.response.respondText
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import io.ktor.server.response.header
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -54,6 +71,30 @@ fun Route.subscriptionRoutes(services: ServerServices) {
                 subscriptionResource(item, representation.forms), representation,
                 if (created) HttpStatusCode.Created else HttpStatusCode.OK,
             )
+        }
+
+        get("/subscriptions/opml") {
+            val podcasts = catalog(call).subscriptions()
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "podcasts.opml").toString(),
+            )
+            call.respondText(Opml.write("${call.user.displayName} — ${services.config.name}", podcasts), OpmlContentType)
+        }
+
+        // Instant: new podcasts wait for their feed to be read (refreshStatus PENDING).
+        post("/subscriptions/opml") {
+            call.mutatingUser() ?: return@post
+            val entries = try {
+                val bytes = call.receiveUpload(MAX_OPML_BYTES) ?: throw OpmlException("OPML file expected")
+                Opml.read(bytes.inputStream())
+            } catch (unreadable: OpmlException) {
+                return@post call.respondProblem(HttpStatusCode.UnprocessableEntity, unreadable.message, type = ProblemTypes.NOT_AN_OPML)
+            }
+            val import = catalog(call).importFeeds(entries, services.guard)
+            services.refreshSoon(import.newPodcasts)
+            if (call.isHtmx) call.response.header("HX-Trigger", "subscriptions-changed")
+            call.respondText(opmlImportResource(import.report).toString(), HalJson)
         }
 
         get("/subscriptions/{id}") {
@@ -97,16 +138,22 @@ fun Route.subscriptionRoutes(services: ServerServices) {
     }
 }
 
-/** Users often paste "example.org/feed": HTTPS is assumed when the scheme is missing. */
-internal fun withScheme(url: String): String = if ("://" in url) url else "https://$url"
+internal suspend fun ApplicationCall.respondFeedProblem(refused: FeedException) =
+    respondProblem(HttpStatusCode.UnprocessableEntity, refused.message, listOf(FieldError("feedUrl", refused.code)), "/problems/${refused.code}")
 
-internal suspend fun ApplicationCall.respondFeedProblem(refused: FeedException) {
-    val type = when (refused) {
-        is FeedException.InvalidUrl -> ProblemTypes.INVALID_FEED_URL
-        is FeedException.ForbiddenAddress -> ProblemTypes.FORBIDDEN_FEED_ADDRESS
-        is FeedException.Unreachable -> ProblemTypes.FEED_UNREACHABLE
-        is FeedException.NotAFeed -> ProblemTypes.NOT_A_FEED
-        is FeedException.TooLarge -> ProblemTypes.FEED_TOO_LARGE
+private const val MAX_OPML_BYTES = 5L * 1024 * 1024
+
+private val OpmlContentType = ContentType("text", "x-opml")
+
+/** The request body, or the first file of a multipart form (thin client upload); null if too large. */
+private suspend fun ApplicationCall.receiveUpload(limit: Long): ByteArray? {
+    if (request.contentType().match(ContentType.MultiPart.FormData)) {
+        var file: ByteArray? = null
+        receiveMultipart(formFieldLimit = limit).forEachPart { part ->
+            if (part is PartData.FileItem && file == null) file = part.provider().readRemaining(limit + 1).readByteArray()
+            part.dispose()
+        }
+        return file?.takeIf { it.size <= limit }
     }
-    respondProblem(HttpStatusCode.UnprocessableEntity, refused.message, listOf(FieldError("feedUrl", type.substringAfterLast('/'))), type)
+    return receiveChannel().readRemaining(limit + 1).readByteArray().takeIf { it.size <= limit }
 }

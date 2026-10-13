@@ -6,6 +6,7 @@ import fr.podcast.server.catalog.Page
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.model.Episode
+import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.Subscription
 import fr.podcast.shared.model.SubscriptionItem
@@ -130,7 +131,7 @@ fun subscriptionResource(item: SubscriptionItem, forms: Boolean): JsonObject = b
 
 fun subscriptionCollection(items: List<SubscriptionItem>, forms: Boolean): JsonObject = buildJsonObject {
     put("count", items.size)
-    links("self" to "/subscriptions")
+    links("self" to "/subscriptions", "opml" to "/subscriptions/opml")
     putJsonObject("_embedded") {
         put("subscriptions", buildJsonArray { items.forEach { add(subscriptionResource(it, forms)) } })
     }
@@ -173,4 +174,9 @@ fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, 
     putJsonObject("_embedded") {
         put("episodes", buildJsonArray { page.items.forEach { add(episodeResource(it, forms)) } })
     }
+}
+
+fun opmlImportResource(report: OpmlImportReport): JsonObject = buildJsonObject {
+    fields(OpmlImportReport.serializer(), report)
+    links("subscriptions" to "/subscriptions")
 }
