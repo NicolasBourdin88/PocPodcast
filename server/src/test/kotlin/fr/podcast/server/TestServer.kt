@@ -3,7 +3,12 @@ package fr.podcast.server
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import fr.podcast.server.db.ServerDatabase
-import fr.podcast.server.dev.DevSeed
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
@@ -41,22 +46,40 @@ object TestDatabase {
     fun reset() {
         dataSource.connection.use {
             it.createStatement().execute(
-                "TRUNCATE users, api_tokens, http_sessions, podcasts, episodes, subscriptions, playback_states RESTART IDENTITY CASCADE",
+                "TRUNCATE users, api_tokens, http_sessions, podcasts, episodes, episode_transcripts, subscriptions, " +
+                    "playback_states, media_files RESTART IDENTITY CASCADE",
             )
         }
-        runBlocking { DevSeed.seed(database) }
+        runBlocking { TestSeed.seed(database) }
     }
 }
 
-val testConfig = ServerConfig(name = "Podcast (test)", secureCookies = false)
+// Background jobs off (tests call them directly); test feeds live on a fake host.
+val testConfig = ServerConfig(name = "Podcast (test)", secureCookies = false, allowPrivateFeeds = true, backgroundJobs = false)
+
+/**
+ * The outside world seen by the server in tests: https://feeds.test serves the fixtures of
+ * src/test/resources/feeds, everything else is unknown.
+ */
+fun testFeeds(): HttpClient = HttpClient(
+    MockEngine { request ->
+        val fixture = request.url.encodedPath.removePrefix("/")
+        val content = TestDatabase::class.java.getResourceAsStream("/feeds/$fixture")?.readBytes()
+        when {
+            request.url.host != "feeds.test" || content == null -> respond("", HttpStatusCode.NotFound)
+            fixture.endsWith(".html") -> respond(ByteReadChannel(content), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html"))
+            else -> respond(ByteReadChannel(content), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/rss+xml"))
+        }
+    },
+) { followRedirects = false }
 
 val HalForms = ContentType("application", "prs.hal-forms+json")
 
 fun ApplicationTestBuilder.podcastServer() {
-    application { module(testConfig, TestDatabase.database) }
+    application { module(testConfig, TestDatabase.database, testFeeds()) }
 }
 
-suspend fun HttpClient.token(username: String = DevSeed.ALICE, password: String = DevSeed.ALICE_PASSWORD): String {
+suspend fun HttpClient.token(username: String = TestSeed.ALICE, password: String = TestSeed.ALICE_PASSWORD): String {
     val response = post("/auth/tokens") {
         contentType(ContentType.Application.Json)
         setBody("""{"username":"$username","password":"$password","deviceName":"test"}""")

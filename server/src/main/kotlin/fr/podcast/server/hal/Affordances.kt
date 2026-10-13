@@ -2,6 +2,8 @@ package fr.podcast.server.hal
 
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.model.Podcast
+import fr.podcast.shared.model.SubscriptionItem
 import io.ktor.http.HttpMethod
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -43,22 +45,57 @@ object Affordances {
 
     val logout = Affordance("logout", HttpMethod.Delete, "/auth/tokens/current")
 
-    /** `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new. */
+    val subscribe = Affordance(
+        "subscribe", HttpMethod.Post, "/subscriptions",
+        listOf(AffordanceProperty("feedUrl", type = "url", required = true)),
+    )
+
+    /** Subscribe to one search result: the feed address is already filled in. */
+    fun subscribeTo(feedUrl: String) = Affordance(
+        "subscribe", HttpMethod.Post, "/subscriptions",
+        listOf(AffordanceProperty("feedUrl", type = "url", required = true, value = JsonPrimitive(feedUrl))),
+    )
+
+    /**
+     * `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new;
+     * `keep` or `unkeep` (kept episodes are never purged).
+     */
     fun forEpisode(episode: Episode): List<Affordance> = buildList {
         add(
             Affordance(
                 "update-progress", HttpMethod.Put, "/episodes/${episode.id}/progress",
                 listOf(
                     AffordanceProperty(
-                        "positionSeconds", type = "number", required = true,
-                        value = JsonPrimitive(episode.positionSeconds), min = 0, max = episode.durationSeconds,
+                        "positionSeconds", type = "number", required = true, value = JsonPrimitive(episode.positionSeconds),
+                        // Some feeds do not give the duration (0): no upper bound then.
+                        min = 0, max = episode.durationSeconds.takeIf { it > 0 },
                     ),
                 ),
             ),
         )
         if (episode.status != EpisodeStatus.PLAYED) add(Affordance("mark-played", HttpMethod.Post, "/episodes/${episode.id}/played"))
         if (episode.status != EpisodeStatus.NEW) add(Affordance("mark-unplayed", HttpMethod.Delete, "/episodes/${episode.id}/played"))
+        if (episode.kept) {
+            add(Affordance("unkeep", HttpMethod.Delete, "/episodes/${episode.id}/kept"))
+        } else {
+            add(Affordance("keep", HttpMethod.Put, "/episodes/${episode.id}/kept"))
+        }
     }
+
+    /** `update` (note, automatic download) and `unsubscribe`. */
+    fun forSubscription(item: SubscriptionItem): List<Affordance> = listOf(
+        Affordance(
+            "update", HttpMethod.Patch, "/subscriptions/${item.subscription.id}",
+            listOf(
+                AffordanceProperty("note", type = "textarea", value = JsonPrimitive(item.subscription.note)),
+                AffordanceProperty("autoDownload", type = "checkbox", value = JsonPrimitive(item.subscription.autoDownload)),
+            ),
+        ),
+        Affordance("unsubscribe", HttpMethod.Delete, "/subscriptions/${item.subscription.id}"),
+    )
+
+    fun forPodcast(podcast: Podcast): List<Affordance> =
+        listOf(Affordance("refresh", HttpMethod.Post, "/podcasts/${podcast.id}/refresh"))
 }
 
 /** `_templates` object of a HAL-FORMS document. */

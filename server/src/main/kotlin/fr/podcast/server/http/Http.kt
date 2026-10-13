@@ -44,10 +44,25 @@ val ApplicationCall.isHtmx: Boolean get() = request.header("HX-Request") == "tru
 
 data class FieldError(val field: String, val message: String)
 
+/** Problem types the clients recognize (docs/api/conventions.md). */
+object ProblemTypes {
+    const val INVALID_FEED_URL = "/problems/invalid-feed-url"
+    const val FORBIDDEN_FEED_ADDRESS = "/problems/forbidden-feed-address"
+    const val FEED_UNREACHABLE = "/problems/feed-unreachable"
+    const val NOT_A_FEED = "/problems/not-a-feed"
+    const val FEED_TOO_LARGE = "/problems/feed-too-large"
+    const val SEARCH_FAILED = "/problems/search-failed"
+}
+
 /** Problem Details (RFC 9457). */
-suspend fun ApplicationCall.respondProblem(status: HttpStatusCode, detail: String? = null, errors: List<FieldError> = emptyList()) {
+suspend fun ApplicationCall.respondProblem(
+    status: HttpStatusCode,
+    detail: String? = null,
+    errors: List<FieldError> = emptyList(),
+    type: String = "about:blank",
+) {
     val problem = buildJsonObject {
-        put("type", "about:blank")
+        put("type", type)
         put("title", status.description)
         put("status", status.value)
         detail?.let { put("detail", it) }

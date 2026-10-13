@@ -108,10 +108,81 @@ paths:
             application/prs.hal-forms+json:
               schema: { $ref: "#/components/schemas/SubscriptionCollection" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [abonnements]
+      operationId: createSubscription
+      summary: S'abonner à un flux RSS (template `subscribe`)
+      description: |
+        Le serveur lit le flux tout de suite : un podcast n'existe que si son flux a pu être lu.
+        Le podcast est mutualisé ; s'abonner à un flux déjà connu ne le relit pas.
+        Sans schéma, l'adresse est complétée en `https://`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionRequest" }
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/SubscriptionRequest" }
+      responses:
+        "201":
+          description: Abonnement créé
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        "200":
+          description: Déjà abonné à ce flux
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/FeedRejected" }
 
   /subscriptions/{subscriptionId}:
     parameters:
       - $ref: "#/components/parameters/subscriptionId"
+    patch:
+      tags: [abonnements]
+      operationId: updateSubscription
+      summary: Annoter un abonnement ou régler le téléchargement automatique (template `update`)
+      description: |
+        Mise à jour partielle ; un champ absent garde sa valeur, `"note": null` efface la note.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionUpdate" }
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/SubscriptionUpdate" }
+      responses:
+        "200":
+          description: Abonnement modifié
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [abonnements]
+      operationId: deleteSubscription
+      summary: Se désabonner (template `unsubscribe`)
+      description: Quand plus personne ne suit le podcast, il est supprimé avec ses épisodes et ses fichiers.
+      responses:
+        "204": { description: Désabonné }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     get:
       tags: [abonnements]
       operationId: getSubscription
@@ -143,6 +214,26 @@ paths:
             application/prs.hal-forms+json:
               schema: { $ref: "#/components/schemas/Podcast" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /podcasts/{podcastId}/refresh:
+    parameters:
+      - $ref: "#/components/parameters/podcastId"
+    post:
+      tags: [podcasts]
+      operationId: refreshPodcast
+      summary: Relire le flux maintenant (template `refresh`)
+      description: Un échec n'est pas une erreur HTTP ; il se lit dans `refreshStatus`.
+      responses:
+        "200":
+          description: Podcast après la lecture du flux
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Podcast" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Podcast" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /podcasts/{podcastId}/episodes:
@@ -249,6 +340,28 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /episodes/{episodeId}/kept:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [épisodes]
+      operationId: keepEpisode
+      summary: Garder l'épisode (template `keep`) ; son fichier sur le serveur n'est jamais purgé
+      responses:
+        "204": { description: Épisode gardé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [épisodes]
+      operationId: unkeepEpisode
+      summary: Ne plus garder l'épisode (template `unkeep`)
+      responses:
+        "204": { description: Épisode plus gardé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /episodes/{episodeId}/audio:
     parameters:
       - $ref: "#/components/parameters/episodeId"
@@ -332,6 +445,16 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    FeedRejected:
+      description: |
+        Le flux est refusé. `type` en donne la raison :
+        `/problems/invalid-feed-url` (adresse invalide ou non http(s)),
+        `/problems/forbidden-feed-address` (réseau privé, protection SSRF),
+        `/problems/feed-unreachable`, `/problems/not-a-feed` (pas un flux RSS),
+        `/problems/feed-too-large`. Un champ `feedUrl` vide donne un 422 sans `type` particulier.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     ValidationError:
       description: Corps de requête invalide
       content:
@@ -345,6 +468,8 @@ components:
       properties:
         href: { type: string }
         templated: { type: boolean }
+        type: { type: string, description: Type de la ressource liée (transcriptions, chapitres). }
+        hreflang: { type: string }
       additionalProperties: false
 
     Template:
@@ -510,15 +635,23 @@ components:
             episodes: { $ref: "#/components/schemas/Link" }
             feed: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            refresh: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
       additionalProperties: false
 
     Subscription:
       type: object
-      required: [id, note, subscribedAt, _links, _embedded]
+      required: [id, note, subscribedAt, autoDownload, _links, _embedded]
       properties:
         id: { type: string }
         note: { type: [string, "null"], description: Annotation de l'utilisateur }
         subscribedAt: { type: string, format: date-time }
+        autoDownload:
+          type: boolean
+          description: Le serveur télécharge les nouveaux épisodes de ce podcast pour cet utilisateur.
         _links:
           type: object
           required: [self, podcast]
@@ -531,6 +664,12 @@ components:
           required: [podcast]
           properties:
             podcast: { $ref: "#/components/schemas/Podcast" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            update: { $ref: "#/components/schemas/Template" }
+            unsubscribe: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 
@@ -553,6 +692,25 @@ components:
               type: array
               items: { $ref: "#/components/schemas/Subscription" }
           additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            subscribe: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    SubscriptionRequest:
+      type: object
+      required: [feedUrl]
+      properties:
+        feedUrl: { type: string, description: "Adresse du flux RSS ; `https://` est ajouté s'il manque." }
+      additionalProperties: false
+
+    SubscriptionUpdate:
+      type: object
+      properties:
+        note: { type: [string, "null"], maxLength: 2000 }
+        autoDownload: { type: boolean }
       additionalProperties: false
 
     EpisodeStatus:
@@ -593,6 +751,13 @@ components:
             self: { $ref: "#/components/schemas/Link" }
             podcast: { $ref: "#/components/schemas/Link" }
             audio: { $ref: "#/components/schemas/Link" }
+            chapters:
+              description: "Podcast 2.0 : chapitres annoncés par le flux (JSON Chapters)."
+              $ref: "#/components/schemas/Link"
+            transcript:
+              description: "Podcast 2.0 : transcriptions annoncées par le flux, une par format ou par langue."
+              type: array
+              items: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
         _embedded:
           type: object
@@ -601,12 +766,16 @@ components:
             podcast: { $ref: "#/components/schemas/Podcast" }
           additionalProperties: false
         _templates:
-          description: "Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté, `mark-unplayed` s'il n'est pas nouveau."
+          description: |
+            Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté,
+            `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`.
           type: object
           properties:
             update-progress: { $ref: "#/components/schemas/Template" }
             mark-played: { $ref: "#/components/schemas/Template" }
             mark-unplayed: { $ref: "#/components/schemas/Template" }
+            keep: { $ref: "#/components/schemas/Template" }
+            unkeep: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 

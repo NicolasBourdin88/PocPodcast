@@ -1,6 +1,5 @@
 package fr.podcast.server
 
-import fr.podcast.server.dev.DevSeed
 import fr.podcast.shared.account.AccountService
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.home.LoadHomeState
@@ -24,7 +23,7 @@ class SdkTest {
         podcastServer()
         val accounts = AccountService(client, deviceName = "SDK test")
 
-        val account = accounts.signIn("http://localhost", DevSeed.ALICE, DevSeed.ALICE_PASSWORD)
+        val account = accounts.signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
         assertEquals("Podcast (test)", account.serverName)
         assertEquals("Alice", account.displayName)
 
@@ -54,7 +53,7 @@ class SdkTest {
         podcastServer()
 
         assertFailsWith<ApiException.Unauthorized> {
-            AccountService(client, "SDK test").signIn("http://localhost", DevSeed.ALICE, "wrong")
+            AccountService(client, "SDK test").signIn("http://localhost", TestSeed.ALICE, "wrong")
         }
     }
 }

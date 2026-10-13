@@ -1,17 +1,100 @@
+-- Podcasts (shared catalog) and how the server reads their feeds.
+
 insertPodcast:
 INSERT INTO podcasts(feed_url, title, author, description, artwork_url, website_url)
 VALUES (:feedUrl, :title, :author, :description, :artworkUrl, :websiteUrl)
 RETURNING id;
 
+-- From OPML: only the title is known until the feed is read.
+insertPendingPodcast:
+INSERT INTO podcasts(feed_url, title)
+VALUES (:feedUrl, :title)
+ON CONFLICT (feed_url) DO NOTHING
+RETURNING id;
+
+podcastIdByFeedUrl:
+SELECT id FROM podcasts WHERE feed_url = :feedUrl;
+
+-- Same column list for every podcast query, so one mapper builds a Podcast.
 podcastById:
-SELECT id, title, author, feed_url, artwork_url, description
+SELECT id, title, author, feed_url, artwork_url, description, website_url, language, refresh_status, last_refreshed_at
 FROM podcasts
 WHERE id = :id;
+
+podcastFeed:
+SELECT id, feed_url, refresh_status, http_etag, http_last_modified
+FROM podcasts
+WHERE id = :id;
+
+-- Podcasts with subscribers whose feed was not read since :before (failed ones wait too).
+podcastsDueForRefresh:
+SELECT p.id
+FROM podcasts p
+WHERE EXISTS (SELECT 1 FROM subscriptions s WHERE s.podcast_id = p.id)
+  AND (p.last_attempt_at IS NULL OR p.last_attempt_at < :before)
+ORDER BY p.last_attempt_at NULLS FIRST, p.id
+LIMIT :limit;
+
+updatePodcastFromFeed:
+UPDATE podcasts
+SET title = :title, author = :author, description = :description, artwork_url = :artworkUrl,
+    website_url = :websiteUrl, language = :language, http_etag = :etag, http_last_modified = :lastModified,
+    refresh_status = 'OK', refresh_error = NULL, last_refreshed_at = now(), last_attempt_at = now()
+WHERE id = :id;
+
+markPodcastUnchanged:
+UPDATE podcasts
+SET refresh_status = 'OK', refresh_error = NULL, last_refreshed_at = now(), last_attempt_at = now()
+WHERE id = :id;
+
+markPodcastFailed:
+UPDATE podcasts
+SET refresh_status = 'FAILED', refresh_error = :error, last_attempt_at = now()
+WHERE id = :id;
+
+-- Follows a permanent redirect, unless another podcast already has that address.
+moveFeed:
+UPDATE podcasts
+SET feed_url = :newUrl
+WHERE id = :id AND NOT EXISTS (SELECT 1 FROM podcasts other WHERE other.feed_url = :newUrl);
+
+deletePodcast:
+DELETE FROM podcasts WHERE id = :id;
+
+-- Episodes, inserted or updated by guid when a feed is read.
+
+episodeGuids:
+SELECT guid FROM episodes WHERE podcast_id = :podcastId;
+
+upsertEpisode:
+INSERT INTO episodes(podcast_id, guid, title, description, published_at, duration_seconds, audio_url, audio_type, audio_length, chapters_url, chapters_type)
+VALUES (:podcastId, :guid, :title, :description, :publishedAt, :durationSeconds, :audioUrl, :audioType, :audioLength, :chaptersUrl, :chaptersType)
+ON CONFLICT (podcast_id, guid) DO UPDATE
+SET title = excluded.title, description = excluded.description,
+    -- Without a readable date, the episode keeps the date it got when first seen.
+    published_at = CASE WHEN :dateKnown THEN excluded.published_at ELSE episodes.published_at END,
+    duration_seconds = excluded.duration_seconds, audio_url = excluded.audio_url, audio_type = excluded.audio_type,
+    audio_length = excluded.audio_length, chapters_url = excluded.chapters_url, chapters_type = excluded.chapters_type
+RETURNING id;
 
 insertEpisode:
 INSERT INTO episodes(podcast_id, guid, title, description, published_at, duration_seconds, audio_url)
 VALUES (:podcastId, :guid, :title, :description, :publishedAt, :durationSeconds, :audioUrl)
 RETURNING id;
+
+deleteTranscripts:
+DELETE FROM episode_transcripts WHERE episode_id = :episodeId;
+
+insertTranscript:
+INSERT INTO episode_transcripts(episode_id, url, type, language, position)
+VALUES (:episodeId, :url, :type, :language, :position)
+ON CONFLICT DO NOTHING;
+
+transcriptsOf:
+SELECT episode_id, url, type, language
+FROM episode_transcripts
+WHERE episode_id IN :episodeIds
+ORDER BY episode_id, position;
 
 episodeAudio:
 SELECT audio_url FROM episodes WHERE id = :id;
@@ -22,23 +105,49 @@ SELECT duration_seconds FROM episodes WHERE id = :id;
 countPodcastEpisodes:
 SELECT count(*) FROM episodes WHERE podcast_id = :podcastId;
 
+-- Subscriptions (per user).
+
 insertSubscription:
 INSERT INTO subscriptions(user_id, podcast_id, note)
 VALUES (:userId, :podcastId, :note)
 RETURNING id;
 
--- Same column list for both queries, so one mapper builds a Subscription.
+subscriptionIdFor:
+SELECT id FROM subscriptions WHERE user_id = :userId AND podcast_id = :podcastId;
+
+updateSubscription:
+UPDATE subscriptions
+SET note = :note, auto_download = :autoDownload
+WHERE id = :id AND user_id = :userId;
+
+deleteSubscription:
+DELETE FROM subscriptions
+WHERE id = :id AND user_id = :userId
+RETURNING podcast_id;
+
+countSubscribers:
+SELECT count(*) FROM subscriptions WHERE podcast_id = :podcastId;
+
+-- Same column list for both queries, so one mapper builds a subscription with its podcast.
 subscriptionsOfUser:
-SELECT s.id, s.note, s.subscribed_at,
-       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description
+SELECT s.id, s.note, s.subscribed_at, s.auto_download,
+       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description,
+       p.website_url, p.language, p.refresh_status, p.last_refreshed_at
 FROM subscriptions s
 JOIN podcasts p ON p.id = s.podcast_id
 WHERE s.user_id = :userId
 ORDER BY lower(p.title), p.id;
 
 subscriptionOfUser:
-SELECT s.id, s.note, s.subscribed_at,
-       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description
+SELECT s.id, s.note, s.subscribed_at, s.auto_download,
+       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description,
+       p.website_url, p.language, p.refresh_status, p.last_refreshed_at
 FROM subscriptions s
 JOIN podcasts p ON p.id = s.podcast_id
 WHERE s.user_id = :userId AND s.id = :id;
+
+subscribedFeedUrls:
+SELECT p.feed_url
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id
+WHERE s.user_id = :userId;

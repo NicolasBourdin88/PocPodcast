@@ -1,0 +1,60 @@
+-- Étape 4 : abonnements (ajout par URL, OPML, annotation), lecture périodique des flux,
+-- Podcast 2.0, téléchargements mutualisés et purge. Voir docs/api/modele-de-donnees.md et l'ADR 0007.
+
+-- How the server reads each feed.
+ALTER TABLE podcasts ADD COLUMN language TEXT;
+ALTER TABLE podcasts ADD COLUMN refresh_status TEXT NOT NULL DEFAULT 'PENDING';
+ALTER TABLE podcasts ADD CONSTRAINT podcasts_refresh_status_check CHECK (refresh_status IN ('PENDING', 'OK', 'FAILED'));
+ALTER TABLE podcasts ADD COLUMN refresh_error TEXT;
+ALTER TABLE podcasts ADD COLUMN last_attempt_at TIMESTAMPTZ;
+ALTER TABLE podcasts ADD COLUMN http_etag TEXT;
+ALTER TABLE podcasts ADD COLUMN http_last_modified TEXT;
+
+-- Audio details and Podcast 2.0 chapters.
+ALTER TABLE episodes ADD COLUMN audio_type TEXT;
+ALTER TABLE episodes ADD COLUMN audio_length BIGINT;
+ALTER TABLE episodes ADD COLUMN chapters_url TEXT;
+ALTER TABLE episodes ADD COLUMN chapters_type TEXT;
+
+-- Podcast 2.0 transcripts (several formats or languages per episode).
+CREATE TABLE episode_transcripts (
+    episode_id BIGINT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    type TEXT NOT NULL,
+    language TEXT,
+    -- Order of the feed: the publisher's preferred format first.
+    position INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (episode_id, url)
+);
+
+-- The user asks the server to download new episodes of this podcast.
+ALTER TABLE subscriptions ADD COLUMN auto_download BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Kept episodes are never purged; marking an episode unplayed now keeps this row.
+ALTER TABLE playback_states ADD COLUMN kept BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Audio files downloaded by the server, shared by every user.
+CREATE TABLE media_files (
+    episode_id BIGINT PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('PENDING', 'DOWNLOADING', 'READY', 'FAILED')),
+    storage_path TEXT,
+    size_bytes BIGINT,
+    mime_type TEXT,
+    error TEXT,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    downloaded_at TIMESTAMPTZ
+);
+
+-- The view now carries what the API exposes about an episode and its podcast.
+DROP VIEW episode_details;
+
+CREATE VIEW episode_details AS
+SELECT e.id, e.podcast_id, e.title, e.description, e.published_at, e.duration_seconds, e.audio_url,
+       e.chapters_url, e.chapters_type, COALESCE(f.status, 'NONE') AS file_status,
+       p.title AS podcast_title, p.author AS podcast_author, p.description AS podcast_description,
+       p.feed_url AS podcast_feed_url, p.artwork_url AS podcast_artwork_url, p.website_url AS podcast_website_url,
+       p.language AS podcast_language, p.refresh_status AS podcast_refresh_status,
+       p.last_refreshed_at AS podcast_refreshed_at
+FROM episodes e
+JOIN podcasts p ON p.id = e.podcast_id
+LEFT JOIN media_files f ON f.episode_id = e.id;

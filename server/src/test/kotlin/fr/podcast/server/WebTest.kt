@@ -1,6 +1,5 @@
 package fr.podcast.server
 
-import fr.podcast.server.dev.DevSeed
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -29,7 +28,7 @@ class WebTest {
 
     private suspend fun io.ktor.client.HttpClient.login(language: String = "fr") = submitForm(
         "/login",
-        parameters { append("username", DevSeed.ALICE); append("password", DevSeed.ALICE_PASSWORD) },
+        parameters { append("username", TestSeed.ALICE); append("password", TestSeed.ALICE_PASSWORD) },
     ) { header(HttpHeaders.AcceptLanguage, language) }
 
     @Test

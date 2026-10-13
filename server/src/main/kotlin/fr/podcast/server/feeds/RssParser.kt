@@ -31,7 +31,8 @@ data class ParsedItem(
     val guid: String,
     val title: String,
     val description: String,
-    val publishedAt: Instant,
+    /** Null when the feed gives no readable date. */
+    val publishedAt: Instant?,
     val durationSeconds: Int,
     val audioUrl: String,
     val audioType: String?,
@@ -61,11 +62,11 @@ object RssParser {
     }
 
     /** @throws FeedException.NotAFeed if the document is not an RSS feed. */
-    fun parse(input: InputStream, fetchedAt: Instant = Instant.fromEpochMilliseconds(System.currentTimeMillis())): ParsedFeed =
+    fun parse(input: InputStream): ParsedFeed =
         try {
             val reader = factory.createXMLStreamReader(input)
             try {
-                ChannelReader(reader, fetchedAt).read()
+                ChannelReader(reader).read()
             } finally {
                 reader.close()
             }
@@ -73,7 +74,7 @@ object RssParser {
             throw FeedException.NotAFeed("Malformed XML: ${malformed.message}")
         }
 
-    private class ChannelReader(private val reader: XMLStreamReader, private val fetchedAt: Instant) {
+    private class ChannelReader(private val reader: XMLStreamReader) {
         private var title: String? = null
         private var author = ""
         private var description = ""
@@ -193,7 +194,7 @@ object RssParser {
                 guid = guid ?: audio,
                 title = itemTitle.ifBlank { link ?: audio },
                 description = htmlToText(content.ifBlank { itemDescription }.ifBlank { itemSummary }),
-                publishedAt = published ?: fetchedAt,
+                publishedAt = published,
                 durationSeconds = duration,
                 audioUrl = audio,
                 audioType = audioType,

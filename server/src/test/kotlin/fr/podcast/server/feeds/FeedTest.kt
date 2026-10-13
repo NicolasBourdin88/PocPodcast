@@ -23,7 +23,7 @@ class FeedTest {
 
     @Test
     fun rssWithItunesAndPodcast20IsRead() {
-        val feed = RssParser.parse(fixture("podcast20.xml"), fetchedAt = Instant.parse("2026-10-13T00:00:00Z"))
+        val feed = RssParser.parse(fixture("podcast20.xml"))
 
         assertEquals("Le Podcast de Test", feed.title)
         assertEquals("Équipe Test", feed.author)
@@ -55,7 +55,7 @@ class FeedTest {
         assertEquals("Sans guid : l'URL du fichier sert d'identifiant.", second.description)
 
         val first = feed.items[2]
-        assertEquals(Instant.parse("2026-10-13T00:00:00Z"), first.publishedAt) // unreadable date: fetch time
+        assertNull(first.publishedAt) // unreadable date
         assertEquals(2700, first.durationSeconds)
         assertNull(first.audioLength)
     }

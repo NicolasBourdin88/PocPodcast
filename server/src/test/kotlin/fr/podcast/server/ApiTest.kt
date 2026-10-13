@@ -1,6 +1,5 @@
 package fr.podcast.server
 
-import fr.podcast.server.dev.DevSeed
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -47,7 +46,7 @@ class ApiTest {
         podcastServer()
 
         val alice = client.getJson("/", client.token())
-        val bob = client.getJson("/", client.token(DevSeed.BOB, DevSeed.BOB_PASSWORD))
+        val bob = client.getJson("/", client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD))
 
         fun firstResumed(root: kotlinx.serialization.json.JsonObject) =
             root["_embedded"]!!.jsonObject["resume"]!!.jsonArray.first().jsonObject["title"]!!.jsonPrimitive.content
@@ -81,13 +80,13 @@ class ApiTest {
         val token = client.token()
 
         val fresh = client.getJson("/episodes/1", token)["_templates"]!!.jsonObject
-        assertEquals(setOf("update-progress", "mark-played"), fresh.keys)
+        assertEquals(setOf("update-progress", "mark-played", "keep"), fresh.keys)
 
         assertEquals(HttpStatusCode.NoContent, client.post("/episodes/1/played") { bearerAuth(token) }.status)
 
         val played = client.getJson("/episodes/1", token)
         assertEquals("PLAYED", played["status"]!!.jsonPrimitive.content)
-        assertEquals(setOf("update-progress", "mark-unplayed"), played["_templates"]!!.jsonObject.keys)
+        assertEquals(setOf("update-progress", "mark-unplayed", "keep"), played["_templates"]!!.jsonObject.keys)
 
         // Plain HAL has no actions.
         assertNull(client.getJson("/episodes/1", token, accept = ContentType("application", "hal+json"))["_templates"])
@@ -121,7 +120,7 @@ class ApiTest {
     fun listeningStateIsPerUser() = testApplication {
         podcastServer()
         val alice = client.token()
-        val bob = client.token(DevSeed.BOB, DevSeed.BOB_PASSWORD)
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
 
         client.post("/episodes/1/played") { bearerAuth(alice) }
 
@@ -144,7 +143,7 @@ class ApiTest {
         assertEquals(2, inProgress["total"]!!.jsonPrimitive.int)
 
         // Bob only sees the episodes of his two subscriptions.
-        assertEquals(5, client.getJson("/episodes", client.token(DevSeed.BOB, DevSeed.BOB_PASSWORD))["total"]!!.jsonPrimitive.int)
+        assertEquals(5, client.getJson("/episodes", client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD))["total"]!!.jsonPrimitive.int)
 
         assertEquals(HttpStatusCode.BadRequest, client.get("/episodes?limit=1000") { bearerAuth(token) }.status)
         assertEquals(HttpStatusCode.BadRequest, client.get("/episodes?status=LATER") { bearerAuth(token) }.status)

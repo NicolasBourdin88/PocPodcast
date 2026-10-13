@@ -3,7 +3,6 @@ package fr.podcast.server
 import com.networknt.schema.SchemaLocation
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.dialect.Dialects
-import fr.podcast.server.dev.DevSeed
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
@@ -118,13 +117,14 @@ class ContractTest {
         val post = HttpMethod.Post
         val put = HttpMethod.Put
         val delete = HttpMethod.Delete
+        val patch = HttpMethod.Patch
 
         check(get, "/", "/", HttpStatusCode.OK, token = null)
         check(get, "/", "/", HttpStatusCode.OK)
         check(get, "/", "/", HttpStatusCode.OK, accept = ContentType("application", "hal+json"))
 
         check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Created, token = null,
-            body = """{"username":"${DevSeed.BOB}","password":"${DevSeed.BOB_PASSWORD}","deviceName":"contract"}""")
+            body = """{"username":"${TestSeed.BOB}","password":"${TestSeed.BOB_PASSWORD}","deviceName":"contract"}""")
         check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Unauthorized, token = null,
             body = """{"username":"bob","password":"wrong","deviceName":"contract"}""")
         check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.UnprocessableEntity, token = null, body = """{"username":"bob"}""")
@@ -156,6 +156,22 @@ class ContractTest {
         check(post, "/episodes/999/played", "/episodes/{episodeId}/played", HttpStatusCode.NotFound)
         check(delete, "/episodes/3/played", "/episodes/{episodeId}/played", HttpStatusCode.NoContent)
         check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.Found, http = noRedirects)
+        check(put, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)
+        check(put, "/episodes/999/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NotFound)
+        check(delete, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)
+
+        check(post, "/subscriptions", "/subscriptions", HttpStatusCode.Created, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")
+        check(post, "/subscriptions", "/subscriptions", HttpStatusCode.OK, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")
+        check(post, "/subscriptions", "/subscriptions", HttpStatusCode.UnprocessableEntity, body = """{"feedUrl":"https://feeds.test/not-a-feed.html"}""")
+        check(get, "/subscriptions", "/subscriptions", HttpStatusCode.OK) // with the Podcast 2.0 feed
+        check(get, "/podcasts/5/episodes", "/podcasts/{podcastId}/episodes", HttpStatusCode.OK) // chapters, transcripts
+        check(patch, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.OK, body = """{"note":"Le jeudi","autoDownload":true}""")
+        check(patch, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.UnprocessableEntity, body = """{"autoDownload":"maybe"}""")
+        check(patch, "/subscriptions/999", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound, body = """{"note":null}""")
+        check(post, "/podcasts/5/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.OK)
+        check(post, "/podcasts/999/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.NotFound)
+        check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NoContent)
+        check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
 
         val missing = documented - exercised
         assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")
