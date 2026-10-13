@@ -1,0 +1,49 @@
+# CLAUDE.md — contexte du projet
+
+Fichier lu automatiquement par Claude Code. Il résume les décisions prises lors de la phase de cadrage (conversation claude.ai d'octobre 2026). Le plan par étapes est dans `plan.md`.
+
+## Le projet
+
+Projet de master en groupe mixte apprentis / non-apprentis, octobre → mars : un **système de gestion et d'écoute de podcasts** inspiré de PinePods. Un service multi-utilisateurs + plusieurs clients compatibles entre eux et avec des clients tiers (AntennaPod, Kasts, gPodder).
+
+Fonctionnalités imposées par le sujet : abonnements (URL, recherche Podcast Index, OPML import/export, annotation, mise à jour auto, téléchargement local avec purge auto), lecture (playlists statiques et dynamiques — mots-clés, favoris/notes, aléatoire —, partage, synchro de l'état, stats, notation/favoris), fiches podcast/épisode avec recherche multicritère, multi-utilisateurs avec partage et droits (épisodes, playlists, abonnements), fichiers mutualisés mais état de lecture par utilisateur.
+
+Architecture imposée : client léger, client mobile **multiserveur**, client riche, client TUI/CLI, service, **API hypermédia**.
+
+## Décisions d'architecture
+
+- **Kotlin partout.** La valeur de KMP ici est de partager le *contrat* (modèles, client d'API, règles) entre serveur et clients, pas seulement l'UI.
+- `:shared` (KMP : JVM, Android, iOS) : modèles, `PodcastRepository`, états d'écran (`LoadHomeState`). Toute modification de modèle passe par ce module.
+- `:server` : **Ktor**. Une seule API hypermédia, deux représentations selon `Accept` : **HAL JSON** pour les clients riches, **HTML** pour le client léger.
+- **Client léger = HTML rendu côté serveur + htmx**, pas Compose Wasm (Compose Web est en bêta, et le CORS empêche de lire les flux RSS depuis le navigateur).
+- `:composeApp` : **Compose Multiplatform** pour mobile (Android, iOS) et client riche (desktop JVM, y compris macOS). UI **responsive par taille de fenêtre, pas par plateforme**.
+- `:cli` : **Clikt** pour les commandes, **Mosaic** (runtime Compose dans le terminal) pour la TUI.
+- Interop : **API gPodder** en priorité (synchro de l'état de lecture avec AntennaPod), **Open Podcast API** pour les abonnements (sa spec cœur ne couvre encore que ça), **flux RSS par playlist** (enclosures vers les fichiers hébergés), OPML.
+- Lecture audio : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop).
+- **SwiftUI / Liquid Glass** : hors socle, objectif bonus. Liquid Glass n'est obtenu que via des composants natifs (TabView, NavigationStack, toolbars) ; Compose dessine avec Skia et ne peut que l'imiter. Une coque SwiftUI autour des écrans Compose ne marche que sur iOS (pas de Compose natif macOS). Option retenue pour plus tard : un client SwiftUI (iOS + macOS) branché sur le même SDK KMP, avec SKIE pour l'interop Flow/suspend.
+
+## Responsive (repris des wireframes)
+
+| Classe | Condition | Navigation | Contenu |
+|---|---|---|---|
+| Compact | largeur < 600 dp | barre du bas + mini-lecteur | une colonne |
+| Hauteur compacte | hauteur < 480 dp (téléphone paysage) | rail à gauche | deux colonnes, mini-lecteur sur une ligne |
+| Moyen | 600–839 dp | rail | une colonne large (à maquetter) |
+| Étendu | 840–1199 dp | rail | liste/détail + file d'attente |
+| Large | ≥ 1200 dp | tiroir permanent avec abonnements | liste + panneau latéral + lecteur en bas |
+
+Écrans prévus : Accueil (reprendre l'écoute + nouveaux épisodes), Explorer (recherche multi-sources + ajout URL RSS), Fiche podcast, Fiche épisode (notes / chapitres / transcription), Lecteur plein écran, Bibliothèque, Réglages (comptes/serveurs, OPML), Onboarding. Wireframes sur un canvas claude.ai (« Wireframes appli podcast »), refaits proprement sur Figma. Pas encore de design system.
+
+## État actuel et façon de travailler
+
+Le code n'est pas encore commencé. Le travail suit les étapes de `plan.md`, dans l'ordre. **Première étape : le POC d'architecture** (étape 1) — chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend.
+
+- Avant de coder une étape, relire sa section dans `plan.md` et cocher les cases au fur et à mesure.
+- Utiliser les versions les plus récentes des dépendances (Kotlin, Compose Multiplatform, Ktor, Clikt, Mosaic) et les vérifier plutôt que de les supposer ; l'API de Mosaic a changé plusieurs fois.
+- Une étape est terminée quand sa « définition de terminé » est vérifiée.
+
+## Conventions
+
+- Code en anglais, documentation en français.
+- Décisions importantes dans `docs/adr/`.
+- Ne pas faire dépendre `:shared` d'une plateforme ; le code spécifique passe par `expect/actual` ou par des interfaces injectées.
