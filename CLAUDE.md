@@ -39,7 +39,7 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 
 ## État actuel et façon de travailler
 
-Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'architecture) faite** : chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend. Il reste seulement à créer le dépôt GitHub et à protéger `main`. Étape 2 : études 1, 5 et 6 tranchées (ADR 0003 à 0005, POC dans `poc/`) ; études 2, 3 et 4 confiées au groupe avec des fiches de cadrage dans `docs/etudes/`. Prochaine étape : le contrat (étape 3). Les commandes de lancement sont dans `README.md`.
+Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'architecture) faite** : chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend. Il reste seulement à créer le dépôt GitHub et à protéger `main`. Étape 2 : études 1, 5 et 6 tranchées (ADR 0003 à 0005, POC dans `poc/`) ; études 2, 3 et 4 confiées au groupe avec des fiches de cadrage dans `docs/etudes/`. **Étape 3 (contrat) faite** : spécification OpenAPI, serveur sur PostgreSQL avec authentification, SDK avec comptes multiserveurs (ADR 0006), clients branchés sur le serveur. Prochaine étape : les abonnements (étape 4). Les commandes de lancement sont dans `README.md`.
 
 - Avant de coder une étape, relire sa section dans `plan.md` et cocher les cases au fur et à mesure.
 - Utiliser les versions les plus récentes des dépendances (Kotlin, Compose Multiplatform, Ktor, Clikt, Mosaic) et les vérifier plutôt que de les supposer ; l'API de Mosaic a changé plusieurs fois.
@@ -52,4 +52,7 @@ Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'archit
 - Ne pas faire dépendre `:shared` d'une plateforme ; le code spécifique passe par `expect/actual` ou par des interfaces injectées.
 - Package racine `fr.podcast` (provisoire tant que le projet n'a pas de nom).
 - Commits logiques et petits, au format Conventional Commits (`feat(module): …`, `build: …`, `docs: …`) ; chaque commit doit compiler.
-- `:composeApp:desktopTest` rend l'Accueil à chaque taille de fenêtre dans `composeApp/build/snapshots/` : à regarder après toute modification d'UI.
+- `:composeApp:desktopTest` rend les écrans à chaque taille de fenêtre et dans chaque langue dans `composeApp/build/snapshots/` : à regarder après toute modification d'UI.
+- **API : spécification d'abord.** Toute ressource, tout lien ou template nouveau passe par `podcast-api.yaml` ; `ContractTest` échoue si la spécification et les routes divergent. Les clients ne construisent pas d'URL : ils suivent les liens de la racine (ADR 0006).
+- Serveur en développement : `./gradlew :server:run` (PostgreSQL embarqué, données de démo et comptes dans `DevSeed.kt`, source set `dev` hors distribution). Les tests serveur utilisent aussi un PostgreSQL embarqué : ni Docker ni installation.
+- SQLDelight : une requête avec `RETURNING` n'est exécutée qu'avec `executeAsOne()` ; un paramètre nullable comparé par `=` devient `IS ?`, que PostgreSQL refuse (utiliser un indicateur booléen).

@@ -134,10 +134,21 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 3 — Contrat
 
-- [ ] Spécification de l'API (OpenAPI + conventions hypermédia retenues à l'étape 2).
-- [ ] Modèle de données : utilisateurs, podcasts, épisodes, fichiers (mutualisés), états de lecture (par utilisateur), playlists, droits.
-- [ ] PostgreSQL + migrations ; remplacer `FakePodcastRepository` côté serveur par une implémentation en base.
-- [ ] `RemotePodcastRepository` dans `:shared` (Ktor Client) avec une notion de **compte** (URL du serveur + jeton) pour le multiserveur.
+- [x] Spécification de l'API (OpenAPI + conventions hypermédia retenues à l'étape 2). → `server/src/main/resources/openapi/podcast-api.yaml` (servie sur `/docs`), `docs/api/conventions.md`.
+- [x] Modèle de données : utilisateurs, podcasts, épisodes, fichiers (mutualisés), états de lecture (par utilisateur), playlists, droits. → `docs/api/modele-de-donnees.md` ; les tables arrivent avec l'étape qui les utilise.
+- [x] PostgreSQL + migrations ; remplacer `FakePodcastRepository` côté serveur par une implémentation en base. → Flyway + SQLDelight (`UserCatalog`), authentification (ADR 0005), client léger avec connexion.
+- [x] `RemotePodcastRepository` dans `:shared` (Ktor Client) avec une notion de **compte** (URL du serveur + jeton) pour le multiserveur. → ADR 0006 ; branché dans les apps Compose et le CLI.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| C1 | La spécification et le serveur correspondent dans les deux sens, chaque réponse respecte son schéma | `./gradlew :server:test` (`ContractTest`) |
+| C2 | Le SDK de `:shared` fonctionne contre le vrai serveur (connexion, Accueil, actions HAL-FORMS, déconnexion) | `./gradlew :server:test` (`SdkTest`) |
+| C3 | Le serveur démarre sur PostgreSQL avec les données de démo, documentation sur `/docs` | `./gradlew :server:run` |
+| C4 | Client léger : connexion, Accueil de l'utilisateur, action htmx « Marquer comme écouté » | http://localhost:8080 |
+| C5 | Apps (Android, iOS, desktop) : connexion, Accueil chargé du serveur, deux comptes sur deux serveurs | voir `README.md` |
+| C6 | CLI : `login`, `accounts`, `use`, `list`, `tui` sur deux serveurs | `podcast login` |
 
 ## Étape 4 — Abonnements
 
