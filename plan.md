@@ -121,14 +121,14 @@ Et : le même objet `Episode` de `:shared` est visible dans les 5 rendus, le REA
 
 ## Étape 2 — Études techniques (non-apprentis, en parallèle de l'étape 1)
 
-Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, critères, POC jetable, décision.
+Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, critères, POC jetable (dans `poc/`), décision. Suivi et fiches de cadrage : `docs/etudes/`.
 
-1. **Format hypermédia** : HAL vs Siren vs JSON:API. Critère clé : peut-on décrire des *actions* (formulaires) et pas seulement des liens ?
-2. **Synchronisation avec clients tiers** : gPodder API vs Open Podcast API, avec un vrai AntennaPod branché sur un serveur minimal. Attention : le cœur de la spec Open Podcast API ne couvre pour l'instant que les abonnements.
-3. **Lecture audio multiplateforme** : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop) ; lecture en arrière-plan et contrôles système.
-4. **Client léger** : htmx + kotlinx.html vs Compose Wasm (poids, temps de chargement, effort).
-5. **Persistance** : Exposed vs SQLDelight côté serveur ; SQLDelight / Room KMP côté client pour le hors-ligne.
-6. **Authentification et droits** : sessions (client léger) + jetons (clients riches, multiserveur) ; modèle de partage lecture / modification.
+1. [x] **Format hypermédia** : HAL vs Siren vs JSON:API. Critère clé : peut-on décrire des *actions* (formulaires) et pas seulement des liens ? → **HAL + HAL-FORMS** (ADR 0003).
+2. [ ] **Synchronisation avec clients tiers** : gPodder API vs Open Podcast API, avec un vrai AntennaPod branché sur un serveur minimal. Attention : le cœur de la spec Open Podcast API ne couvre pour l'instant que les abonnements. → fiche `docs/etudes/02-…`.
+3. [ ] **Lecture audio multiplateforme** : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop) ; lecture en arrière-plan et contrôles système. → fiche `docs/etudes/03-…`.
+4. [ ] **Client léger** : htmx + kotlinx.html vs Compose Wasm (poids, temps de chargement, effort). → fiche `docs/etudes/04-…` (htmx déjà en place, à confirmer par des mesures).
+5. [x] **Persistance** : Exposed vs SQLDelight côté serveur ; SQLDelight / Room KMP côté client pour le hors-ligne. → **PostgreSQL + Flyway + SQLDelight**, SQLDelight aussi côté client (ADR 0004).
+6. [x] **Authentification et droits** : sessions (client léger) + jetons (clients riches, multiserveur) ; modèle de partage lecture / modification. → **Argon2id, cookie de session, jetons opaques par appareil, Basic + mots de passe d'application pour gPodder, partages READ/WRITE** (ADR 0005).
 
 ---
 

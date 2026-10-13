@@ -15,7 +15,9 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 - **Kotlin partout.** La valeur de KMP ici est de partager le *contrat* (modèles, client d'API, règles) entre serveur et clients, pas seulement l'UI.
 - `:shared` (KMP : JVM, Android, iOS) : modèles, `PodcastRepository`, états d'écran (`LoadHomeState`). Toute modification de modèle passe par ce module.
 - **Chaînes et ressources communes dans `:shared`** (ADR 0002) : catalogue `Strings` français/anglais, `DesignTokens` (couleurs, palette des pochettes), `Destination` (navigation). Aucun texte visible en dur dans les clients ; un nouveau texte = un membre de `Strings`.
-- `:server` : **Ktor**. Une seule API hypermédia, deux représentations selon `Accept` : **HAL JSON** pour les clients riches, **HTML** pour le client léger.
+- `:server` : **Ktor**. Une seule API hypermédia, deux représentations selon `Accept` : **HAL JSON** pour les clients riches, **HTML** pour le client léger. Les actions sont décrites en **HAL-FORMS** (`_templates` nommés) à partir d'un seul modèle `Affordance`, aussi rendu en formulaires htmx (ADR 0003).
+- Persistance : **PostgreSQL + Flyway + SQLDelight** (dialecte PostgreSQL, schéma dérivé des migrations `.sqm`) ; SQLDelight/SQLite côté clients pour le hors-ligne ; PostgreSQL embarqué (zonky) dans les tests (ADR 0004).
+- Authentification : Argon2id ; cookie de session pour le client léger ; **jetons opaques par appareil** (Bearer) pour les clients riches et le multiserveur ; Basic + mots de passe d'application pour gPodder ; droits = propriétaire + partages `READ`/`WRITE` via une seule règle `can()`, 404 pour ce qui n'est pas lisible (ADR 0005).
 - **Client léger = HTML rendu côté serveur + htmx**, pas Compose Wasm (Compose Web est en bêta, et le CORS empêche de lire les flux RSS depuis le navigateur).
 - `:composeApp` : **Compose Multiplatform** pour mobile (Android, iOS) et client riche (desktop JVM, y compris macOS). UI **responsive par taille de fenêtre, pas par plateforme**. C'est une bibliothèque KMP ; l'APK est produit par `:androidApp`, car AGP 9 interdit `com.android.application` dans un module KMP (ADR 0001).
 - `:cli` : **Clikt** pour les commandes, **Mosaic** (runtime Compose dans le terminal) pour la TUI.
@@ -37,7 +39,7 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 
 ## État actuel et façon de travailler
 
-Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'architecture) faite** : chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend. Il reste seulement à créer le dépôt GitHub et à protéger `main`. Prochaine étape : les études techniques (étape 2) et le contrat (étape 3). Les commandes de lancement sont dans `README.md`.
+Le travail suit les étapes de `plan.md`, dans l'ordre. **Étape 1 (POC d'architecture) faite** : chaque client affiche l'écran Accueil à partir d'un `FakePodcastRepository` dans `:shared`, sans backend. Il reste seulement à créer le dépôt GitHub et à protéger `main`. Étape 2 : études 1, 5 et 6 tranchées (ADR 0003 à 0005, POC dans `poc/`) ; études 2, 3 et 4 confiées au groupe avec des fiches de cadrage dans `docs/etudes/`. Prochaine étape : le contrat (étape 3). Les commandes de lancement sont dans `README.md`.
 
 - Avant de coder une étape, relire sa section dans `plan.md` et cocher les cases au fur et à mesure.
 - Utiliser les versions les plus récentes des dépendances (Kotlin, Compose Multiplatform, Ktor, Clikt, Mosaic) et les vérifier plutôt que de les supposer ; l'API de Mosaic a changé plusieurs fois.
