@@ -72,7 +72,8 @@ data class HalFormsProperty(val name: String, val required: Boolean, val value: 
  * Variables without a value are left out.
  */
 fun expandUriTemplate(template: String, values: Map<String, Any?>): String =
-    Regex("""\{(\??)([^}]+)}""").replace(template) { match ->
+    // The closing brace must be escaped: Android's regex engine (ICU) rejects a bare "}".
+    Regex("""\{(\??)([^}]+)\}""").replace(template) { match ->
         val (operator, names) = match.destructured
         val variables = names.split(',').map { it.trim() }
         if (operator == "?") {
