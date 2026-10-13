@@ -1,18 +1,13 @@
 package fr.podcast.server.feeds
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.isSuccess
-import io.ktor.http.takeFrom
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.FilterInputStream
@@ -97,62 +92,43 @@ sealed interface FetchResult {
 
 /** Downloads and parses feeds with conditional requests (ETag, Last-Modified). */
 class FeedFetcher(
-    private val client: HttpClient,
-    private val guard: UrlGuard,
+    client: HttpClient,
+    guard: UrlGuard,
     private val maxBytes: Long = 20L * 1024 * 1024,
 ) {
-    suspend fun fetch(url: String, etag: String? = null, lastModified: String? = null): FetchResult {
-        var current = guard.check(url)
-        var redirected = false
-        var onlyPermanentRedirects = true
-        repeat(MAX_REDIRECTS + 1) {
-            val response = request(current, etag, lastModified)
-            val location = response.headers[HttpHeaders.Location]
-            if (response.status.value in 300..399 && response.status != HttpStatusCode.NotModified && location != null) {
-                redirected = true
-                onlyPermanentRedirects = onlyPermanentRedirects && response.status in PERMANENT_REDIRECTS
-                // Every hop is checked: a public URL must not redirect to an internal one.
-                current = guard.check(URLBuilder(current).takeFrom(location).buildString())
-                return@repeat
-            }
-            if (response.status == HttpStatusCode.NotModified) return FetchResult.NotModified
-            if (!response.status.isSuccess()) throw FeedException.Unreachable("HTTP ${response.status.value} for $current")
-            val feed = withContext(Dispatchers.IO) {
-                LimitedInputStream(response.bodyAsChannel().toInputStream(), maxBytes).use { RssParser.parse(it) }
-            }
-            return FetchResult.Fetched(
-                feed = feed,
-                etag = response.headers[HttpHeaders.ETag],
-                lastModified = response.headers[HttpHeaders.LastModified],
-                movedTo = current.toString().takeIf { redirected && onlyPermanentRedirects && it != url },
-            )
-        }
-        throw FeedException.Unreachable("Too many redirects from $url")
-    }
+    private val http = SafeHttp(client, guard)
 
-    private suspend fun request(url: Url, etag: String?, lastModified: String?): HttpResponse =
-        try {
-            client.get(url) {
+    suspend fun fetch(url: String, etag: String? = null, lastModified: String? = null): FetchResult =
+        http.get(
+            url,
+            configure = {
                 header(HttpHeaders.Accept, "application/rss+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5")
-                header(HttpHeaders.UserAgent, USER_AGENT)
+                header(HttpHeaders.UserAgent, SafeHttp.USER_AGENT)
                 etag?.let { header(HttpHeaders.IfNoneMatch, it) }
                 lastModified?.let { header(HttpHeaders.IfModifiedSince, it) }
+            },
+        ) { response, finalUrl, redirects ->
+            when {
+                response.status == HttpStatusCode.NotModified -> FetchResult.NotModified
+                !response.status.isSuccess() -> throw FeedException.Unreachable("HTTP ${response.status.value} for $finalUrl")
+                else -> {
+                    // Streamed: the size limit applies while reading, not after a full download.
+                    val feed = withContext(Dispatchers.IO) {
+                        LimitedInputStream(response.bodyAsChannel().toInputStream(), maxBytes).use { RssParser.parse(it) }
+                    }
+                    FetchResult.Fetched(
+                        feed = feed,
+                        etag = response.headers[HttpHeaders.ETag],
+                        lastModified = response.headers[HttpHeaders.LastModified],
+                        movedTo = finalUrl.toString().takeIf { redirects.followed && redirects.allPermanent && it != url },
+                    )
+                }
             }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (failure: Exception) {
-            throw FeedException.Unreachable("Cannot reach ${url.host}: ${failure.message}", failure)
         }
-
-    companion object {
-        const val MAX_REDIRECTS = 5
-        const val USER_AGENT = "Podcast/0.4 (master project; Ktor)"
-        private val PERMANENT_REDIRECTS = setOf(HttpStatusCode.MovedPermanently, HttpStatusCode.PermanentRedirect)
-    }
 }
 
 /** Stops reading past [limit] bytes, so a huge or endless response cannot exhaust memory. */
-private class LimitedInputStream(input: InputStream, private val limit: Long) : FilterInputStream(input) {
+internal class LimitedInputStream(input: InputStream, private val limit: Long) : FilterInputStream(input) {
     private var count = 0L
 
     override fun read(): Int = super.read().also { if (it >= 0) count(1) }

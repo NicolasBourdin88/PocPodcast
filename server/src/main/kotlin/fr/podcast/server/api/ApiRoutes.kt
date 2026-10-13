@@ -16,6 +16,7 @@ import fr.podcast.server.html.homePage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.HalJson
 import fr.podcast.server.http.Representation
+import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
 import fr.podcast.server.http.respondSeeOther
@@ -23,7 +24,9 @@ import fr.podcast.server.http.respondUnauthenticated
 import fr.podcast.server.web.language
 import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.model.EpisodeStatus
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.server.http.content.LocalPathContent
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
@@ -185,8 +188,23 @@ fun Route.apiRoutes(services: ServerServices) {
             call.respondChanged()
         }
 
+        post("/episodes/{id}/download") {
+            call.mutatingUser() ?: return@post
+            val episode = catalog(call).episode(call.parameters["id"]!!) ?: return@post call.respondNotFound("Episode")
+            services.media.request(episode.id.toLong())
+            if (call.isHtmx) call.response.header("HX-Trigger", "episodes-changed")
+            call.respond(HttpStatusCode.Accepted)
+        }
+
+        // The server's copy when it has one (with byte ranges for seeking), the original file otherwise.
         get("/episodes/{id}/audio") {
-            val audioUrl = catalog(call).audioUrl(call.parameters["id"]!!) ?: return@get call.respondNotFound("Episode")
+            val episodeId = call.parameters["id"]!!
+            val audioUrl = catalog(call).audioUrl(episodeId) ?: return@get call.respondNotFound("Episode")
+            val file = services.media.file(episodeId.toLong())
+            if (file != null) {
+                val (path, mimeType) = file
+                return@get call.respond(LocalPathContent(path, ContentType.parse(mimeType)))
+            }
             call.response.header(HttpHeaders.Location, audioUrl)
             call.respond(HttpStatusCode.Found)
         }

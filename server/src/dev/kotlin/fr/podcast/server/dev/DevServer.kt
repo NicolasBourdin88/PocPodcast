@@ -6,6 +6,7 @@ import fr.podcast.server.startServer
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.nio.file.Path
 
 /**
  * `./gradlew :server:run`: starts the server with an embedded PostgreSQL (no Docker needed)
@@ -15,7 +16,13 @@ import java.io.File
  * second server (e.g. `PORT=8081 SERVER_NAME="Serveur B"`) to try multi-server clients.
  */
 fun main() {
-    val config = ServerConfig.fromEnvironment(defaultName = "Podcast (dev)", defaultSecureCookies = false)
+    val environment = ServerConfig.fromEnvironment(defaultName = "Podcast (dev)", defaultSecureCookies = false)
+    // Downloaded files stay in the build directory unless MEDIA_DIR says otherwise.
+    val config = if (System.getenv("MEDIA_DIR") == null) {
+        environment.copy(mediaDirectory = Path.of("build/dev-media-${environment.port}"))
+    } else {
+        environment
+    }
     val database = System.getenv("DATABASE_URL")
         ?.let { ServerDatabase.connect(it, System.getenv("DATABASE_USER") ?: "podcast", System.getenv("DATABASE_PASSWORD")) }
         ?: embeddedDatabase(config.port)

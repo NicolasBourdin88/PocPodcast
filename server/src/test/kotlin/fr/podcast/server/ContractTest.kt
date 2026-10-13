@@ -6,10 +6,12 @@ import com.networknt.schema.dialect.Dialects
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -81,7 +83,7 @@ class ContractTest {
 
     @Test
     fun responsesMatchTheSpecification() = testApplication {
-        podcastServer()
+        val services = podcastServer()
         val noRedirects = createClient { followRedirects = false }
         val alice = client.token()
         val disposable = client.token()
@@ -91,11 +93,13 @@ class ContractTest {
             method: HttpMethod, path: String, documentedPath: String, expected: HttpStatusCode,
             token: String? = alice, body: String? = null, accept: ContentType = HalForms, http: HttpClient = client,
             bodyType: ContentType = ContentType.Application.Json,
+            headers: Map<String, String> = emptyMap(),
         ) {
             val response = http.request(path) {
                 this.method = method
                 token?.let { bearerAuth(it) }
                 accept(accept)
+                headers.forEach { (name, value) -> header(name, value) }
                 body?.let { contentType(bodyType); setBody(it) }
             }
             val operation = Operation(method, documentedPath)
@@ -107,7 +111,8 @@ class ContractTest {
             val text = response.bodyAsText()
             if (text.isEmpty()) return
             val mediaType = response.contentType()!!.withoutParameters().toString()
-            val schema = responseSpec["content"]?.get(mediaType)?.get("schema")
+            val content = responseSpec["content"]
+            val schema = (content?.get(mediaType) ?: content?.get(mediaType.substringBefore('/') + "/*"))?.get("schema")
                 ?: fail("$operation: $mediaType is not documented for ${expected.value}")
             val ref = schema["\$ref"]?.asString() ?: return // inline schemas (HTML) are not validated
             val errors = schemas.getSchema(SchemaLocation.of("classpath:$specResource$ref")).validate(json.readTree(text))
@@ -157,6 +162,12 @@ class ContractTest {
         check(post, "/episodes/999/played", "/episodes/{episodeId}/played", HttpStatusCode.NotFound)
         check(delete, "/episodes/3/played", "/episodes/{episodeId}/played", HttpStatusCode.NoContent)
         check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.Found, http = noRedirects)
+        check(post, "/episodes/1/download", "/episodes/{episodeId}/download", HttpStatusCode.Accepted)
+        check(post, "/episodes/999/download", "/episodes/{episodeId}/download", HttpStatusCode.NotFound)
+        services.media.downloadNext()
+        check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.OK, accept = ContentType.Any)
+        check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.PartialContent, accept = ContentType.Any,
+            headers = mapOf(HttpHeaders.Range to "bytes=0-99"))
         check(put, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)
         check(put, "/episodes/999/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NotFound)
         check(delete, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)

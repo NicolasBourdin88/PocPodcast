@@ -441,6 +441,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /episodes/{episodeId}/download:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    post:
+      tags: [épisodes]
+      operationId: downloadEpisode
+      summary: Demander au serveur de télécharger le fichier (template `download`)
+      description: |
+        Le fichier est mutualisé : téléchargé une fois pour tous les utilisateurs, en arrière-plan.
+        `fileStatus` passe à `PENDING`, `DOWNLOADING` puis `READY` (ou `FAILED` ; une nouvelle demande réessaie).
+      responses:
+        "202": { description: Téléchargement demandé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /episodes/{episodeId}/audio:
     parameters:
       - $ref: "#/components/parameters/episodeId"
@@ -449,10 +465,20 @@ paths:
       operationId: getEpisodeAudio
       summary: Fichier audio de l'épisode
       description: |
-        Redirige vers le fichier d'origine (enclosure RSS). À partir de l'étape 4, sert
-        le fichier mutualisé du serveur quand il est téléchargé. Les clients utilisent
-        toujours ce lien, jamais l'URL d'origine.
+        Sert le fichier mutualisé du serveur quand il est téléchargé (`fileStatus: READY`), avec
+        les requêtes partielles (`Range`) pour avancer dans l'épisode ; sinon redirige vers le
+        fichier d'origine (enclosure RSS). Les clients utilisent toujours ce lien.
       responses:
+        "200":
+          description: Fichier du serveur
+          content:
+            audio/*:
+              schema: { type: string, format: binary }
+        "206":
+          description: Partie du fichier demandée par `Range`
+          content:
+            audio/*:
+              schema: { type: string, format: binary }
         "302":
           description: Redirection vers le fichier audio
           headers:
@@ -926,7 +952,8 @@ components:
         _templates:
           description: |
             Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté,
-            `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`.
+            `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`,
+            `download` tant que le serveur n'a pas le fichier (`NONE` ou `FAILED`).
           type: object
           properties:
             update-progress: { $ref: "#/components/schemas/Template" }
@@ -934,6 +961,7 @@ components:
             mark-unplayed: { $ref: "#/components/schemas/Template" }
             keep: { $ref: "#/components/schemas/Template" }
             unkeep: { $ref: "#/components/schemas/Template" }
+            download: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 

@@ -9,6 +9,8 @@ import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.FeedFetcher
 import fr.podcast.server.feeds.FeedRefresher
 import fr.podcast.server.feeds.UrlGuard
+import fr.podcast.server.media.MediaService
+import fr.podcast.server.media.MediaStore
 import fr.podcast.server.search.AppleSource
 import fr.podcast.server.search.PodcastIndexSource
 import fr.podcast.server.search.PodcastSearch
@@ -23,6 +25,8 @@ import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.autohead.AutoHeadResponse
+import io.ktor.server.plugins.partialcontent.PartialContent
 import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CancellationException
@@ -33,8 +37,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import kotlin.system.exitProcess
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -54,6 +60,15 @@ data class ServerConfig(
     /** Podcast Index keys (free at https://api.podcastindex.org); search uses Apple Podcasts only without them. */
     val podcastIndexKey: String? = null,
     val podcastIndexSecret: String? = null,
+    /** Where downloaded audio files are stored (shared by every user). */
+    val mediaDirectory: Path = Path.of("media"),
+    /** Files are purged this long after their download, unless kept or being listened to. */
+    val mediaRetention: Duration = 30.days,
+    /** Optional disk quota: the oldest purgeable files go first when it is exceeded. */
+    val mediaMaxBytes: Long? = null,
+    val maxFileBytes: Long = 1L shl 30,
+    /** Newest episodes downloaded for podcasts followed with automatic download. */
+    val autoDownloadLatest: Int = 1,
 ) {
     companion object {
         fun fromEnvironment(defaultName: String, defaultSecureCookies: Boolean) = ServerConfig(
@@ -64,6 +79,10 @@ data class ServerConfig(
             refreshInterval = System.getenv("REFRESH_INTERVAL_MINUTES")?.toLongOrNull()?.minutes ?: 1.hours,
             podcastIndexKey = System.getenv("PODCASTINDEX_KEY"),
             podcastIndexSecret = System.getenv("PODCASTINDEX_SECRET"),
+            mediaDirectory = Path.of(System.getenv("MEDIA_DIR") ?: "media"),
+            mediaRetention = System.getenv("MEDIA_RETENTION_DAYS")?.toLongOrNull()?.days ?: 30.days,
+            mediaMaxBytes = System.getenv("MEDIA_MAX_GB")?.toLongOrNull()?.let { it shl 30 },
+            autoDownloadLatest = System.getenv("AUTO_DOWNLOAD_LATEST")?.toIntOrNull() ?: 1,
         )
     }
 }
@@ -87,7 +106,8 @@ class ServerServices(
 ) {
     val accounts = Accounts(database)
     val guard = UrlGuard(config.allowPrivateFeeds)
-    val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard))
+    val media = MediaService(database, outgoing, guard, MediaStore(config.mediaDirectory), config.maxFileBytes, config.autoDownloadLatest)
+    val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard), onEpisodesStored = media::scheduleAutomatic)
     val search = PodcastSearch(
         listOfNotNull(
             AppleSource(outgoing),
@@ -104,12 +124,12 @@ class ServerServices(
         }
     }
 
-    /** A subscription changed (e.g. automatic download turned on). */
-    @Suppress("UnusedParameter")
-    suspend fun onSubscriptionChanged(podcastId: Long) = Unit
+    /** A subscription changed: automatic download may have been turned on. */
+    suspend fun onSubscriptionChanged(podcastId: Long) = media.scheduleAutomatic(podcastId)
 
-    /** Removes a podcast nobody follows any more, with its episodes. */
+    /** Removes a podcast nobody follows any more, with its episodes and their files. */
     suspend fun removePodcast(podcastId: Long) {
+        media.deletePodcastFiles(podcastId)
         database.query { catalogQueries.deletePodcast(podcastId) }
     }
 }
@@ -129,9 +149,16 @@ fun startServer(config: ServerConfig, database: ServerDatabase) {
     embeddedServer(Netty, port = config.port, host = config.host) { module(config, database) }.start(wait = true)
 }
 
-fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing: HttpClient = outgoingHttpClient()) {
-    val services = ServerServices(config, database, outgoing, scope = this)
+fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing: HttpClient = outgoingHttpClient()) =
+    module(ServerServices(config, database, outgoing, scope = this))
+
+fun Application.module(services: ServerServices) {
+    val config = services.config
+    val database = services.database
     installAuthentication(services.accounts, database, config.secureCookies)
+    // Audio files: byte ranges (seeking in players) and HEAD requests.
+    install(PartialContent)
+    install(AutoHeadResponse)
     // Every resource is negotiated on these two headers (docs/api/conventions.md).
     install(createApplicationPlugin("Vary") { onCall { it.response.headers.append(HttpHeaders.Vary, "Accept, Accept-Language") } })
 
@@ -144,12 +171,25 @@ fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing:
     }
 
     if (config.backgroundJobs) startBackgroundJobs(services)
-    monitor.subscribe(ApplicationStopped) { outgoing.close() }
+    monitor.subscribe(ApplicationStopped) { services.outgoing.close() }
 }
 
-/** Reads the followed feeds again every [ServerConfig.refreshInterval]. */
+/** Feed refresh every few minutes, downloads as soon as requested, purge every hour. */
 private fun Application.startBackgroundJobs(services: ServerServices) {
     val log = LoggerFactory.getLogger("fr.podcast.server.jobs")
+    launch { services.media.run() }
+    launch {
+        while (isActive) {
+            try {
+                services.media.purge(services.config.mediaRetention, services.config.mediaMaxBytes)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                log.warn("Purge failed", failure)
+            }
+            delay(1.hours)
+        }
+    }
     launch {
         while (isActive) {
             try {

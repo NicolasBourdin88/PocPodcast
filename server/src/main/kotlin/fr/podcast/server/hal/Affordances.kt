@@ -2,6 +2,7 @@ package fr.podcast.server.hal
 
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SubscriptionItem
 import io.ktor.http.HttpMethod
@@ -58,7 +59,7 @@ object Affordances {
 
     /**
      * `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new;
-     * `keep` or `unkeep` (kept episodes are never purged).
+     * `keep` or `unkeep` (kept episodes are never purged); `download` until the server has the file.
      */
     fun forEpisode(episode: Episode): List<Affordance> = buildList {
         add(
@@ -79,6 +80,9 @@ object Affordances {
             add(Affordance("unkeep", HttpMethod.Delete, "/episodes/${episode.id}/kept"))
         } else {
             add(Affordance("keep", HttpMethod.Put, "/episodes/${episode.id}/kept"))
+        }
+        if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
+            add(Affordance("download", HttpMethod.Post, "/episodes/${episode.id}/download"))
         }
     }
 

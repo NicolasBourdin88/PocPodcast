@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.sessions)
     implementation(libs.ktor.server.swagger)
+    implementation(libs.ktor.server.partial.content)
+    implementation(libs.ktor.server.auto.head.response)
     implementation(libs.logback)
     implementation(libs.ktor.client.cio)
 

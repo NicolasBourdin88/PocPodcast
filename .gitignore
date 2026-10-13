@@ -1,3 +1,6 @@
+# Server data (production defaults)
+server/media/
+
 # Gradle
 .gradle/
 build/

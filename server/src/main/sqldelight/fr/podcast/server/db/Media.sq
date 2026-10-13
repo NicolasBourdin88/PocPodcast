@@ -1,0 +1,79 @@
+-- Audio files downloaded by the server and shared by every user (ADR 0007).
+
+-- New download request; an existing one (pending, ready or failed) is left as it is.
+requestDownload:
+INSERT INTO media_files(episode_id, status)
+VALUES (:episodeId, 'PENDING')
+ON CONFLICT (episode_id) DO NOTHING;
+
+-- A user's explicit request also retries a failure (automatic downloads never do).
+retryFailedDownload:
+UPDATE media_files
+SET status = 'PENDING', error = NULL, requested_at = now()
+WHERE episode_id = :episodeId AND status = 'FAILED';
+
+-- The newest episodes of a podcast, if a subscriber asked for automatic downloads.
+autoDownloadCandidates:
+SELECT e.id
+FROM episodes e
+WHERE e.podcast_id = :podcastId
+  AND EXISTS (SELECT 1 FROM subscriptions s WHERE s.podcast_id = e.podcast_id AND s.auto_download)
+ORDER BY e.published_at DESC, e.id DESC
+LIMIT :limit;
+
+nextPendingDownload:
+SELECT f.episode_id, e.podcast_id, e.audio_url, e.audio_type
+FROM media_files f
+JOIN episodes e ON e.id = f.episode_id
+WHERE f.status = 'PENDING'
+ORDER BY f.requested_at, f.episode_id
+LIMIT 1;
+
+-- Claims a pending download (0 rows if another worker took it).
+claimDownload:
+UPDATE media_files SET status = 'DOWNLOADING'
+WHERE episode_id = :episodeId AND status = 'PENDING';
+
+markDownloaded:
+UPDATE media_files
+SET status = 'READY', storage_path = :storagePath, size_bytes = :sizeBytes, mime_type = :mimeType,
+    error = NULL, downloaded_at = now()
+WHERE episode_id = :episodeId;
+
+markDownloadFailed:
+UPDATE media_files SET status = 'FAILED', error = :error
+WHERE episode_id = :episodeId;
+
+-- After a restart, interrupted downloads start again.
+resetInterruptedDownloads:
+UPDATE media_files SET status = 'PENDING' WHERE status = 'DOWNLOADING';
+
+readyFile:
+SELECT storage_path, mime_type
+FROM media_files
+WHERE episode_id = :episodeId AND status = 'READY' AND storage_path IS NOT NULL;
+
+-- Files that may be purged, oldest first. Never purged: kept episodes, and episodes someone
+-- listened to recently (still in progress). Playlists (step 7) will be excluded here too.
+purgeCandidates:
+SELECT f.episode_id, f.storage_path, f.size_bytes, f.downloaded_at
+FROM media_files f
+WHERE f.status = 'READY'
+  AND NOT EXISTS (
+      SELECT 1 FROM playback_states s
+      WHERE s.episode_id = f.episode_id
+        AND (s.kept OR (s.status = 'IN_PROGRESS' AND s.updated_at > :activeSince))
+  )
+ORDER BY f.downloaded_at, f.episode_id;
+
+totalReadyBytes:
+SELECT CAST(COALESCE(SUM(size_bytes), 0) AS BIGINT) FROM media_files WHERE status = 'READY';
+
+deleteMediaFile:
+DELETE FROM media_files WHERE episode_id = :episodeId;
+
+filesOfPodcast:
+SELECT f.storage_path
+FROM media_files f
+JOIN episodes e ON e.id = f.episode_id
+WHERE e.podcast_id = :podcastId AND f.storage_path IS NOT NULL;

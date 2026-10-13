@@ -11,6 +11,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -21,6 +22,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -43,6 +46,14 @@ object TestDatabase {
 
     val database by lazy { ServerDatabase(dataSource) }
 
+    /** Downloaded files of the tests, emptied by [reset]. */
+    val mediaDirectory: java.nio.file.Path by lazy { java.nio.file.Files.createTempDirectory("podcast-media") }
+
+    /** Raw SQL, to set up situations the API cannot create (old downloads…). */
+    fun execute(sql: String) {
+        dataSource.connection.use { it.createStatement().execute(sql) }
+    }
+
     /** Fresh demo data with predictable ids (users 1 = alice, 2 = bob; episodes 1…9, most recent first). */
     fun reset() {
         dataSource.connection.use {
@@ -51,6 +62,7 @@ object TestDatabase {
                     "playback_states, media_files RESTART IDENTITY CASCADE",
             )
         }
+        mediaDirectory.toFile().listFiles()?.forEach { it.deleteRecursively() }
         runBlocking { TestSeed.seed(database) }
     }
 }
@@ -63,7 +75,11 @@ val testConfig = ServerConfig(
     backgroundJobs = false,
     podcastIndexKey = "test-key",
     podcastIndexSecret = "test-secret",
+    mediaDirectory = TestDatabase.mediaDirectory,
 )
+
+/** Bytes of the fake audio file served by https://cdn.test. */
+val testAudio = ByteArray(200_000) { (it % 251).toByte() }
 
 /**
  * The outside world seen by the server in tests: https://feeds.test serves the fixtures of
@@ -80,6 +96,11 @@ fun testFeeds(): HttpClient = HttpClient(
         )
         val query = request.url.parameters["term"] ?: request.url.parameters["q"]
         when {
+            // Like real podcast hosts: a tracker redirect, then the file.
+            request.url.host == "cdn.test" && request.url.encodedPath == "/podcast/seed-1.mp3" ->
+                respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://cdn.test/files/seed-1.mp3"))
+            request.url.host == "cdn.test" && request.url.encodedPath == "/files/seed-1.mp3" ->
+                respond(ByteReadChannel(testAudio), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "audio/mpeg"))
             request.url.host == "itunes.apple.com" ->
                 if (query == "panne") respond("", HttpStatusCode.ServiceUnavailable) else search("apple")
             request.url.host == "api.podcastindex.org" -> {
@@ -97,12 +118,18 @@ fun testFeeds(): HttpClient = HttpClient(
             else -> respond(ByteReadChannel(content), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/rss+xml"))
         }
     },
-) { followRedirects = false }
+) {
+    followRedirects = false
+    install(HttpTimeout)
+}
 
 val HalForms = ContentType("application", "prs.hal-forms+json")
 
-fun ApplicationTestBuilder.podcastServer() {
-    application { module(testConfig, TestDatabase.database, testFeeds()) }
+/** Starts the server under test; its services let tests run background jobs on demand. */
+fun ApplicationTestBuilder.podcastServer(): ServerServices {
+    val services = ServerServices(testConfig, TestDatabase.database, testFeeds(), CoroutineScope(SupervisorJob()))
+    application { module(services) }
+    return services
 }
 
 suspend fun HttpClient.token(username: String = TestSeed.ALICE, password: String = TestSeed.ALICE_PASSWORD): String {
