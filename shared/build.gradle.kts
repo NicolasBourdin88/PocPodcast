@@ -30,10 +30,22 @@ kotlin {
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.datetime)
             api(libs.kotlinx.serialization.json)
+            api(libs.ktor.client.core)
+        }
+        androidMain.dependencies {
+            implementation(libs.ktor.client.okhttp)
+        }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+        jvmMain.dependencies {
+            // Pure Kotlin engine: no java.net.http module needed in the packaged desktop app.
+            implementation(libs.ktor.client.cio)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
         }
     }
 }
