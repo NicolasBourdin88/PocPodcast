@@ -65,7 +65,6 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.json.schema.validator)
-    testImplementation(libs.jackson.yaml)
 }
 
 // Flyway reads the same migration files from the classpath.
