@@ -246,6 +246,37 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /search:
+    get:
+      tags: [podcasts]
+      operationId: searchPodcasts
+      summary: Chercher des podcasts dans les annuaires (via le serveur)
+      description: |
+        Le serveur interroge en parallèle Apple Podcasts et, si ses clés sont configurées, Podcast Index.
+        Les résultats sont fusionnés sans doublon (même flux). Un annuaire en panne est ignoré ;
+        `sources` liste ceux qui ont répondu. Chaque résultat non suivi porte un template `subscribe`
+        prérempli avec l'adresse de son flux.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 200 }
+      responses:
+        "200":
+          description: Résultats
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/SearchResults" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/SearchResults" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502":
+          description: "Aucun annuaire n'a répondu (`type` : `/problems/search-failed`)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
   /podcasts/{podcastId}:
     parameters:
       - $ref: "#/components/parameters/podcastId"
@@ -590,6 +621,9 @@ components:
             podcast:
               description: "Gabarit `/podcasts/{id}` : un podcast à partir de son identifiant."
               $ref: "#/components/schemas/Link"
+            search:
+              description: "Gabarit `/search{?q}` : recherche dans les annuaires."
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _embedded:
           description: Accueil de l'utilisateur connecté.
@@ -770,6 +804,56 @@ components:
           required: [subscriptions]
           properties:
             subscriptions: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+      additionalProperties: false
+
+    SearchResults:
+      type: object
+      required: [query, count, sources, _links, _embedded]
+      properties:
+        query: { type: string }
+        count: { type: integer, minimum: 0 }
+        sources:
+          description: Annuaires qui ont répondu.
+          type: array
+          items: { type: string, enum: [apple, podcastindex] }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items: { $ref: "#/components/schemas/SearchResult" }
+          additionalProperties: false
+      additionalProperties: false
+
+    SearchResult:
+      type: object
+      required: [title, author, feedUrl, artworkUrl, description, source, subscribed, _links]
+      properties:
+        title: { type: string }
+        author: { type: string }
+        feedUrl: { type: string }
+        artworkUrl: { type: [string, "null"] }
+        description: { type: string }
+        source: { type: string, enum: [apple, podcastindex] }
+        subscribed: { type: boolean, description: L'utilisateur suit déjà ce flux. }
+        _links:
+          type: object
+          required: [feed]
+          properties:
+            feed: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            subscribe: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 

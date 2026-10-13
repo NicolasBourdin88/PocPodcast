@@ -3,17 +3,22 @@ package fr.podcast.server.hal
 import fr.podcast.server.auth.IssuedToken
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.catalog.Page
+import fr.podcast.server.search.SearchHit
+import fr.podcast.server.search.normalizedFeed
+import io.ktor.http.encodeURLParameter
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
+import fr.podcast.shared.model.SearchResult
 import fr.podcast.shared.model.Subscription
 import fr.podcast.shared.model.SubscriptionItem
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -86,6 +91,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
+            "search" to "/search{?q}",
         )
         if (home != null) {
             putJsonObject("_embedded") {
@@ -179,4 +185,29 @@ fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, 
 fun opmlImportResource(report: OpmlImportReport): JsonObject = buildJsonObject {
     fields(OpmlImportReport.serializer(), report)
     links("subscriptions" to "/subscriptions")
+}
+
+/** Search results; each one can be subscribed to with its pre-filled `subscribe` template. */
+fun searchResults(query: String, hits: List<SearchHit>, answeredBy: List<String>, subscribed: Set<String>, forms: Boolean): JsonObject = buildJsonObject {
+    put("query", query)
+    put("count", hits.size)
+    putJsonArray("sources") { answeredBy.forEach { add(JsonPrimitive(it)) } }
+    links("self" to "/search?q=${query.encodeURLParameter()}")
+    putJsonObject("_embedded") {
+        put(
+            "results",
+            buildJsonArray {
+                for (hit in hits) {
+                    val isSubscribed = normalizedFeed(hit.feedUrl) in subscribed
+                    add(
+                        buildJsonObject {
+                            fields(SearchResult.serializer(), SearchResult(hit.title, hit.author, hit.feedUrl, hit.artworkUrl, hit.description, hit.source, isSubscribed))
+                            links("feed" to hit.feedUrl)
+                            templates(forms, if (isSubscribed) emptyList() else listOf(Affordances.subscribeTo(hit.feedUrl)))
+                        },
+                    )
+                }
+            },
+        )
+    }
 }

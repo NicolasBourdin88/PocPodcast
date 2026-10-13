@@ -1,0 +1,4 @@
+{"status":"true","count":2,"query":"kotlin","description":"Found matching feeds.","feeds":[
+ {"id":42,"title":"Le Podcast de Test","url":"https://feeds.test/podcast20.xml","author":"Équipe Test","description":"Un podcast de test.","artwork":"https://img.test/test.jpg"},
+ {"id":43,"title":"Kotlin Internals","url":"https://Feeds.test/internals.xml/","author":"","ownerName":"Crash","description":"Duplicate of the Apple result.","image":"https://img.test/int.jpg"}
+]}

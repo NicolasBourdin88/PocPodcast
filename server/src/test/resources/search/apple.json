@@ -1,0 +1,5 @@
+{"resultCount":3,"results":[
+ {"collectionName":"Talking Kotlin","artistName":"JetBrains","feedUrl":"https://feeds.test/tk.xml","artworkUrl600":"https://img.test/tk600.jpg","artworkUrl100":"https://img.test/tk100.jpg"},
+ {"collectionName":"Kotlin Internals","artistName":"crashcasts.com","feedUrl":"https://feeds.test/internals.xml","artworkUrl100":"https://img.test/int100.jpg"},
+ {"collectionName":"Sans flux public","artistName":"Apple Exclusive"}
+]}

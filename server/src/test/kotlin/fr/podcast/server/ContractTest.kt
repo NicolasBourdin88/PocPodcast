@@ -172,6 +172,9 @@ class ContractTest {
         check(post, "/podcasts/5/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.OK)
         check(post, "/podcasts/999/refresh", "/podcasts/{podcastId}/refresh", HttpStatusCode.NotFound)
         val opml = ContentType("text", "x-opml")
+        check(get, "/search?q=kotlin", "/search", HttpStatusCode.OK)
+        check(get, "/search?q=k", "/search", HttpStatusCode.BadRequest)
+        check(get, "/search?q=panne", "/search", HttpStatusCode.BadGateway)
         check(get, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.OK)
         check(post, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.OK, bodyType = opml,
             body = javaClass.getResourceAsStream("/feeds/import.opml")!!.readBytes().decodeToString())

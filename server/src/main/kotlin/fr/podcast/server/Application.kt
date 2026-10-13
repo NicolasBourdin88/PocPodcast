@@ -1,6 +1,7 @@
 package fr.podcast.server
 
 import fr.podcast.server.api.apiRoutes
+import fr.podcast.server.api.searchRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
 import fr.podcast.server.auth.installAuthentication
@@ -8,6 +9,9 @@ import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.FeedFetcher
 import fr.podcast.server.feeds.FeedRefresher
 import fr.podcast.server.feeds.UrlGuard
+import fr.podcast.server.search.AppleSource
+import fr.podcast.server.search.PodcastIndexSource
+import fr.podcast.server.search.PodcastSearch
 import fr.podcast.server.web.webRoutes
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -47,6 +51,9 @@ data class ServerConfig(
     val backgroundJobs: Boolean = true,
     /** How long a feed stays unread before the server reads it again. */
     val refreshInterval: Duration = 1.hours,
+    /** Podcast Index keys (free at https://api.podcastindex.org); search uses Apple Podcasts only without them. */
+    val podcastIndexKey: String? = null,
+    val podcastIndexSecret: String? = null,
 ) {
     companion object {
         fun fromEnvironment(defaultName: String, defaultSecureCookies: Boolean) = ServerConfig(
@@ -55,6 +62,8 @@ data class ServerConfig(
             secureCookies = System.getenv("SECURE_COOKIES")?.toBooleanStrictOrNull() ?: defaultSecureCookies,
             allowPrivateFeeds = System.getenv("ALLOW_PRIVATE_FEEDS")?.toBooleanStrictOrNull() ?: false,
             refreshInterval = System.getenv("REFRESH_INTERVAL_MINUTES")?.toLongOrNull()?.minutes ?: 1.hours,
+            podcastIndexKey = System.getenv("PODCASTINDEX_KEY"),
+            podcastIndexSecret = System.getenv("PODCASTINDEX_SECRET"),
         )
     }
 }
@@ -79,6 +88,12 @@ class ServerServices(
     val accounts = Accounts(database)
     val guard = UrlGuard(config.allowPrivateFeeds)
     val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard))
+    val search = PodcastSearch(
+        listOfNotNull(
+            AppleSource(outgoing),
+            config.podcastIndexKey?.let { key -> config.podcastIndexSecret?.let { PodcastIndexSource(outgoing, key, it) } },
+        ),
+    )
 
     /** Reads new feeds (e.g. after an OPML import) without making the request wait. */
     fun refreshSoon(podcastIds: List<Long>) {
@@ -123,6 +138,7 @@ fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing:
     routing {
         apiRoutes(services)
         subscriptionRoutes(services)
+        searchRoutes(services)
         webRoutes(database, services.accounts)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")
     }
