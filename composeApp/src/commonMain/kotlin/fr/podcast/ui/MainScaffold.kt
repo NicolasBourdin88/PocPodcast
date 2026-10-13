@@ -51,12 +51,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.ApiException
+import fr.podcast.shared.api.userMessage
 import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.navigation.Destination
 import fr.podcast.shared.repository.PodcastRepository
-import fr.podcast.ui.account.message
 import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.home.HomeScreen
 import fr.podcast.ui.home.HomeUiState
@@ -122,7 +122,7 @@ private fun AdaptiveScaffold(
             state is HomeUiState.Loading -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             state is HomeUiState.Failed && state.error is ApiException.Unauthorized ->
                 Message(strings.sessionExpired, modifier, action = strings.signIn, onAction = onSessionExpired)
-            state is HomeUiState.Failed -> Message(state.error.message(strings), modifier, action = strings.retry, onAction = onRetry)
+            state is HomeUiState.Failed -> Message(state.error.userMessage(strings), modifier, action = strings.retry, onAction = onRetry)
             home != null -> HomeScreen(home, twoColumns = layout == WindowLayout.CompactHeight, modifier = modifier)
         }
     }

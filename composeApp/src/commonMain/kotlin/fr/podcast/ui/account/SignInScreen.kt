@@ -36,7 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.account.Account
 import fr.podcast.shared.api.ApiException
-import fr.podcast.shared.i18n.Strings
+import fr.podcast.shared.api.userMessage
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
 
@@ -70,7 +70,7 @@ fun SignInScreen(
             try {
                 onSignedIn(signIn(server, username.trim(), password))
             } catch (failure: ApiException) {
-                error = failure.message(strings)
+                error = failure.userMessage(strings)
             } finally {
                 busy = false
             }
@@ -118,12 +118,4 @@ fun SignInScreen(
             onCancel?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(strings.cancel) } }
         }
     }
-}
-
-/** User-facing explanation of an API failure. */
-fun Exception.message(strings: Strings): String = when (this) {
-    is ApiException.Unreachable -> strings.serverUnreachable
-    is ApiException.NotAPodcastServer -> strings.notAPodcastServer
-    is ApiException.Unauthorized -> strings.invalidCredentials
-    else -> strings.loadingError
 }
