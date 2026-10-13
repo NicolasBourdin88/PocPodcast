@@ -134,7 +134,8 @@ private val STYLES = """
     .section-header { display: flex; align-items: center; justify-content: space-between; }
     button { font: inherit; border: none; border-radius: 999px; background: var(--card); color: var(--text); padding: 8px 16px; cursor: pointer; }
     button.link { background: none; padding: 0; color: var(--accent); text-decoration: underline; }
-    button.action { font-size: .8rem; padding: 4px 12px; white-space: nowrap; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    button.action { font-size: .8rem; padding: 4px 12px; }
     .htmx-request.refresh, .htmx-request.action { opacity: .5; }
 
     .mini-player { position: fixed; left: 0; right: 0; bottom: 52px; background: var(--surface); padding: 8px 16px; border-top: 3px solid var(--accent); }
