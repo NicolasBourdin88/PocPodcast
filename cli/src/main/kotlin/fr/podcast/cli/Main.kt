@@ -24,24 +24,34 @@ import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.repository.FakePodcastRepository
-import fr.podcast.shared.repository.PodcastRepository
+import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.shared.repository.RemotePodcastRepository
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import java.util.prefs.Preferences
 
 /** Language of the system locale; also used for --help, which is shown before options are parsed. */
-private val systemLanguage = Language.fromTag(Locale.getDefault().toLanguageTag()) ?: Language.Default
+internal val systemLanguage = Language.fromTag(Locale.getDefault().toLanguageTag()) ?: Language.Default
 
 /** Shared by every command: language, saved accounts, HTTP client. */
 class CliContext(val strings: Strings, val demo: Boolean) {
+    private val preferences = Preferences.userRoot().node("fr/podcast/cli")
     val httpClient by lazy { podcastHttpClient() }
-    val accounts = AccountStore(PreferencesKeyValueStore(Preferences.userRoot().node("fr/podcast/cli")))
+    val accounts = AccountStore(PreferencesKeyValueStore(preferences))
     val accountService by lazy { AccountService(httpClient, "CLI (${System.getProperty("os.name")})") }
 
     /** Demo data with --demo, otherwise the active account's server. */
-    fun repository(): PodcastRepository? =
+    fun repository(): PodcastClient? =
         if (demo) FakePodcastRepository() else accounts.state.value.active?.let { RemotePodcastRepository(it, httpClient) }
+
+    /** Feeds of the last `podcast search`, so that `podcast subscribe 2` works. */
+    var lastSearch: List<String>
+        get() = preferences.get(LAST_SEARCH, "").lines().filter { it.isNotBlank() }
+        set(value) = preferences.put(LAST_SEARCH, value.joinToString("\n"))
+
+    private companion object {
+        const val LAST_SEARCH = "lastSearch"
+    }
 }
 
 class PodcastCommand : CliktCommand(name = "podcast") {
@@ -59,9 +69,9 @@ class PodcastCommand : CliktCommand(name = "podcast") {
 
 /** Base for commands that run against a server: turns API failures into messages. */
 abstract class ServerCommand(name: String) : CliktCommand(name = name) {
-    protected val cli by requireObject<CliContext>()
+    val cli by requireObject<CliContext>()
 
-    protected fun <T> call(block: suspend () -> T): T =
+    fun <T> call(block: suspend () -> T): T =
         try {
             runBlocking { block() }
         } catch (failure: Exception) {
@@ -69,12 +79,15 @@ abstract class ServerCommand(name: String) : CliktCommand(name = name) {
             throw ProgramResult(1)
         }
 
+    /** The active account's server, or the demo data. */
+    fun client(): PodcastClient = cli.repository() ?: run {
+        echo(cli.strings.noAccount, err = true)
+        throw ProgramResult(1)
+    }
+
     protected fun loadHome(): HomeState {
-        val repository = cli.repository() ?: run {
-            echo(cli.strings.noAccount, err = true)
-            throw ProgramResult(1)
-        }
-        return call { LoadHomeState(repository)() }
+        val client = client()
+        return call { LoadHomeState(client)() }
     }
 }
 
@@ -146,5 +159,10 @@ class LogoutCommand : ServerCommand("logout") {
 }
 
 fun main(args: Array<String>) = PodcastCommand()
-    .subcommands(ListCommand(), TuiCommand(), LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand())
+    .subcommands(
+        ListCommand(), TuiCommand(),
+        SearchCommand(), SubscribeCommand(), SubscriptionsCommand(), NoteCommand(), UnsubscribeCommand(),
+        OpmlCommand().subcommands(OpmlExportCommand(), OpmlImportCommand()),
+        LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand(),
+    )
     .main(args)
