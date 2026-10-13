@@ -142,6 +142,25 @@ private val STYLES = """
     .mini-player .artwork { width: 40px; height: 40px; font-size: .8rem; }
     .mini-player .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    a.button, .upload button, .search button, .add-feed button { display: inline-block; border-radius: 999px; background: var(--card); color: var(--text); padding: 8px 16px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+    .upload, .search, .add-feed { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+    .upload label { display: flex; gap: 8px; align-items: center; font-size: .9rem; color: var(--muted); }
+    .search input, .add-feed input, textarea { font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--card); background: var(--surface); color: var(--text); }
+    .search input { flex: 1; min-width: 200px; }
+    .add-feed input { flex: 1; min-width: 240px; }
+    textarea { width: 100%; resize: vertical; }
+    .subscription { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--card); }
+    .note { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 4px 0; }
+    .toggle { display: flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--muted); }
+    .badge { align-self: flex-start; font-size: .75rem; padding: 2px 8px; border-radius: 999px; background: var(--card); }
+    .badge.warning, .error { color: #b3261e; }
+    .subscribed, .notice { font-size: .85rem; color: var(--accent); }
+    button.danger { color: #b3261e; }
+    img.artwork { object-fit: cover; }
+    .results .episode { align-items: center; }
+    .empty { color: var(--muted); }
+
     .login { max-width: 360px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: 12px; }
     .login label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
     .login input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--card); background: var(--surface); color: var(--text); }

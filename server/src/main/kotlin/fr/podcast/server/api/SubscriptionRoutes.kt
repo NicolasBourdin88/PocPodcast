@@ -9,12 +9,19 @@ import fr.podcast.server.feeds.code
 import fr.podcast.server.feeds.withScheme
 import fr.podcast.server.opml.Opml
 import fr.podcast.server.opml.OpmlException
+import fr.podcast.server.web.language
+import fr.podcast.shared.i18n.Strings
 import fr.podcast.server.hal.opmlImportResource
+import fr.podcast.server.html.libraryPage
+import fr.podcast.server.html.opmlReportFragment
+import fr.podcast.server.html.refusedFragment
+import fr.podcast.server.html.subscribedFragment
 import fr.podcast.server.hal.subscriptionCollection
 import fr.podcast.server.hal.subscriptionResource
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.HalJson
 import fr.podcast.server.http.ProblemTypes
+import fr.podcast.server.http.Representation
 import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
@@ -26,6 +33,7 @@ import io.ktor.http.content.forEachPart
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.html.respondHtml
 import io.ktor.server.request.contentType
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.request.receiveMultipart
@@ -48,8 +56,11 @@ fun Route.subscriptionRoutes(services: ServerServices) {
 
     authenticate(SESSION_AUTH, BEARER_AUTH) {
         get("/subscriptions") {
-            val representation = call.representation()
-            call.respondResource(subscriptionCollection(catalog(call).subscriptionList(), representation.forms), representation)
+            val items = catalog(call).subscriptionList()
+            when (val representation = call.representation()) {
+                Representation.Html -> call.respondHtml { libraryPage(items, call.language(), call.user) }
+                else -> call.respondResource(subscriptionCollection(items, representation.forms), representation)
+            }
         }
 
         post("/subscriptions") {
@@ -62,9 +73,14 @@ fun Route.subscriptionRoutes(services: ServerServices) {
             val podcastId = try {
                 services.refresher.podcastFor(withScheme(feedUrl))
             } catch (refused: FeedException) {
+                if (call.isHtmx) return@post call.respondFragment(refusedFragment(refused.userMessage(call.language().strings)))
                 return@post call.respondFeedProblem(refused)
             }
             val (item, created) = catalog(call).subscribe(podcastId)
+            if (call.isHtmx) {
+                call.response.header("HX-Trigger", "subscriptions-changed")
+                return@post call.respondFragment(subscribedFragment(item.podcast, call.language().strings))
+            }
             call.response.header(HttpHeaders.Location, "/subscriptions/${item.subscription.id}")
             val representation = call.representation()
             call.respondResource(
@@ -89,11 +105,15 @@ fun Route.subscriptionRoutes(services: ServerServices) {
                 val bytes = call.receiveUpload(MAX_OPML_BYTES) ?: throw OpmlException("OPML file expected")
                 Opml.read(bytes.inputStream())
             } catch (unreadable: OpmlException) {
+                if (call.isHtmx) return@post call.respondFragment(refusedFragment(call.language().strings.notAnOpml))
                 return@post call.respondProblem(HttpStatusCode.UnprocessableEntity, unreadable.message, type = ProblemTypes.NOT_AN_OPML)
             }
             val import = catalog(call).importFeeds(entries, services.guard)
             services.refreshSoon(import.newPodcasts)
-            if (call.isHtmx) call.response.header("HX-Trigger", "subscriptions-changed")
+            if (call.isHtmx) {
+                call.response.header("HX-Trigger", "subscriptions-changed")
+                return@post call.respondFragment(opmlReportFragment(import.report, call.language().strings))
+            }
             call.respondText(opmlImportResource(import.report).toString(), HalJson)
         }
 
@@ -124,6 +144,7 @@ fun Route.subscriptionRoutes(services: ServerServices) {
 
             val updated = catalog.updateSubscription(current.subscription.id, note, autoDownload!!)!!
             services.onSubscriptionChanged(updated.podcast.id.toLong())
+            if (call.isHtmx) call.response.header("HX-Trigger", "subscriptions-changed")
             val representation = call.representation()
             call.respondResource(subscriptionResource(updated, representation.forms), representation)
         }
@@ -156,4 +177,13 @@ private suspend fun ApplicationCall.receiveUpload(limit: Long): ByteArray? {
         return file?.takeIf { it.size <= limit }
     }
     return receiveChannel().readRemaining(limit + 1).readByteArray().takeIf { it.size <= limit }
+}
+
+/** Thin client: htmx only swaps successful responses, so refusals are fragments too. */
+internal suspend fun ApplicationCall.respondFragment(html: String) = respondText(html, ContentType.Text.Html)
+
+internal fun FeedException.userMessage(strings: Strings): String = when (this) {
+    is FeedException.ForbiddenAddress -> strings.forbiddenFeedAddress
+    is FeedException.Unreachable, is FeedException.TooLarge -> strings.feedUnreachable
+    is FeedException.InvalidUrl, is FeedException.NotAFeed -> strings.notAFeed
 }

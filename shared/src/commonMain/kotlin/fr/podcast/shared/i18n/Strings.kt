@@ -98,6 +98,7 @@ interface Strings {
     val feedUnreachable: String
     val notAFeed: String
     val forbiddenFeedAddress: String
+    val notAnOpml: String
     val searchFailed: String
 
     // CLI

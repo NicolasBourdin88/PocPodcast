@@ -113,7 +113,14 @@ private fun UL.episodeRow(item: EpisodeItem, strings: Strings) {
         div("card-body") {
             span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn())}" }
             a(href = "/episodes/${episode.id}", classes = "title") { +episode.title }
-            span("meta") { +"${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}" }
+            span("meta") {
+                +listOfNotNull(
+                    strings.duration(episode.durationSeconds).takeIf { episode.durationSeconds > 0 },
+                    strings.status(episode),
+                    strings.kept.takeIf { episode.kept },
+                    strings.fileStatus(episode.fileStatus),
+                ).joinToString(" · ")
+            }
             // Same affordances as the HAL-FORMS templates; those without input become buttons.
             div("actions") {
                 Affordances.forEpisode(episode).filter { it.properties.isEmpty() }.forEach { affordanceButton(it, strings) }

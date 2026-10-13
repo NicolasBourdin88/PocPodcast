@@ -110,6 +110,7 @@ object FrenchStrings : Strings {
     override val feedUnreachable = "Impossible de lire ce flux."
     override val notAFeed = "Cette adresse n'est pas un flux de podcast."
     override val forbiddenFeedAddress = "Cette adresse n'est pas autorisée."
+    override val notAnOpml = "Ce fichier n'est pas un OPML lisible."
     override val searchFailed = "La recherche n'a pas abouti."
 
     override val cliDescription = "Client en ligne de commande du système de podcasts."

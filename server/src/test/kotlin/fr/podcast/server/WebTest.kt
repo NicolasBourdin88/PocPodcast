@@ -1,12 +1,17 @@
 package fr.podcast.server
 
 import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.parameters
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -104,5 +109,52 @@ class WebTest {
 
         assertEquals(HttpStatusCode.SeeOther, browser.post("/logout").status)
         assertEquals(HttpStatusCode.SeeOther, browser.get("/") { header(HttpHeaders.Accept, "text/html") }.status)
+    }
+
+    @Test
+    fun libraryAndExplorePagesWorkWithHtmx() = testApplication {
+        podcastServer()
+        val browser = browser()
+        browser.login()
+        fun HttpRequestBuilder.frenchHtmx() {
+            header("HX-Request", "true")
+            header(HttpHeaders.AcceptLanguage, "fr")
+        }
+
+        val library = browser.get("/subscriptions") {
+            header(HttpHeaders.Accept, "text/html")
+            header(HttpHeaders.AcceptLanguage, "fr")
+        }.bodyAsText()
+        assertContains(library, "Bibliothèque")
+        assertContains(library, "hx-patch=\"/subscriptions/1\"")
+        assertContains(library, "href=\"/subscriptions/opml\"")
+
+        val explore = browser.get("/search?q=kotlin") {
+            header(HttpHeaders.Accept, "text/html")
+            header(HttpHeaders.AcceptLanguage, "fr")
+        }.bodyAsText()
+        assertContains(explore, "Le Podcast de Test")
+        assertContains(explore, "Abonné") // Alice already follows Talking Kotlin
+
+        // htmx gets fragments, even for refusals (htmx only swaps successful responses).
+        val subscribed = browser.submitForm("/subscriptions", parameters { append("feedUrl", "https://feeds.test/podcast20.xml") }) { frenchHtmx() }
+        assertEquals(HttpStatusCode.OK, subscribed.status)
+        assertEquals("subscriptions-changed", subscribed.headers["HX-Trigger"])
+        assertContains(subscribed.bodyAsText(), "Abonné à « Le Podcast de Test »")
+        val refused = browser.submitForm("/subscriptions", parameters { append("feedUrl", "https://feeds.test/not-a-feed.html") }) { frenchHtmx() }
+        assertContains(refused.bodyAsText(), "Cette adresse n'est pas un flux de podcast.")
+
+        val noted = browser.submitForm("/subscriptions/1", parameters { append("note", "Le vendredi") }, encodeInQuery = false) {
+            method = HttpMethod.Patch
+            frenchHtmx()
+        }
+        assertEquals(HttpStatusCode.OK, noted.status)
+        assertContains(browser.get("/subscriptions") { header(HttpHeaders.Accept, "text/html") }.bodyAsText(), "Le vendredi")
+
+        val report = browser.submitFormWithBinaryData(
+            "/subscriptions/opml",
+            formData { append("opml", javaClass.getResourceAsStream("/feeds/import.opml")!!.readBytes(), Headers.build { append(HttpHeaders.ContentDisposition, "filename=\"a.opml\"") }) },
+        ) { frenchHtmx() }
+        assertContains(report.bodyAsText(), "importé(s)")
     }
 }

@@ -108,6 +108,7 @@ object EnglishStrings : Strings {
     override val feedUnreachable = "This feed cannot be read."
     override val notAFeed = "This address is not a podcast feed."
     override val forbiddenFeedAddress = "This address is not allowed."
+    override val notAnOpml = "This file is not a readable OPML."
     override val searchFailed = "The search did not succeed."
 
     override val cliDescription = "Command-line client for the podcast system."
