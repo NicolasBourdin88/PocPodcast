@@ -1,0 +1,23 @@
+upsertState:
+INSERT INTO playback_states(user_id, episode_id, position_seconds, status)
+VALUES (:userId, :episodeId, :positionSeconds, :status)
+ON CONFLICT (user_id, episode_id) DO UPDATE
+SET position_seconds = excluded.position_seconds, status = excluded.status, updated_at = now();
+
+inProgress:
+SELECT e.title, p.title AS podcast_title, e.duration_seconds, s.position_seconds
+FROM playback_states s
+JOIN episodes e ON e.id = s.episode_id
+JOIN podcasts p ON p.id = e.podcast_id
+WHERE s.user_id = :userId AND s.status = 'IN_PROGRESS'
+ORDER BY s.updated_at DESC;
+
+latestWithState:
+SELECT e.title, p.title AS podcast_title, e.duration_seconds,
+       COALESCE(s.position_seconds, 0) AS position_seconds,
+       COALESCE(s.status, 'NEW') AS status
+FROM episodes e
+JOIN podcasts p ON p.id = e.podcast_id
+LEFT JOIN playback_states s ON s.episode_id = e.id AND s.user_id = :userId
+ORDER BY e.published_on DESC, e.id DESC
+LIMIT :limit;
