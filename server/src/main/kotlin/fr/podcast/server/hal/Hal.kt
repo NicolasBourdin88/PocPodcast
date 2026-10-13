@@ -64,6 +64,8 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "me" to "/me",
             "subscriptions" to "/subscriptions",
             "episodes" to "/episodes{?status,offset,limit}",
+            "episode" to "/episodes/{id}",
+            "podcast" to "/podcasts/{id}",
         )
         if (home != null) {
             putJsonObject("_embedded") {

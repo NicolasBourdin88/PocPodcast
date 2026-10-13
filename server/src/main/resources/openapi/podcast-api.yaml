@@ -411,6 +411,12 @@ components:
             me: { $ref: "#/components/schemas/Link" }
             subscriptions: { $ref: "#/components/schemas/Link" }
             episodes: { $ref: "#/components/schemas/Link" }
+            episode:
+              description: "Gabarit `/episodes/{id}` : un épisode à partir de son identifiant."
+              $ref: "#/components/schemas/Link"
+            podcast:
+              description: "Gabarit `/podcasts/{id}` : un podcast à partir de son identifiant."
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _embedded:
           description: Accueil de l'utilisateur connecté.

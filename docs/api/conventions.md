@@ -20,7 +20,7 @@ Pour l'instant, seule la racine `/` a une représentation HTML. Les autres pages
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `episodes`, `me`, et l'état de l'Accueil embarqué (`resume`, `latest`).
+- **Racine authentifiée** : liens `subscriptions`, `episodes`, `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
 - **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
