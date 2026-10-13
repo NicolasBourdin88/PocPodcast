@@ -25,6 +25,7 @@ class ApplicationTest {
 
         val response = client.get("/") {
             header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            header(HttpHeaders.AcceptLanguage, "fr-FR,fr;q=0.9,en;q=0.8")
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
@@ -33,6 +34,25 @@ class ApplicationTest {
         assertContains(html, "Reprendre l'écoute")
         assertContains(html, "LCC 330 - Les nouveautés de Kotlin 2.4")
         assertContains(html, "hx-get=\"/fragments/latest\"")
+        assertContains(html, "lang=\"fr\"")
+    }
+
+    @Test
+    fun htmlFollowsAcceptLanguage() = testApplication {
+        application { module() }
+
+        val english = client.get("/") {
+            header(HttpHeaders.Accept, "text/html")
+            header(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+        }.bodyAsText()
+        val unsupported = client.get("/") {
+            header(HttpHeaders.Accept, "text/html")
+            header(HttpHeaders.AcceptLanguage, "de-DE")
+        }.bodyAsText()
+
+        assertContains(english, "Continue listening")
+        assertContains(english, "Oct 12")
+        assertContains(unsupported, "lang=\"en\"") // falls back to the default language
     }
 
     @Test
@@ -56,9 +76,10 @@ class ApplicationTest {
     fun htmxFragmentIsPartialHtml() = testApplication {
         application { module() }
 
-        val html = client.get("/fragments/latest").bodyAsText()
+        val html = client.get("/fragments/latest") { header(HttpHeaders.AcceptLanguage, "fr") }.bodyAsText()
 
         assertTrue(html.trimStart().startsWith("<ul"), html)
         assertContains(html, "id=\"latest\"")
+        assertContains(html, "12 oct.")
     }
 }

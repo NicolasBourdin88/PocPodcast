@@ -49,7 +49,6 @@ fun episodeResource(episode: Episode, podcast: Podcast?): JsonObject = buildJson
     fields(episode)
     put("progress", episode.progress)
     put("remainingMinutes", episode.remainingMinutes)
-    put("durationLabel", episode.durationLabel)
     if (podcast != null) {
         putJsonObject("_embedded") { put("podcast", podcastResource(podcast)) }
     }

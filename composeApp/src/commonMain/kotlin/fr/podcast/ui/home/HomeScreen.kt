@@ -28,21 +28,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
-import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.theme.LocalStrings
 
 /** Home screen content. [twoColumns] puts "resume" and "latest" side by side. */
 @Composable
 fun HomeScreen(state: HomeState, twoColumns: Boolean, modifier: Modifier = Modifier) {
+    val strings = LocalStrings.current
     if (twoColumns) {
         Row(modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LazyColumn(Modifier.weight(1f)) { resumeSection(state.resume) }
-            LazyColumn(Modifier.weight(1f)) { latestSection(state.latest) }
+            LazyColumn(Modifier.weight(1f)) { resumeSection(strings.resumeListening, state.resume) }
+            LazyColumn(Modifier.weight(1f)) { latestSection(strings.latestEpisodes, state.latest) }
         }
     } else {
         LazyColumn(modifier.fillMaxSize()) {
-            resumeSection(state.resume)
-            latestSection(state.latest)
+            resumeSection(strings.resumeListening, state.resume)
+            latestSection(strings.latestEpisodes, state.latest)
         }
     }
 }
@@ -57,19 +58,20 @@ private fun LazyListScope.sectionTitle(title: String) {
     }
 }
 
-private fun LazyListScope.resumeSection(items: List<EpisodeItem>) {
+private fun LazyListScope.resumeSection(title: String, items: List<EpisodeItem>) {
     if (items.isEmpty()) return
-    sectionTitle("Reprendre l'écoute")
+    sectionTitle(title)
     items(items, key = { "resume-${it.episode.id}" }) { ResumeCard(it) }
 }
 
-private fun LazyListScope.latestSection(items: List<EpisodeItem>) {
-    sectionTitle("Nouveaux épisodes")
+private fun LazyListScope.latestSection(title: String, items: List<EpisodeItem>) {
+    sectionTitle(title)
     items(items, key = { "latest-${it.episode.id}" }) { EpisodeRow(it) }
 }
 
 @Composable
 private fun ResumeCard(item: EpisodeItem) {
+    val strings = LocalStrings.current
     val episode = item.episode
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
@@ -87,11 +89,11 @@ private fun ResumeCard(item: EpisodeItem) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 LinearProgressIndicator(progress = { episode.progress }, modifier = Modifier.fillMaxWidth())
-                Text("${episode.remainingMinutes} min restantes", style = MaterialTheme.typography.bodySmall)
+                Text(strings.remaining(episode.remainingMinutes), style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.width(8.dp))
             FilledTonalIconButton(onClick = {}) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Reprendre")
+                Icon(Icons.Default.PlayArrow, contentDescription = strings.resume)
             }
         }
     }
@@ -99,20 +101,16 @@ private fun ResumeCard(item: EpisodeItem) {
 
 @Composable
 private fun EpisodeRow(item: EpisodeItem) {
+    val strings = LocalStrings.current
     val episode = item.episode
-    val status = when (episode.status) {
-        EpisodeStatus.NEW -> "Nouveau"
-        EpisodeStatus.IN_PROGRESS -> "${episode.remainingMinutes} min restantes"
-        EpisodeStatus.PLAYED -> "Écouté"
-    }
     ListItem(
         leadingContent = { Artwork(item.podcast, size = 48.dp) },
-        overlineContent = { Text("${item.podcast.title} · ${episode.publishedLabel}") },
+        overlineContent = { Text("${item.podcast.title} · ${strings.shortDate(episode.publishedOn)}") },
         headlineContent = { Text(episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text("${episode.durationLabel} · $status") },
+        supportingContent = { Text("${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}") },
         trailingContent = {
             FilledTonalIconButton(onClick = {}) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Lire")
+                Icon(Icons.Default.PlayArrow, contentDescription = strings.play)
             }
         },
     )

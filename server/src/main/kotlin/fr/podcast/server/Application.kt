@@ -9,6 +9,7 @@ import fr.podcast.server.hal.podcastResource
 import fr.podcast.server.html.homePage
 import fr.podcast.server.html.latestFragmentHtml
 import fr.podcast.shared.home.LoadHomeState
+import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.repository.FakePodcastRepository
 import fr.podcast.shared.repository.PodcastRepository
 import io.ktor.http.ContentType
@@ -20,6 +21,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.respondHtml
 import io.ktor.server.netty.Netty
 import io.ktor.server.request.acceptItems
+import io.ktor.server.request.acceptLanguageItems
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -37,16 +39,18 @@ fun Application.module(repository: PodcastRepository = FakePodcastRepository()) 
     routing {
         get("/") {
             val state = loadHomeState()
-            call.response.header(HttpHeaders.Vary, HttpHeaders.Accept)
+            call.response.header(HttpHeaders.Vary, "${HttpHeaders.Accept}, ${HttpHeaders.AcceptLanguage}")
             if (call.prefersHal()) {
                 call.respondHal(homeResource(state))
             } else {
-                call.respondHtml { homePage(state) }
+                val language = call.language()
+                call.respondHtml { homePage(state, language) }
             }
         }
 
         get("/fragments/latest") {
-            call.respondText(latestFragmentHtml(loadHomeState().latest), ContentType.Text.Html)
+            call.response.header(HttpHeaders.Vary, HttpHeaders.AcceptLanguage)
+            call.respondText(latestFragmentHtml(loadHomeState().latest, call.language().strings), ContentType.Text.Html)
         }
 
         get("/podcasts") {
@@ -80,6 +84,10 @@ fun Application.module(repository: PodcastRepository = FakePodcastRepository()) 
         }
     }
 }
+
+/** Interface language negotiated from Accept-Language (HAL stays language-neutral). */
+private fun ApplicationCall.language(): Language =
+    Language.negotiate(request.acceptLanguageItems().map { it.value })
 
 /** True when the client ranks a JSON representation above HTML in its Accept header. */
 private fun ApplicationCall.prefersHal(): Boolean {

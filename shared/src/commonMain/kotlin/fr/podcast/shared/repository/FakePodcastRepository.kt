@@ -3,6 +3,7 @@ package fr.podcast.shared.repository
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.Podcast
+import kotlinx.datetime.LocalDate
 
 /** In-memory data used by every client until the real backend exists (step 3). */
 class FakePodcastRepository : PodcastRepository {
@@ -16,18 +17,18 @@ class FakePodcastRepository : PodcastRepository {
 
     // Ordered from most recent to oldest.
     private val episodes = listOf(
-        Episode("e1", "p2", "Compose Multiplatform for iOS is stable", "12 oct.", durationSeconds = 52 * 60),
+        Episode("e1", "p2", "Compose Multiplatform for iOS is stable", LocalDate(2026, 10, 12), durationSeconds = 52 * 60),
         Episode(
-            "e2", "p1", "LCC 330 - Les nouveautés de Kotlin 2.4", "10 oct.",
+            "e2", "p1", "LCC 330 - Les nouveautés de Kotlin 2.4", LocalDate(2026, 10, 10),
             durationSeconds = 95 * 60, positionSeconds = 38 * 60, status = EpisodeStatus.IN_PROGRESS,
         ),
-        Episode("e3", "p4", "KMP in production", "8 oct.", durationSeconds = 47 * 60),
+        Episode("e3", "p4", "KMP in production", LocalDate(2026, 10, 8), durationSeconds = 47 * 60),
         Episode(
-            "e4", "p3", "Qui a inventé le copier-coller ?", "5 oct.",
+            "e4", "p3", "Qui a inventé le copier-coller ?", LocalDate(2026, 10, 5),
             durationSeconds = 34 * 60, positionSeconds = 25 * 60, status = EpisodeStatus.IN_PROGRESS,
         ),
         Episode(
-            "e5", "p2", "Ktor 3 and server-side Kotlin", "28 sept.",
+            "e5", "p2", "Ktor 3 and server-side Kotlin", LocalDate(2026, 9, 28),
             durationSeconds = 61 * 60, positionSeconds = 61 * 60, status = EpisodeStatus.PLAYED,
         ),
     )

@@ -1,8 +1,7 @@
 package fr.podcast.cli
 
-import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
-import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.i18n.Strings
 import kotlin.math.roundToInt
 
 /** Progress bar drawn with block characters, e.g. "████░░░░░░". */
@@ -11,25 +10,20 @@ fun progressBar(progress: Float, width: Int = 20): String {
     return "█".repeat(filled) + "░".repeat(width - filled)
 }
 
-fun EpisodeItem.statusLabel(): String = when (episode.status) {
-    EpisodeStatus.NEW -> "Nouveau"
-    EpisodeStatus.IN_PROGRESS -> "${episode.remainingMinutes} min restantes"
-    EpisodeStatus.PLAYED -> "Écouté"
-}
-
 /** Plain-text Home screen for `podcast list`. */
-fun renderHomeText(state: HomeState): String = buildString {
+fun renderHomeText(state: HomeState, strings: Strings): String = buildString {
     if (state.resume.isNotEmpty()) {
-        appendLine("Reprendre l'écoute")
+        appendLine(strings.resumeListening)
         state.resume.forEach { item ->
             appendLine("  ${item.episode.title} — ${item.podcast.title}")
-            appendLine("  ${progressBar(item.episode.progress)} ${item.episode.remainingMinutes} min restantes")
+            appendLine("  ${progressBar(item.episode.progress)} ${strings.remaining(item.episode.remainingMinutes)}")
         }
         appendLine()
     }
-    appendLine("Nouveaux épisodes")
+    appendLine(strings.latestEpisodes)
     state.latest.forEach { item ->
-        appendLine("  ${item.episode.publishedLabel.padEnd(8)} ${item.episode.title}")
-        appendLine("  ${" ".repeat(8)} ${item.podcast.title} · ${item.episode.durationLabel} · ${item.statusLabel()}")
+        val episode = item.episode
+        appendLine("  ${strings.shortDate(episode.publishedOn).padEnd(8)} ${episode.title}")
+        appendLine("  ${" ".repeat(8)} ${item.podcast.title} · ${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}")
     }
 }.trimEnd()

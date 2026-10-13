@@ -1,5 +1,6 @@
 package fr.podcast.shared.model
 
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,8 +11,7 @@ data class Episode(
     val id: String,
     val podcastId: String,
     val title: String,
-    /** Human-readable publication date, e.g. "12 oct.". Will become a real date in step 3. */
-    val publishedLabel: String,
+    val publishedOn: LocalDate,
     val durationSeconds: Int,
     val positionSeconds: Int = 0,
     val status: EpisodeStatus = EpisodeStatus.NEW,
@@ -22,13 +22,4 @@ data class Episode(
 
     val remainingMinutes: Int
         get() = ((durationSeconds - positionSeconds).coerceAtLeast(0) + 59) / 60
-
-    /** Duration formatted as "1 h 05" or "42 min". */
-    val durationLabel: String
-        get() {
-            val totalMinutes = durationSeconds / 60
-            val hours = totalMinutes / 60
-            val minutes = totalMinutes % 60
-            return if (hours > 0) "$hours h ${minutes.toString().padStart(2, '0')}" else "$minutes min"
-        }
 }

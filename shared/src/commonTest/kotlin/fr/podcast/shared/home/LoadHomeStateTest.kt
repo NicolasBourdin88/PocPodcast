@@ -40,6 +40,5 @@ class LoadHomeStateTest {
 
         assertEquals(0.4f, episode.progress, absoluteTolerance = 0.001f)
         assertEquals(57, episode.remainingMinutes)
-        assertEquals("1 h 35", episode.durationLabel)
     }
 }

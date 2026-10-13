@@ -3,13 +3,14 @@ package fr.podcast.ui
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import fr.podcast.shared.i18n.Language
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Renders the app at each window size and writes PNGs to build/snapshots,
+ * Renders the app at each window size, in every language, and writes PNGs to build/snapshots,
  * so the responsive layouts can be checked without launching the app.
  */
 class ResponsiveSnapshotTest {
@@ -34,14 +35,14 @@ class ResponsiveSnapshotTest {
     @Test
     fun renderEveryLayout() {
         val outDir = File("build/snapshots").apply { mkdirs() }
-        sizes.forEach { (name, size) ->
+        for ((name, size) in sizes) for (language in Language.entries) {
             val (width, height) = size
-            val scene = ImageComposeScene(width, height, Density(1f)) { App() }
+            val scene = ImageComposeScene(width, height, Density(1f)) { App(language = language) }
             try {
                 scene.render(0) // first frame launches the state loading
                 val image = scene.render(1_000_000_000)
                 val data = requireNotNull(image.encodeToData(EncodedImageFormat.PNG))
-                File(outDir, "$name.png").writeBytes(data.bytes)
+                File(outDir, "$name-${language.tag}.png").writeBytes(data.bytes)
             } finally {
                 scene.close()
             }

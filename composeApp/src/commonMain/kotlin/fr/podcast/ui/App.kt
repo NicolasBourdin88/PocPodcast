@@ -1,6 +1,5 @@
 package fr.podcast.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -35,8 +34,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,24 +49,33 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.home.LoadHomeState
+import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.Podcast
+import fr.podcast.shared.navigation.Destination
 import fr.podcast.shared.repository.FakePodcastRepository
 import fr.podcast.shared.repository.PodcastRepository
 import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.home.HomeScreen
 import fr.podcast.ui.player.MiniPlayer
+import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.theme.PodcastTheme
+import fr.podcast.ui.theme.platformLanguage
 
-enum class Destination(val label: String, val icon: ImageVector) {
-    Home("Accueil", Icons.Default.Home),
-    Explore("Explorer", Icons.Default.Search),
-    Library("Bibliothèque", Icons.AutoMirrored.Filled.List),
-    Settings("Réglages", Icons.Default.Settings),
-}
+private val Destination.icon: ImageVector
+    get() = when (this) {
+        Destination.Home -> Icons.Default.Home
+        Destination.Explore -> Icons.Default.Search
+        Destination.Library -> Icons.AutoMirrored.Filled.List
+        Destination.Settings -> Icons.Default.Settings
+    }
 
 @Composable
-fun App(repository: PodcastRepository = remember { FakePodcastRepository() }) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+fun App(
+    repository: PodcastRepository = remember { FakePodcastRepository() },
+    language: Language = platformLanguage(),
+) {
+    PodcastTheme(language) {
         val home by produceState<HomeState?>(null, repository) { value = LoadHomeState(repository)() }
         val subscriptions by produceState(emptyList<Podcast>(), repository) { value = repository.subscriptions() }
 
@@ -83,12 +89,13 @@ fun App(repository: PodcastRepository = remember { FakePodcastRepository() }) {
 
 @Composable
 private fun AppScaffold(layout: WindowLayout, home: HomeState?, subscriptions: List<Podcast>) {
+    val strings = LocalStrings.current
     var selected by rememberSaveable { mutableStateOf(Destination.Home) }
     val nowPlaying = home?.resume?.firstOrNull()
 
     val content: @Composable (Modifier) -> Unit = { modifier ->
         when {
-            selected != Destination.Home -> Placeholder(selected.label, modifier)
+            selected != Destination.Home -> Placeholder(strings.comingSoon(strings.destination(selected)), modifier)
             home == null -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             else -> HomeScreen(home, twoColumns = layout == WindowLayout.CompactHeight, modifier = modifier)
         }
@@ -105,7 +112,7 @@ private fun AppScaffold(layout: WindowLayout, home: HomeState?, subscriptions: L
                                 selected = selected == destination,
                                 onClick = { selected = destination },
                                 icon = { Icon(destination.icon, contentDescription = null) },
-                                label = { Text(destination.label) },
+                                label = { Text(strings.destination(destination)) },
                             )
                         }
                     }
@@ -120,7 +127,7 @@ private fun AppScaffold(layout: WindowLayout, home: HomeState?, subscriptions: L
                         selected = selected == destination,
                         onClick = { selected = destination },
                         icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(destination.label) },
+                        label = { Text(strings.destination(destination)) },
                     )
                 }
             }
@@ -141,7 +148,7 @@ private fun AppScaffold(layout: WindowLayout, home: HomeState?, subscriptions: L
             drawerContent = {
                 PermanentDrawerSheet(Modifier.width(280.dp)) {
                     Text(
-                        "Podcast",
+                        strings.appName,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
                     )
@@ -150,13 +157,13 @@ private fun AppScaffold(layout: WindowLayout, home: HomeState?, subscriptions: L
                             selected = selected == destination,
                             onClick = { selected = destination },
                             icon = { Icon(destination.icon, contentDescription = null) },
-                            label = { Text(destination.label) },
+                            label = { Text(strings.destination(destination)) },
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
                     HorizontalDivider(Modifier.padding(vertical = 12.dp, horizontal = 28.dp))
                     Text(
-                        "Abonnements",
+                        strings.subscriptions,
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
                     )
@@ -195,7 +202,7 @@ private fun QueuePanel(home: HomeState, width: Dp) {
     LazyColumn(Modifier.width(width).fillMaxHeight()) {
         item {
             Text(
-                "File d'attente",
+                LocalStrings.current.queue,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(16.dp),
             )
@@ -204,15 +211,15 @@ private fun QueuePanel(home: HomeState, width: Dp) {
             ListItem(
                 leadingContent = { Artwork(item.podcast, size = 40.dp) },
                 headlineContent = { Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                supportingContent = { Text("${item.podcast.title} · ${item.episode.durationLabel}") },
+                supportingContent = { Text("${item.podcast.title} · ${LocalStrings.current.duration(item.episode.durationSeconds)}") },
             )
         }
     }
 }
 
 @Composable
-private fun Placeholder(label: String, modifier: Modifier) {
+private fun Placeholder(text: String, modifier: Modifier) {
     Box(modifier.fillMaxSize(), Alignment.Center) {
-        Text("$label — à venir", style = MaterialTheme.typography.bodyLarge)
+        Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }

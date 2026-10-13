@@ -14,14 +14,17 @@ import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
+import fr.podcast.shared.design.DesignTokens
 import fr.podcast.shared.home.HomeState
+import fr.podcast.shared.i18n.Strings
+import fr.podcast.shared.navigation.Destination
 import kotlinx.coroutines.CompletableDeferred
 
-private val Accent = Color(0xD0, 0xBC, 0xFF)
+private val Accent = DesignTokens.dark.primary.let { Color(it shr 16 and 0xFF, it shr 8 and 0xFF, it and 0xFF) }
 
 /** Interactive Home screen: same state as every other client, rendered in the terminal. */
 @Composable
-fun HomeTui(state: HomeState) {
+fun HomeTui(state: HomeState, strings: Strings) {
     val quit = remember { CompletableDeferred<Unit>() }
     var selected by remember { mutableIntStateOf(0) }
 
@@ -39,32 +42,32 @@ fun HomeTui(state: HomeState) {
             true
         },
     ) {
-        Text("Podcast · Accueil", textStyle = TextStyle.Bold, color = Accent)
+        Text("${strings.appName} · ${strings.destination(Destination.Home)}", textStyle = TextStyle.Bold, color = Accent)
         Text("")
 
         if (state.resume.isNotEmpty()) {
-            Text("Reprendre l'écoute", textStyle = TextStyle.Bold)
+            Text(strings.resumeListening, textStyle = TextStyle.Bold)
             state.resume.forEach { item ->
                 Text("  ${item.episode.title}")
                 Row {
                     Text("  ${progressBar(item.episode.progress)} ", color = Accent)
-                    Text("${item.episode.remainingMinutes} min restantes · ${item.podcast.title}", textStyle = TextStyle.Dim)
+                    Text("${strings.remaining(item.episode.remainingMinutes)} · ${item.podcast.title}", textStyle = TextStyle.Dim)
                 }
             }
             Text("")
         }
 
-        Text("Nouveaux épisodes", textStyle = TextStyle.Bold)
+        Text(strings.latestEpisodes, textStyle = TextStyle.Bold)
         state.latest.forEachIndexed { index, item ->
             val isSelected = index == selected
             Text(
                 "${if (isSelected) "›" else " "} ${item.episode.title}",
                 textStyle = if (isSelected) TextStyle.Invert else TextStyle.Unspecified,
             )
-            Text("    ${item.podcast.title} · ${item.episode.publishedLabel} · ${item.episode.durationLabel} · ${item.statusLabel()}", textStyle = TextStyle.Dim)
+            Text("    ${item.podcast.title} · ${strings.shortDate(item.episode.publishedOn)} · ${strings.duration(item.episode.durationSeconds)} · ${strings.status(item.episode)}", textStyle = TextStyle.Dim)
         }
 
         Text("")
-        Text("↑/↓ naviguer · q quitter", textStyle = TextStyle.Dim)
+        Text(strings.tuiHelp, textStyle = TextStyle.Dim)
     }
 }

@@ -1,8 +1,15 @@
 package fr.podcast.server.html
 
 import fr.podcast.shared.home.EpisodeItem
+import fr.podcast.shared.design.ColorTokens
+import fr.podcast.shared.design.DesignTokens
+import fr.podcast.shared.design.artworkColor
+import fr.podcast.shared.design.initials
+import fr.podcast.shared.design.toCssHex
 import fr.podcast.shared.home.HomeState
-import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.i18n.Language
+import fr.podcast.shared.i18n.Strings
+import fr.podcast.shared.navigation.Destination
 import kotlinx.html.FlowContent
 import kotlinx.html.HTML
 import kotlinx.html.UL
@@ -30,43 +37,39 @@ import kotlinx.html.style
 import kotlinx.html.title
 import kotlinx.html.ul
 import kotlinx.html.unsafe
-import kotlin.math.absoluteValue
-
-// Same palette and choice rule as the Compose client, so a podcast has the same color everywhere.
-private val ARTWORK_COLORS = listOf("#6750A4", "#0B6E4F", "#B3261E", "#1F5FA8", "#8A5A00")
 
 private const val HTMX_URL = "https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js"
 
-private val navigation = listOf(
-    "Accueil" to "/",
-    "Explorer" to "/explore",
-    "Bibliothèque" to "/library",
-    "Réglages" to "/settings",
-)
-
-fun HTML.homePage(state: HomeState) {
-    lang = "fr"
+fun HTML.homePage(state: HomeState, language: Language) {
+    val strings = language.strings
+    val homeTitle = strings.destination(Destination.Home)
+    lang = language.tag
     head {
         meta(charset = "utf-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1")
-        title("Podcast — Accueil")
+        title("${strings.appName} — $homeTitle")
         script(src = HTMX_URL) {}
         style { unsafe { +STYLES } }
     }
     body {
         nav(classes = "nav") {
-            div("brand") { +"Podcast" }
+            div("brand") { +strings.appName }
             ul {
-                navigation.forEach { (label, href) ->
-                    li { a(href = href) { if (href == "/") attributes["aria-current"] = "page"; +label } }
+                Destination.entries.forEach { destination ->
+                    li {
+                        a(href = destination.path) {
+                            if (destination == Destination.Home) attributes["aria-current"] = "page"
+                            +strings.destination(destination)
+                        }
+                    }
                 }
             }
         }
         main {
-            header { h1 { +"Accueil" } }
+            header { h1 { +homeTitle } }
             if (state.resume.isNotEmpty()) {
                 section {
-                    h2 { +"Reprendre l'écoute" }
+                    h2 { +strings.resumeListening }
                     ul("cards") {
                         state.resume.forEach { item ->
                             li("card") {
@@ -78,7 +81,7 @@ fun HTML.homePage(state: HomeState) {
                                         attributes["max"] = "1"
                                         attributes["value"] = item.episode.progress.toString()
                                     }
-                                    span("meta") { +"${item.episode.remainingMinutes} min restantes" }
+                                    span("meta") { +strings.remaining(item.episode.remainingMinutes) }
                                 }
                             }
                         }
@@ -87,15 +90,15 @@ fun HTML.homePage(state: HomeState) {
             }
             section {
                 div("section-header") {
-                    h2 { +"Nouveaux épisodes" }
+                    h2 { +strings.latestEpisodes }
                     button(classes = "refresh") {
                         attributes["hx-get"] = "/fragments/latest"
                         attributes["hx-target"] = "#latest"
                         attributes["hx-swap"] = "outerHTML"
-                        +"Rafraîchir"
+                        +strings.refresh
                     }
                 }
-                latestFragment(state.latest)
+                latestFragment(state.latest, strings)
             }
         }
         state.resume.firstOrNull()?.let { item ->
@@ -105,57 +108,57 @@ fun HTML.homePage(state: HomeState) {
                     span("title") { +item.episode.title }
                     span("meta") { +item.podcast.title }
                 }
-                button(classes = "play") { attributes["aria-label"] = "Lecture"; +"▶" }
+                button(classes = "play") { attributes["aria-label"] = strings.play; +"▶" }
             }
         }
     }
 }
 
 /** List of latest episodes, also served alone at /fragments/latest for htmx. */
-fun FlowContent.latestFragment(items: List<EpisodeItem>) {
-    ul("episodes") { latestItems(items) }
+fun FlowContent.latestFragment(items: List<EpisodeItem>, strings: Strings) {
+    ul("episodes") { latestItems(items, strings) }
 }
 
-fun latestFragmentHtml(items: List<EpisodeItem>): String =
-    createHTML().ul("episodes") { latestItems(items) }
+fun latestFragmentHtml(items: List<EpisodeItem>, strings: Strings): String =
+    createHTML().ul("episodes") { latestItems(items, strings) }
 
-private fun UL.latestItems(items: List<EpisodeItem>) {
+private fun UL.latestItems(items: List<EpisodeItem>, strings: Strings) {
     attributes["id"] = "latest"
     items.forEach { item ->
         val episode = item.episode
-        val status = when (episode.status) {
-            EpisodeStatus.NEW -> "Nouveau"
-            EpisodeStatus.IN_PROGRESS -> "${episode.remainingMinutes} min restantes"
-            EpisodeStatus.PLAYED -> "Écouté"
-        }
         li("episode") {
             artwork(item)
             div("card-body") {
-                span("overline") { +"${item.podcast.title} · ${episode.publishedLabel}" }
+                span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn)}" }
                 a(href = "/episodes/${episode.id}", classes = "title") { +episode.title }
-                span("meta") { +"${episode.durationLabel} · $status" }
+                span("meta") { +"${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}" }
             }
         }
     }
 }
 
 private fun FlowContent.artwork(item: EpisodeItem) {
-    val initials = item.podcast.title.split(' ').filter { it.isNotBlank() }.take(2)
-        .joinToString("") { it.first().uppercase() }
     aside("artwork") {
-        attributes["style"] = "background: ${ARTWORK_COLORS[item.podcast.id.hashCode().absoluteValue % ARTWORK_COLORS.size]}"
+        attributes["style"] = "background: ${item.podcast.artworkColor.toCssHex()}"
         attributes["aria-hidden"] = "true"
-        +initials
+        +item.podcast.initials
     }
 }
 
+/** CSS variables generated from the shared design tokens. */
+private fun ColorTokens.cssVariables() = listOf(
+    "--bg" to background,
+    "--surface" to surfaceContainer,
+    "--card" to secondaryContainer,
+    "--text" to onSurface,
+    "--muted" to onSurfaceVariant,
+    "--accent" to primary,
+).joinToString(" ") { (name, value) -> "$name: ${value.toCssHex()};" }
+
 private val STYLES = """
-    :root {
-      --bg: #fdf7ff; --surface: #f3edf7; --card: #e8def8; --text: #1d1b20; --muted: #625b71; --accent: #6750a4;
-      color-scheme: light dark;
-    }
+    :root { ${DesignTokens.light.cssVariables()} color-scheme: light dark; }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #141218; --surface: #1d1b20; --card: #4a4458; --text: #e6e0e9; --muted: #cac4d0; --accent: #d0bcff; }
+      :root { ${DesignTokens.dark.cssVariables()} }
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.theme.LocalStrings
 
 /** Fake mini player: shows the episode but does not play anything yet (step 5). */
 @Composable
@@ -54,7 +55,7 @@ fun MiniPlayer(item: EpisodeItem, singleLine: Boolean, modifier: Modifier = Modi
                     }
                 }
                 IconButton(onClick = {}) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Lecture")
+                    Icon(Icons.Default.PlayArrow, contentDescription = LocalStrings.current.play)
                 }
             }
         }

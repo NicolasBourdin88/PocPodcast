@@ -1,6 +1,7 @@
 package fr.podcast.cli
 
 import fr.podcast.shared.home.LoadHomeState
+import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.repository.FakePodcastRepository
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -17,11 +18,16 @@ class HomeTextTest {
     }
 
     @Test
-    fun homeTextShowsBothSections() {
-        val text = renderHomeText(runBlocking { LoadHomeState(FakePodcastRepository())() })
+    fun homeTextShowsBothSectionsInTheRequestedLanguage() {
+        val home = runBlocking { LoadHomeState(FakePodcastRepository())() }
 
-        assertContains(text, "Reprendre l'écoute")
-        assertContains(text, "Nouveaux épisodes")
-        assertContains(text, "LCC 330 - Les nouveautés de Kotlin 2.4")
+        val french = renderHomeText(home, Language.French.strings)
+        assertContains(french, "Reprendre l'écoute")
+        assertContains(french, "Nouveaux épisodes")
+        assertContains(french, "LCC 330 - Les nouveautés de Kotlin 2.4")
+
+        val english = renderHomeText(home, Language.English.strings)
+        assertContains(english, "Continue listening")
+        assertContains(english, "57 min left")
     }
 }
