@@ -37,10 +37,40 @@ interface Strings {
         EpisodeStatus.PLAYED -> statusPlayed
     }
 
+    // Accounts and sign-in
+    val signInTitle: String
+    val serverUrl: String
+    val username: String
+    val password: String
+    val signIn: String
+    val signOut: String
+    val invalidCredentials: String
+    val serverUnreachable: String
+    val notAPodcastServer: String
+    val accounts: String
+    val addAccount: String
+    val demoMode: String
+    val demoAccount: String
+    val loadingError: String
+    val retry: String
+    fun signedInAs(name: String): String
+
+    /** Label of a server action, by its HAL-FORMS template name (ADR 0003). */
+    fun action(name: String): String
+
     // CLI
     val cliDescription: String
     val cliListDescription: String
     val cliTuiDescription: String
     val cliLanguageOption: String
+    val cliDemoOption: String
+    val cliLoginDescription: String
+    val cliAccountsDescription: String
+    val cliUseDescription: String
+    val cliLogoutDescription: String
+    val noAccount: String
+    val unknownAccount: String
+    val signedOut: String
+    fun accountSaved(username: String, server: String): String
     val tuiHelp: String
 }

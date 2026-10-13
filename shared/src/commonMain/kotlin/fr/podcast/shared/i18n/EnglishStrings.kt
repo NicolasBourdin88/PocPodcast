@@ -34,9 +34,43 @@ object EnglishStrings : Strings {
     override val statusNew = "New"
     override val statusPlayed = "Played"
 
+    override val signInTitle = "Sign in"
+    override val serverUrl = "Server address"
+    override val username = "Username"
+    override val password = "Password"
+    override val signIn = "Sign in"
+    override val signOut = "Sign out"
+    override val invalidCredentials = "Wrong username or password."
+    override val serverUnreachable = "Cannot reach the server."
+    override val notAPodcastServer = "This address is not a podcast server."
+    override val accounts = "Accounts"
+    override val addAccount = "Add an account"
+    override val demoMode = "Try with demo data"
+    override val demoAccount = "Demo (no server)"
+    override val loadingError = "Could not load the data."
+    override val retry = "Retry"
+    override fun signedInAs(name: String) = "Signed in as $name"
+
+    override fun action(name: String) = when (name) {
+        "mark-played" -> "Mark as played"
+        "mark-unplayed" -> "Mark as unplayed"
+        "update-progress" -> "Save position"
+        "logout" -> signOut
+        else -> name
+    }
+
     override val cliDescription = "Command-line client for the podcast system."
     override val cliListDescription = "Prints the Home screen as text."
     override val cliTuiDescription = "Opens the Home screen in interactive mode."
     override val cliLanguageOption = "Interface language (fr or en)."
+    override val cliDemoOption = "Use demo data instead of a server."
+    override val cliLoginDescription = "Signs in to a server and saves the account."
+    override val cliAccountsDescription = "Lists saved accounts (* = active account)."
+    override val cliUseDescription = "Selects the active account."
+    override val cliLogoutDescription = "Signs out of the active account and revokes its token."
+    override val noAccount = "No account. Run \"podcast login\" or add --demo."
+    override val unknownAccount = "Unknown account."
+    override val signedOut = "Signed out."
+    override fun accountSaved(username: String, server: String) = "Signed in: $username on $server."
     override val tuiHelp = "↑/↓ move · q quit"
 }
