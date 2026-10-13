@@ -9,4 +9,5 @@ data class Podcast(
     val author: String,
     val feedUrl: String,
     val artworkUrl: String? = null,
+    val description: String = "",
 )

@@ -64,7 +64,7 @@ fun HomeTui(state: HomeState, strings: Strings) {
                 "${if (isSelected) "›" else " "} ${item.episode.title}",
                 textStyle = if (isSelected) TextStyle.Invert else TextStyle.Unspecified,
             )
-            Text("    ${item.podcast.title} · ${strings.shortDate(item.episode.publishedOn)} · ${strings.duration(item.episode.durationSeconds)} · ${strings.status(item.episode)}", textStyle = TextStyle.Dim)
+            Text("    ${item.podcast.title} · ${strings.shortDate(item.episode.publishedOn())} · ${strings.duration(item.episode.durationSeconds)} · ${strings.status(item.episode)}", textStyle = TextStyle.Dim)
         }
 
         Text("")

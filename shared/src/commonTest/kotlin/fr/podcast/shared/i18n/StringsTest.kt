@@ -3,6 +3,7 @@ package fr.podcast.shared.i18n
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import kotlinx.datetime.LocalDate
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -37,7 +38,7 @@ class StringsTest {
 
     @Test
     fun statusDependsOnTheEpisode() {
-        val episode = Episode("e", "p", "t", LocalDate(2026, 1, 1), durationSeconds = 600, positionSeconds = 540,
+        val episode = Episode("e", "p", "t", Instant.parse("2026-01-01T00:00:00Z"), durationSeconds = 600, positionSeconds = 540,
             status = EpisodeStatus.IN_PROGRESS)
 
         assertEquals("1 min restante", FrenchStrings.status(episode))

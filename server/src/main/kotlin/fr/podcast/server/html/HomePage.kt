@@ -129,7 +129,7 @@ private fun UL.latestItems(items: List<EpisodeItem>, strings: Strings) {
         li("episode") {
             artwork(item)
             div("card-body") {
-                span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn)}" }
+                span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn())}" }
                 a(href = "/episodes/${episode.id}", classes = "title") { +episode.title }
                 span("meta") { +"${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}" }
             }
