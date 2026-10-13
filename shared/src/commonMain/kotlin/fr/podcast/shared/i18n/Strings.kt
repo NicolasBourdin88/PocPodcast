@@ -87,6 +87,10 @@ interface Strings {
     val opmlExport: String
     val opmlImport: String
     fun opmlReport(imported: Int, alreadySubscribed: Int, failed: Int): String
+    fun opmlSaved(name: String): String
+    val choosePodcast: String
+    val noEpisodes: String
+    val searchUnavailable: String
 
     // Files and marks (ADR 0007)
     val kept: String
@@ -113,6 +117,7 @@ interface Strings {
     val cliLogoutDescription: String
     val noAccount: String
     val unknownAccount: String
+    fun unknownNumber(number: Int): String
     val signedOut: String
     fun accountSaved(username: String, server: String): String
     val cliSearchDescription: String

@@ -94,6 +94,10 @@ object EnglishStrings : Strings {
     override val opmlImport = "Import an OPML file"
     override fun opmlReport(imported: Int, alreadySubscribed: Int, failed: Int) =
         "$imported imported, $alreadySubscribed already followed, $failed failed."
+    override fun opmlSaved(name: String) = "Subscriptions exported to $name."
+    override val choosePodcast = "Choose a podcast in the list."
+    override val noEpisodes = "No episodes yet."
+    override val searchUnavailable = "This server has no search; add a feed by its address."
 
     override val kept = "Kept"
     override val chapters = "Chapters"
@@ -121,6 +125,7 @@ object EnglishStrings : Strings {
     override val cliUseDescription = "Selects the active account."
     override val cliLogoutDescription = "Signs out of the active account and revokes its token."
     override val noAccount = "No account. Run \"podcast login\" or add --demo."
+    override fun unknownNumber(number: Int) = "No number $number in the list."
     override val unknownAccount = "Unknown account."
     override val signedOut = "Signed out."
     override fun accountSaved(username: String, server: String) = "Signed in: $username on $server."

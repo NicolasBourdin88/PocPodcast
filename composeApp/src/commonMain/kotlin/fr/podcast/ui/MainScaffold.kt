@@ -56,11 +56,13 @@ import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.navigation.Destination
-import fr.podcast.shared.repository.PodcastRepository
+import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.explore.ExploreScreen
 import fr.podcast.ui.home.HomeScreen
 import fr.podcast.ui.home.HomeUiState
 import fr.podcast.ui.home.loadHome
+import fr.podcast.ui.library.LibraryScreen
 import fr.podcast.ui.player.MiniPlayer
 import fr.podcast.ui.theme.LocalStrings
 
@@ -72,28 +74,34 @@ private val Destination.icon: ImageVector
         Destination.Settings -> Icons.Default.Settings
     }
 
-/** The app once an account (or the demo) is chosen: Home from [repository], adaptive navigation. */
+/** The app once an account (or the demo) is chosen: everything comes from [client], adaptive navigation. */
 @Composable
 fun MainScaffold(
-    repository: PodcastRepository,
+    client: PodcastClient,
     accountLabel: String,
     settings: @Composable (Modifier) -> Unit,
     onSessionExpired: () -> Unit = {},
     initialDestination: Destination = Destination.Home,
+    initialPodcastId: String? = null,
+    initialQuery: String = "",
 ) {
     var reloads by remember { mutableIntStateOf(0) }
-    val state by produceState<HomeUiState>(HomeUiState.Loading, repository, reloads) {
-        value = HomeUiState.Loading
-        value = loadHome(repository)
+    val state by produceState<HomeUiState>(HomeUiState.Loading, client, reloads) {
+        // A reload after a library change keeps the current Home on screen until the new one is ready.
+        if (value !is HomeUiState.Loaded) value = HomeUiState.Loading
+        value = loadHome(client)
     }
     BoxWithConstraints {
         AdaptiveScaffold(
             layout = WindowLayout.from(maxWidth, maxHeight),
+            client = client,
             state = state,
             accountLabel = accountLabel,
             initialDestination = initialDestination,
+            initialPodcastId = initialPodcastId,
+            initialQuery = initialQuery,
             settings = settings,
-            onRetry = { reloads++ },
+            onReload = { reloads++ },
             onSessionExpired = onSessionExpired,
         )
     }
@@ -102,15 +110,25 @@ fun MainScaffold(
 @Composable
 private fun AdaptiveScaffold(
     layout: WindowLayout,
+    client: PodcastClient,
     state: HomeUiState,
     accountLabel: String,
     initialDestination: Destination,
+    initialPodcastId: String?,
+    initialQuery: String,
     settings: @Composable (Modifier) -> Unit,
-    onRetry: () -> Unit,
+    onReload: () -> Unit,
     onSessionExpired: () -> Unit,
 ) {
     val strings = LocalStrings.current
     var selected by rememberSaveable { mutableStateOf(initialDestination) }
+    var openPodcastId by rememberSaveable { mutableStateOf(initialPodcastId) }
+
+    // Choosing Library again goes back to the list.
+    fun select(destination: Destination) {
+        if (destination == selected && destination == Destination.Library) openPodcastId = null
+        selected = destination
+    }
     val home = (state as? HomeUiState.Loaded)?.home
     val subscriptions = (state as? HomeUiState.Loaded)?.subscriptions.orEmpty()
     val nowPlaying = home?.resume?.firstOrNull()
@@ -118,11 +136,19 @@ private fun AdaptiveScaffold(
     val content: @Composable (Modifier) -> Unit = { modifier ->
         when {
             selected == Destination.Settings -> settings(modifier)
-            selected != Destination.Home -> Message(strings.comingSoon(strings.destination(selected)), modifier)
+            selected == Destination.Explore -> ExploreScreen(client, onSubscribed = onReload, modifier, initialQuery)
+            selected == Destination.Library -> LibraryScreen(
+                client = client,
+                openPodcastId = openPodcastId,
+                onOpenPodcast = { openPodcastId = it },
+                twoPanes = layout == WindowLayout.Expanded || layout == WindowLayout.Large,
+                onChanged = onReload,
+                modifier = modifier,
+            )
             state is HomeUiState.Loading -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             state is HomeUiState.Failed && state.error is ApiException.Unauthorized ->
                 Message(strings.sessionExpired, modifier, action = strings.signIn, onAction = onSessionExpired)
-            state is HomeUiState.Failed -> Message(state.error.userMessage(strings), modifier, action = strings.retry, onAction = onRetry)
+            state is HomeUiState.Failed -> Message(state.error.userMessage(strings), modifier, action = strings.retry, onAction = onReload)
             home != null -> HomeScreen(home, twoColumns = layout == WindowLayout.CompactHeight, modifier = modifier)
         }
     }
@@ -136,7 +162,7 @@ private fun AdaptiveScaffold(
                         Destination.entries.forEach { destination ->
                             NavigationBarItem(
                                 selected = selected == destination,
-                                onClick = { selected = destination },
+                                onClick = { select(destination) },
                                 icon = { Icon(destination.icon, contentDescription = null) },
                                 label = { Text(strings.destination(destination)) },
                             )
@@ -151,7 +177,7 @@ private fun AdaptiveScaffold(
                 Destination.entries.forEach { destination ->
                     NavigationRailItem(
                         selected = selected == destination,
-                        onClick = { selected = destination },
+                        onClick = { select(destination) },
                         icon = { Icon(destination.icon, contentDescription = null) },
                         label = { Text(strings.destination(destination)) },
                     )
@@ -189,7 +215,7 @@ private fun AdaptiveScaffold(
                     Destination.entries.forEach { destination ->
                         NavigationDrawerItem(
                             selected = selected == destination,
-                            onClick = { selected = destination },
+                            onClick = { select(destination) },
                             icon = { Icon(destination.icon, contentDescription = null) },
                             label = { Text(strings.destination(destination)) },
                             modifier = Modifier.padding(horizontal = 12.dp),
@@ -202,7 +228,10 @@ private fun AdaptiveScaffold(
                             style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
                         )
-                        SubscriptionItems(subscriptions)
+                        SubscriptionItems(subscriptions, selectedId = openPodcastId.takeIf { selected == Destination.Library }) {
+                            openPodcastId = it.id
+                            selected = Destination.Library
+                        }
                     }
                 }
             },
@@ -222,11 +251,11 @@ private fun AdaptiveScaffold(
 }
 
 @Composable
-private fun SubscriptionItems(subscriptions: List<Podcast>) {
+private fun SubscriptionItems(subscriptions: List<Podcast>, selectedId: String?, onOpen: (Podcast) -> Unit) {
     subscriptions.forEach { podcast ->
         NavigationDrawerItem(
-            selected = false,
-            onClick = {},
+            selected = podcast.id == selectedId,
+            onClick = { onOpen(podcast) },
             icon = { Artwork(podcast, size = 28.dp) },
             label = { Text(podcast.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.padding(horizontal = 12.dp),

@@ -65,7 +65,7 @@ private fun AppRoot(environment: AppEnvironment) {
     val usingDemo = active == null
     val repository = remember(active) { active?.let { RemotePodcastRepository(it, environment.httpClient) } ?: FakePodcastRepository() }
     MainScaffold(
-        repository = repository,
+        client = repository,
         accountLabel = active?.let { "${it.displayName} · ${it.serverName}" } ?: strings.demoAccount,
         onSessionExpired = { active?.let { store.remove(it.id) } },
         settings = { modifier ->

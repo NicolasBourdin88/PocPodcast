@@ -68,15 +68,30 @@ class ResponsiveSnapshotTest {
         }
     }
 
+    @Test
+    fun renderLibraryScreens() {
+        for (language in Language.entries) {
+            val tag = language.tag
+            render("explore-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Explore, query = "kotlin") }
+            render("explore-large-$tag", sizes.getValue("large")) { Home(language, Destination.Explore, query = "kotlin") }
+            render("library-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library) }
+            render("podcast-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library, podcastId = "p2") }
+            render("library-expanded-$tag", sizes.getValue("expanded")) { Home(language, Destination.Library, podcastId = "p2") }
+            render("library-large-$tag", sizes.getValue("large")) { Home(language, Destination.Library, podcastId = "p1") }
+        }
+    }
+
     @Composable
-    private fun Home(language: Language, destination: Destination) {
+    private fun Home(language: Language, destination: Destination, podcastId: String? = null, query: String = "") {
         // Same tree as App(): theme, then a Surface for background and content colors.
         PodcastTheme(language) {
             Surface {
                 MainScaffold(
-                    repository = FakePodcastRepository(),
+                    client = FakePodcastRepository(),
                     accountLabel = "Alice · Podcast (dev)",
                     initialDestination = destination,
+                    initialPodcastId = podcastId,
+                    initialQuery = query,
                     settings = { modifier -> AccountsScreen(accounts, demo = false, {}, {}, {}, {}, modifier) },
                 )
             }

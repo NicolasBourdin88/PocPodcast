@@ -36,6 +36,10 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.material.icons.core)
         }
+        androidMain.dependencies {
+            // System back and file pickers.
+            implementation(libs.androidx.activity.compose)
+        }
         named("desktopMain").dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
