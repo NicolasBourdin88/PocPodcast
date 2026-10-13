@@ -1,5 +1,6 @@
 package fr.podcast.server.auth
 
+import com.password4j.Argon2Function
 import com.password4j.Password
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.db.toKotlinInstant
@@ -35,7 +36,10 @@ class Accounts(private val database: ServerDatabase) {
     /** The account if [password] is right, null otherwise. */
     suspend fun authenticate(username: String, password: String): UserAccount? {
         val row = database.query { usersQueries.userByUsername(username).executeAsOneOrNull() }
-        val matches = Password.check(password, row?.password_hash ?: dummyHash).withArgon2()
+        val hash = row?.password_hash ?: dummyHash
+        // Check with the parameters stored in the hash, not the configured ones (withArgon2()):
+        // raising the Argon2 cost later must not lock out existing accounts.
+        val matches = Password.check(password, hash).with(Argon2Function.getInstanceFromHash(hash))
         return row?.takeIf { matches }?.let { UserAccount(it.id, it.username, it.display_name, Role.valueOf(it.role)) }
     }
 
