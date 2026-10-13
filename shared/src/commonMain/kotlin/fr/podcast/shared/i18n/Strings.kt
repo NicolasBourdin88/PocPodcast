@@ -51,6 +51,8 @@ interface Strings {
     val addAccount: String
     val demoMode: String
     val demoAccount: String
+    val cancel: String
+    val sessionExpired: String
     val loadingError: String
     val retry: String
     fun signedInAs(name: String): String

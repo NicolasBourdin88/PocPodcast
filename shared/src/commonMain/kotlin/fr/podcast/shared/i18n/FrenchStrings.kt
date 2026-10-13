@@ -49,6 +49,8 @@ object FrenchStrings : Strings {
     override val addAccount = "Ajouter un compte"
     override val demoMode = "Essayer avec des données de démo"
     override val demoAccount = "Démo (sans serveur)"
+    override val cancel = "Annuler"
+    override val sessionExpired = "Ce compte n'est plus connecté sur ce serveur."
     override val loadingError = "Impossible de charger les données."
     override val retry = "Réessayer"
     override fun signedInAs(name: String) = "Connecté en tant que $name"

@@ -47,6 +47,8 @@ object EnglishStrings : Strings {
     override val addAccount = "Add an account"
     override val demoMode = "Try with demo data"
     override val demoAccount = "Demo (no server)"
+    override val cancel = "Cancel"
+    override val sessionExpired = "This account is no longer signed in on this server."
     override val loadingError = "Could not load the data."
     override val retry = "Retry"
     override fun signedInAs(name: String) = "Signed in as $name"
