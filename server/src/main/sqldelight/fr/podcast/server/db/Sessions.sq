@@ -1,0 +1,13 @@
+writeSession:
+INSERT INTO http_sessions(id, value, expires_at)
+VALUES (:id, :value, :expiresAt)
+ON CONFLICT (id) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at;
+
+readSession:
+SELECT value FROM http_sessions WHERE id = :id AND expires_at > now();
+
+deleteSession:
+DELETE FROM http_sessions WHERE id = :id;
+
+deleteExpiredSessions:
+DELETE FROM http_sessions WHERE expires_at <= now();

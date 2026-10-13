@@ -1,0 +1,44 @@
+insertPodcast:
+INSERT INTO podcasts(feed_url, title, author, description, artwork_url, website_url)
+VALUES (:feedUrl, :title, :author, :description, :artworkUrl, :websiteUrl)
+RETURNING id;
+
+podcastById:
+SELECT id, title, author, feed_url, artwork_url, description
+FROM podcasts
+WHERE id = :id;
+
+insertEpisode:
+INSERT INTO episodes(podcast_id, guid, title, description, published_at, duration_seconds, audio_url)
+VALUES (:podcastId, :guid, :title, :description, :publishedAt, :durationSeconds, :audioUrl)
+RETURNING id;
+
+episodeAudio:
+SELECT audio_url FROM episodes WHERE id = :id;
+
+episodeDuration:
+SELECT duration_seconds FROM episodes WHERE id = :id;
+
+countPodcastEpisodes:
+SELECT count(*) FROM episodes WHERE podcast_id = :podcastId;
+
+insertSubscription:
+INSERT INTO subscriptions(user_id, podcast_id, note)
+VALUES (:userId, :podcastId, :note)
+RETURNING id;
+
+-- Same column list for both queries, so one mapper builds a Subscription.
+subscriptionsOfUser:
+SELECT s.id, s.note, s.subscribed_at,
+       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id
+WHERE s.user_id = :userId
+ORDER BY lower(p.title), p.id;
+
+subscriptionOfUser:
+SELECT s.id, s.note, s.subscribed_at,
+       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id
+WHERE s.user_id = :userId AND s.id = :id;

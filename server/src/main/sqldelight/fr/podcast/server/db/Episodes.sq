@@ -1,0 +1,60 @@
+-- Every query below returns the same columns (an episode, its podcast and the user's state),
+-- so a single mapper builds an EpisodeItem. Missing state means NEW at position 0.
+-- A nullable ":status" cannot be used: SQLDelight turns "= ?" into "IS ?" for null, which
+-- PostgreSQL rejects. Hence the explicit ":filterByStatus" flag.
+
+latestForUser:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status
+FROM episode_details d
+JOIN subscriptions sub ON sub.podcast_id = d.podcast_id AND sub.user_id = :userId
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+WHERE :filterByStatus = FALSE OR COALESCE(s.status, 'NEW') = :status
+ORDER BY d.published_at DESC, d.id DESC
+LIMIT :limit OFFSET :offset;
+
+countLatestForUser:
+SELECT count(*)
+FROM episodes e
+JOIN subscriptions sub ON sub.podcast_id = e.podcast_id AND sub.user_id = :userId
+LEFT JOIN playback_states s ON s.episode_id = e.id AND s.user_id = :userId
+WHERE :filterByStatus = FALSE OR COALESCE(s.status, 'NEW') = :status;
+
+-- Episodes being listened to, most recently played first.
+resumeForUser:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status
+FROM episode_details d
+JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+WHERE s.status = 'IN_PROGRESS'
+ORDER BY s.updated_at DESC, d.id DESC
+LIMIT :limit;
+
+episodeForUser:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status
+FROM episode_details d
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+WHERE d.id = :id;
+
+podcastEpisodesForUser:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status
+FROM episode_details d
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+WHERE d.podcast_id = :podcastId
+ORDER BY d.published_at DESC, d.id DESC
+LIMIT :limit OFFSET :offset;
+
+saveProgress:
+INSERT INTO playback_states(user_id, episode_id, position_seconds, status)
+VALUES (:userId, :episodeId, :positionSeconds, :status)
+ON CONFLICT (user_id, episode_id) DO UPDATE
+SET position_seconds = excluded.position_seconds, status = excluded.status, updated_at = now();
+
+resetProgress:
+DELETE FROM playback_states WHERE user_id = :userId AND episode_id = :episodeId;

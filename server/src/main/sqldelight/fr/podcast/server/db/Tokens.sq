@@ -1,0 +1,16 @@
+insertToken:
+INSERT INTO api_tokens(user_id, token_hash, device_name)
+VALUES (:userId, :tokenHash, :deviceName)
+RETURNING created_at;
+
+-- Finds the owner of an active token and records its use in one statement.
+useToken:
+UPDATE api_tokens
+SET last_used_at = now()
+WHERE token_hash = :tokenHash AND revoked_at IS NULL
+RETURNING user_id;
+
+revokeToken:
+UPDATE api_tokens
+SET revoked_at = now()
+WHERE token_hash = :tokenHash AND revoked_at IS NULL;
