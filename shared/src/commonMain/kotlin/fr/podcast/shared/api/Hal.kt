@@ -22,7 +22,14 @@ internal val apiJson = Json { ignoreUnknownKeys = true }
 /** A HAL document with its HAL-FORMS templates. */
 class HalResource(val json: JsonObject) {
 
-    fun link(rel: String): String? = json.objectAt("_links")?.objectAt(rel)?.stringAt("href")
+    fun link(rel: String): String? = links(rel).firstOrNull()?.href
+
+    /** Every link of a relation: HAL allows one object or an array (e.g. several transcripts). */
+    fun links(rel: String): List<HalLink> = when (val value = json.objectAt("_links")?.get(rel)) {
+        is JsonObject -> listOfNotNull(value.toHalLink())
+        is JsonArray -> value.mapNotNull { (it as? JsonObject)?.toHalLink() }
+        else -> emptyList()
+    }
 
     fun embedded(rel: String): List<HalResource> = when (val value = json.objectAt("_embedded")?.get(rel)) {
         is JsonArray -> value.map { HalResource(it.jsonObject) }
@@ -56,6 +63,10 @@ class HalResource(val json: JsonObject) {
     /** Reads the resource fields into a :shared model (links and templates are ignored). */
     fun <T> decode(serializer: KSerializer<T>): T = apiJson.decodeFromJsonElement(serializer, json)
 }
+
+data class HalLink(val href: String, val type: String? = null, val hreflang: String? = null)
+
+private fun JsonObject.toHalLink(): HalLink? = stringAt("href")?.let { HalLink(it, stringAt("type"), stringAt("hreflang")) }
 
 data class HalFormsTemplate(
     val name: String,

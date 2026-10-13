@@ -26,6 +26,10 @@ sealed class ApiException(message: String, cause: Throwable? = null) : Exception
     class NotAPodcastServer(url: String) : ApiException("$url is not a podcast server")
     class Unauthorized : ApiException("Authentication refused")
     class NotFound(url: String) : ApiException("$url not found")
+
+    /** The server refused the request and said why (Problem Details, RFC 9457). */
+    class Rejected(val status: Int, val type: String?, detail: String?) : ApiException(detail ?: "Refused ($status, $type)")
+
     class Unexpected(status: Int, url: String) : ApiException("Unexpected status $status for $url")
 }
 
@@ -66,6 +70,26 @@ class PodcastApi(val serverUrl: String, private val httpClient: HttpClient, priv
         }
     }
 
+    /** A non-HAL representation (e.g. OPML). */
+    suspend fun getText(href: String, accept: ContentType): String {
+        val url = resolve(href)
+        return send(url) {
+            method = HttpMethod.Get
+            accept(accept)
+        }.bodyAsText()
+    }
+
+    /** Posts a raw body (e.g. an OPML file) and reads the HAL answer. */
+    suspend fun postText(href: String, body: String, contentType: ContentType): HalResource {
+        val url = resolve(href)
+        return send(url) {
+            method = HttpMethod.Post
+            accept(HalFormsJson)
+            contentType(contentType)
+            setBody(body)
+        }.halResource(url)
+    }
+
     private suspend fun send(url: String, block: HttpRequestBuilder.() -> Unit): HttpResponse {
         val response = try {
             httpClient.request {
@@ -81,7 +105,7 @@ class PodcastApi(val serverUrl: String, private val httpClient: HttpClient, priv
         when {
             response.status == HttpStatusCode.Unauthorized -> throw ApiException.Unauthorized()
             response.status == HttpStatusCode.NotFound -> throw ApiException.NotFound(url)
-            !response.status.isSuccess() -> throw ApiException.Unexpected(response.status.value, url)
+            !response.status.isSuccess() -> throw response.problem() ?: ApiException.Unexpected(response.status.value, url)
         }
         return response
     }
@@ -95,3 +119,12 @@ internal suspend fun HttpResponse.halResource(url: String): HalResource =
     } catch (notJson: Exception) {
         throw ApiException.NotAPodcastServer(url)
     }
+
+/** The Problem Details of a refusal, if the server sent some. */
+private suspend fun HttpResponse.problem(): ApiException.Rejected? {
+    if (contentType()?.match(ContentType("application", "problem+json")) != true) return null
+    val problem = runCatching { apiJson.parseToJsonElement(bodyAsText()).jsonObject }.getOrNull() ?: return null
+    val type = (problem["type"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    val detail = (problem["detail"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    return ApiException.Rejected(status.value, type, detail)
+}
