@@ -21,6 +21,7 @@ erDiagram
     users ||--o{ subscriptions : "s'abonne"
     podcasts ||--o{ subscriptions : "suivi par"
     podcasts ||--o{ episodes : "publie"
+    episodes ||--o{ episode_transcripts : "transcriptions"
     users ||--o{ playback_states : "écoute"
     episodes ||--o{ playback_states : "écouté par"
     episodes ||--o| media_files : "fichier mutualisé"
@@ -60,13 +61,20 @@ erDiagram
         text description
         text artwork_url
         text website_url
+        text language
+        text refresh_status "PENDING | OK | FAILED"
+        text refresh_error
+        timestamptz last_attempt_at
         timestamptz last_refreshed_at
+        text http_etag "GET conditionnel"
+        text http_last_modified
     }
     subscriptions {
         bigint id PK
         bigint user_id FK
         bigint podcast_id FK
         text note "annotation"
+        boolean auto_download
         timestamptz subscribed_at
     }
     episodes {
@@ -78,20 +86,35 @@ erDiagram
         timestamptz published_at
         int duration_seconds
         text audio_url "enclosure RSS"
+        text audio_type
+        bigint audio_length
+        text chapters_url "Podcast 2.0"
+        text chapters_type
+    }
+    episode_transcripts {
+        bigint episode_id PK
+        text url PK
+        text type "text/vtt, application/x-subrip…"
+        text language
+        int position "ordre du flux"
     }
     playback_states {
         bigint user_id PK
         bigint episode_id PK
         int position_seconds
         text status "NEW | IN_PROGRESS | PLAYED"
+        boolean kept "jamais purgé"
         timestamptz updated_at
     }
     media_files {
-        bigint id PK
-        bigint episode_id FK
+        bigint episode_id PK
+        text status "PENDING | DOWNLOADING | READY | FAILED"
         text storage_path
         bigint size_bytes
-        text status "PENDING | READY | FAILED"
+        text mime_type
+        text error
+        timestamptz requested_at
+        timestamptz downloaded_at
     }
     playlists {
         bigint id PK
@@ -125,13 +148,17 @@ erDiagram
 | `podcasts`, `episodes` | Catalogue mutualisé | Étape 3 (`V1`) |
 | `subscriptions` | Abonnements par utilisateur (+ annotation) | Étape 3 (`V1`) |
 | `playback_states` | Position et statut par utilisateur et par épisode | Étape 3 (`V1`) |
-| `media_files` | Fichiers audio téléchargés et mutualisés, purge | Étape 4 |
+| `episode_transcripts` | Transcriptions Podcast 2.0 | Étape 4 (`V2`) |
+| `media_files` | Fichiers audio téléchargés et mutualisés, purge | Étape 4 (`V2`) |
 | `shares` | Partages et droits | Étape 6 |
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 |
 
 ## Règles
 
 - **Absence d'état** : un épisode sans ligne dans `playback_states` vaut `NEW`, position 0.
-- **Écouté** : marquer un épisode comme écouté met `status = PLAYED` et `position_seconds = duration_seconds`. Le marquer comme non écouté supprime la ligne.
-- **Suppression d'un podcast** : elle supprime ses épisodes, et donc les états d'écoute qui s'y rapportent (`ON DELETE CASCADE`). Un podcast n'est supprimé que lorsqu'il n'a plus d'abonnés (étape 4).
-- **Unicité** : `(podcast_id, guid)` identifie un épisode lors des rafraîchissements du flux. `feed_url` identifie un podcast.
+- **Écouté** : marquer un épisode comme écouté met `status = PLAYED` et `position_seconds = duration_seconds`. Le marquer comme non écouté remet `NEW` et la position à 0, sans supprimer la ligne, qui garde `kept` (étape 4).
+- **Gardé** : `kept` est propre à chaque utilisateur. Un fichier gardé par au moins un utilisateur n'est jamais purgé (ADR 0007).
+- **Suppression d'un podcast** : quand son dernier abonné se désabonne, le podcast est supprimé avec ses épisodes, leurs transcriptions, leurs fichiers et les états d'écoute qui s'y rapportent (`ON DELETE CASCADE`, fichiers effacés du disque avant).
+- **Lecture des flux** : `refresh_status` vaut `PENDING` tant que le flux n'a jamais été lu (import OPML), `FAILED` si la dernière lecture a échoué (`refresh_error` dit pourquoi). `last_attempt_at` règle le rafraîchissement périodique.
+- **Unicité** : `(podcast_id, guid)` identifie un épisode lors des rafraîchissements du flux. `feed_url` identifie un podcast ; elle suit les déménagements du flux.
+- **Fichiers** : au plus un par épisode (`media_files.episode_id`), partagé par tous les utilisateurs. La ligne disparaît quand le fichier est purgé.

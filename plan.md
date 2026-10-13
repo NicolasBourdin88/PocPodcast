@@ -152,12 +152,25 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 4 — Abonnements
 
-- [ ] Ajout par URL, parsing RSS (balises Podcast 2.0 : chapitres, transcriptions).
-- [ ] Recherche via Podcast Index (proxifiée par le serveur).
-- [ ] Import / export OPML.
-- [ ] Modification, annotation, suppression d'abonnements.
-- [ ] Worker de rafraîchissement périodique des flux.
-- [ ] Téléchargement côté serveur + purge automatique (sauf épisodes marqués ou en playlist).
+- [x] Ajout par URL, parsing RSS (balises Podcast 2.0 : chapitres, transcriptions). → parseur StAX protégé (XXE, SSRF, taille), GET conditionnel, déménagements de flux ; chapitres et transcriptions exposés en liens HAL (ADR 0007).
+- [x] Recherche via Podcast Index (proxifiée par le serveur). → `GET /search` : Apple Podcasts toujours, Podcast Index avec `PODCASTINDEX_KEY`/`PODCASTINDEX_SECRET`.
+- [x] Import / export OPML. → lien `opml` des abonnements ; client léger, apps desktop et Android, CLI (pas encore dans l'app iOS).
+- [x] Modification, annotation, suppression d'abonnements. → note, téléchargement automatique, désabonnement ; le podcast part avec son dernier abonné.
+- [x] Worker de rafraîchissement périodique des flux. → toutes les 5 min, flux relus après `REFRESH_INTERVAL_MINUTES` ; relecture à la demande (template `refresh`).
+- [x] Téléchargement côté serveur + purge automatique (sauf épisodes marqués ou en playlist). → fichiers mutualisés, `GET /episodes/{id}/audio` avec `Range` ; purge par âge et quota, sauf épisodes gardés ou en cours d'écoute. **L'exception « en playlist » s'ajoutera à l'étape 7**, avec les playlists.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| A1 | Lecture de flux : Podcast 2.0, flux invalides, XXE, adresses privées refusées, déménagements | `./gradlew :server:test` (`FeedTest`, `SubscriptionsTest`) |
+| A2 | Recherche fusionnée, une source en panne n'empêche pas l'autre ; OPML aller-retour | `./gradlew :server:test` (`SearchTest`, `OpmlTest`) |
+| A3 | Téléchargement (redirections, `Range`) et purge (âge, quota, épisodes gardés ou en cours) | `./gradlew :server:test` (`DownloadsTest`) |
+| A4 | Contrat à jour et SDK de bout en bout (abonnement, note, épisodes Podcast 2.0, téléchargement, OPML, refus typés) | `./gradlew :server:test` (`ContractTest`, `SdkTest`) |
+| A5 | Serveur de développement alimenté par de vrais flux, rafraîchis en arrière-plan | `./gradlew :server:run` |
+| A6 | Client léger : Explorer (recherche, ajout par adresse), Bibliothèque (note, téléchargement automatique, désabonnement, OPML) | http://localhost:8080 |
+| A7 | Apps : Explorer, Bibliothèque et page d'un podcast, en compact et en deux panneaux | `./gradlew :composeApp:desktopTest` (captures), puis chaque app |
+| A8 | CLI : `search`, `subscribe`, `subscriptions`, `note`, `unsubscribe`, `opml export`/`import` | voir `README.md` |
 
 ## Étape 5 — Lecture
 

@@ -14,16 +14,19 @@ Chaque ressource a **une seule URL** et le format est négocié avec l'en-tête 
 
 Les réponses portent `Vary: Accept, Accept-Language`. Le JSON est **neutre en langue** : seul le HTML est traduit (ADR 0002).
 
-Pour l'instant, seule la racine `/` a une représentation HTML. Les autres pages du client léger arrivent avec leurs fonctionnalités (étape 4 et suivantes).
+Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`) et la Bibliothèque (`/subscriptions`). Les autres arrivent avec leurs fonctionnalités.
+
+**Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, toujours en `200`, car htmx n'insère que les réponses réussies. Un refus y est donc un fragment d'erreur traduit, et non un Problem Details. Quand une action change la liste des abonnements, l'en-tête `HX-Trigger: subscriptions-changed` demande à la page de la recharger.
 
 ## Point d'entrée et navigation
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `episodes`, `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
+- **Racine authentifiée** : liens `subscriptions`, `episodes`, `search` (gabarit `/search{?q}`), `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
 - **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
+- **Ressources externes** : un lien peut pointer hors du serveur et porter `type` et `hreflang`, comme les chapitres et transcriptions Podcast 2.0 d'un épisode. Une relation qui a plusieurs liens (`transcript`) est un **tableau**, dans l'ordre de préférence de l'éditeur.
 
 ## Collections et pagination
 
@@ -71,6 +74,18 @@ Le format des erreurs est **Problem Details** (RFC 9457), en `application/proble
 
 Les erreurs de validation (`422`) ajoutent `errors: [{ "field": "positionSeconds", "message": "…" }]`.
 
+Quand le client doit réagir différemment selon la cause, `type` la nomme. Le SDK la garde (`ApiException.Rejected`) et la traduit pour l'utilisateur.
+
+| `type` | Statut | Cause |
+|---|---|---|
+| `/problems/invalid-feed-url` | 422 | Adresse invalide ou autre schéma que `http(s)` |
+| `/problems/forbidden-feed-address` | 422 | Réseau privé ou local (protection SSRF, ADR 0007) |
+| `/problems/feed-unreachable` | 422 | Flux injoignable (réseau, statut HTTP, trop de redirections) |
+| `/problems/feed-too-large` | 422 | Flux de plus de 20 Mo |
+| `/problems/not-a-feed` | 422 | La réponse n'est pas un flux RSS |
+| `/problems/not-an-opml` | 422 | Fichier OPML illisible |
+| `/problems/search-failed` | 502 | Aucun annuaire n'a répondu |
+
 ## Formats
 
 - **Identifiants** : chaînes opaques. Ne pas les interpréter.
@@ -78,6 +93,8 @@ Les erreurs de validation (`422`) ajoutent `errors: [{ "field": "positionSeconds
 - **Durées et positions** : en secondes (`durationSeconds`, `positionSeconds`).
 - **Champs dérivés** (progression, minutes restantes) : non exposés, les clients les calculent. Le SDK le fait dans `Episode`.
 - **Énumérations** : en majuscules (`NEW`, `IN_PROGRESS`, `PLAYED`).
+- **OPML** : `text/x-opml`, par le lien `opml` de la collection des abonnements. `GET` exporte et `POST` importe (corps brut, ou formulaire `multipart` depuis le client léger). L'import répond par un bilan : importés, déjà suivis, refusés avec leur cause.
+- **Audio** : `GET /episodes/{id}/audio` sert le fichier téléchargé par le serveur (requêtes `Range` acceptées), sinon redirige vers l'enclosure de l'éditeur.
 
 ## Évolution
 

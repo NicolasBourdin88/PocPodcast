@@ -11,7 +11,7 @@ Système de gestion et d'écoute de podcasts (projet de master). Il se compose d
 
 | Module | Cibles | Rôle |
 |---|---|---|
-| `:shared` | JVM, Android, iOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository`) |
+| `:shared` | JVM, Android, iOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository` : Accueil, abonnements, recherche, OPML) |
 | `:composeApp` | Android, iOS, Desktop (JVM) | UI Compose Multiplatform, responsive par taille de fenêtre |
 | `:androidApp` | Android | Point d'entrée Android (`MainActivity`) |
 | `iosApp/` | iOS | Projet Xcode qui héberge l'UI Compose |
@@ -39,10 +39,12 @@ L'interface existe en français et en anglais. Les textes, les couleurs et la na
 ./gradlew :server:run
 ```
 
-- http://localhost:8080 : client léger (page de connexion, puis Accueil)
+- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer et Bibliothèque)
 - http://localhost:8080/docs : documentation de l'API (Swagger UI)
 
-Au premier lancement, un PostgreSQL embarqué est créé dans `server/build/dev-postgres-8080`, avec des données de démo. Les **comptes de démo** sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt) : Alice est abonnée aux quatre podcasts, Bob à deux, chacun avec sa propre progression.
+Au premier lancement, un PostgreSQL embarqué est créé dans `server/build/dev-postgres-8080`, avec des données de démo lues dans de **vrais flux** (Les Cast Codeurs, Talking Kotlin, Fragmented, Podnews Weekly Review, qui a des chapitres et des transcriptions). Sans réseau, les podcasts sont créés vides et lus plus tard. Les **comptes de démo** sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt) : Alice est abonnée aux quatre podcasts, Bob à deux, chacun avec sa propre progression. Les fichiers téléchargés vont dans `server/build/dev-media-8080`.
+
+Pour repartir de zéro, on arrête le serveur et on supprime ces deux dossiers.
 
 Pour essayer le multiserveur, on lance un second serveur, avec sa propre base, dans un autre terminal :
 
@@ -51,6 +53,19 @@ PORT=8081 SERVER_NAME="Serveur B" ./gradlew :server:run
 ```
 
 En production, le point d'entrée `fr.podcast.server.ApplicationKt` exige une vraie base (`DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`) et active les cookies `Secure`.
+
+Variables d'environnement (voir l'[ADR 0007](docs/adr/0007-flux-telechargements-et-purge.md)) :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `PORT`, `SERVER_NAME` | `8080`, `Podcast` | Port d'écoute et nom affiché aux clients |
+| `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | aucune | Ajoute Podcast Index à la recherche (clés gratuites sur api.podcastindex.org) ; sans elles, seul Apple Podcasts est interrogé |
+| `REFRESH_INTERVAL_MINUTES` | `60` | Délai avant de relire un flux |
+| `MEDIA_DIR` | `media` | Dossier des fichiers audio téléchargés |
+| `MEDIA_RETENTION_DAYS` | `30` | Âge à partir duquel un fichier est purgé (sauf épisode gardé ou en cours d'écoute) |
+| `MEDIA_MAX_GB` | aucun | Quota disque : au-delà, les fichiers les plus anciens sont purgés |
+| `AUTO_DOWNLOAD_LATEST` | `1` | Nombre d'épisodes récents téléchargés pour un abonnement en téléchargement automatique |
+| `ALLOW_PRIVATE_FEEDS` | `false` | Autorise les flux sur un réseau privé (développement seulement : protection SSRF) |
 
 ## Lancer les clients
 
@@ -91,6 +106,18 @@ cli/build/install/podcast/bin/podcast list
 ```
 
 Les autres commandes sont `accounts`, `use 2`, `logout` et `tui` (la TUI a besoin d'un vrai terminal, pas de `./gradlew :cli:run`). L'option `--demo` utilise les données de démo sans serveur.
+
+Abonnements : les listes sont numérotées, et les commandes suivantes reprennent ces numéros.
+
+```bash
+cli/build/install/podcast/bin/podcast search kotlin
+```
+
+```bash
+cli/build/install/podcast/bin/podcast subscribe 2
+```
+
+Ensuite : `subscriptions`, `note 3 À écouter dans le train` (sans texte, la note est effacée), `unsubscribe 3`, `opml export podcasts.opml` et `opml import podcasts.opml`. `subscribe` accepte aussi l'adresse d'un flux.
 
 ## Tests
 
