@@ -223,6 +223,7 @@ paths:
       responses:
         "204": { description: Position enregistrée, l'épisode est en cours d'écoute }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
@@ -236,6 +237,7 @@ paths:
       responses:
         "204": { description: Épisode écouté }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [épisodes]
@@ -244,6 +246,7 @@ paths:
       responses:
         "204": { description: Épisode remis à l'état nouveau }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /episodes/{episodeId}/audio:
@@ -314,6 +317,13 @@ components:
       headers:
         WWW-Authenticate:
           schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: |
+        Requête authentifiée par session (client léger) sans l'en-tête `HX-Request` :
+        refusée pour se protéger du CSRF. Ne concerne pas les jetons Bearer.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
