@@ -14,6 +14,7 @@ Architecture imposée : client léger, client mobile **multiserveur**, client ri
 
 - **Kotlin partout.** La valeur de KMP ici est de partager le *contrat* (modèles, client d'API, règles) entre serveur et clients, pas seulement l'UI.
 - `:shared` (KMP : JVM, Android, iOS) : modèles, `PodcastRepository`, états d'écran (`LoadHomeState`). Toute modification de modèle passe par ce module.
+- **Chaînes et ressources communes dans `:shared`** (ADR 0002) : catalogue `Strings` français/anglais, `DesignTokens` (couleurs, palette des pochettes), `Destination` (navigation). Aucun texte visible en dur dans les clients ; un nouveau texte = un membre de `Strings`.
 - `:server` : **Ktor**. Une seule API hypermédia, deux représentations selon `Accept` : **HAL JSON** pour les clients riches, **HTML** pour le client léger.
 - **Client léger = HTML rendu côté serveur + htmx**, pas Compose Wasm (Compose Web est en bêta, et le CORS empêche de lire les flux RSS depuis le navigateur).
 - `:composeApp` : **Compose Multiplatform** pour mobile (Android, iOS) et client riche (desktop JVM, y compris macOS). UI **responsive par taille de fenêtre, pas par plateforme**. C'est une bibliothèque KMP ; l'APK est produit par `:androidApp`, car AGP 9 interdit `com.android.application` dans un module KMP (ADR 0001).

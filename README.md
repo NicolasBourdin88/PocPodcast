@@ -19,6 +19,14 @@ Système de gestion et d'écoute de podcasts (projet de master) : un service mul
 
 Pour l'instant toutes les données viennent de `FakePodcastRepository` (étape 1 du plan).
 
+## Langues
+
+L'interface existe en français et en anglais. Les textes, les couleurs et la navigation sont définis une seule fois dans `:shared` (voir l'[ADR 0002](docs/adr/0002-chaines-et-ressources-partagees.md)). Chaque client choisit sa langue ainsi :
+
+- Compose : langue du système, ou langue de l'app dans les réglages Android 13 et plus ;
+- client léger : en-tête `Accept-Language` du navigateur ;
+- CLI : `podcast --lang en list` (par défaut, la langue du système).
+
 ## Prérequis
 
 - JDK 17 ou plus récent (21 recommandé)
