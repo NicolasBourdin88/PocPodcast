@@ -2,17 +2,20 @@ package fr.podcast.server.dev
 
 import fr.podcast.server.auth.Accounts
 import fr.podcast.server.auth.Role
+import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.server.db.ServerDatabase
-import fr.podcast.server.db.toOffsetDateTime
+import fr.podcast.server.feeds.FeedException
+import fr.podcast.server.feeds.FeedRefresher
 import fr.podcast.shared.model.EpisodeStatus
-import kotlin.time.Instant
+import org.slf4j.LoggerFactory
 
 /**
- * Demo data for local development and tests. Never part of the production distribution.
+ * Demo data for local development, read from real feeds on the first start.
+ * Never part of the production distribution; tests use their own deterministic data.
  *
  * Demo accounts (development only):
- * - alice / [ALICE_PASSWORD] (admin), subscribed to every podcast
- * - bob / [BOB_PASSWORD], subscribed to Talking Kotlin and Fragmented, with his own progress
+ * - alice / [ALICE_PASSWORD] (admin), subscribed to the four podcasts below
+ * - bob / [BOB_PASSWORD], subscribed to Talking Kotlin and Podnews Weekly Review
  */
 object DevSeed {
     const val ALICE = "alice"
@@ -20,70 +23,54 @@ object DevSeed {
     const val BOB = "bob"
     const val BOB_PASSWORD = "podcast-bob"
 
-    private class SeedPodcast(val key: String, val title: String, val author: String, val feedUrl: String, val description: String)
-    private class SeedEpisode(val podcast: String, val title: String, val publishedAt: String, val minutes: Int)
+    private class SeedFeed(val title: String, val url: String, val bob: Boolean)
 
-    private val podcasts = listOf(
-        SeedPodcast("lcc", "Les Cast Codeurs", "Emmanuel Bernard & co", "https://lescastcodeurs.libsyn.com/rss", "Le podcast Java en français."),
-        SeedPodcast("tk", "Talking Kotlin", "JetBrains", "https://talkingkotlin.com/feed.xml", "A podcast about Kotlin and more."),
-        SeedPodcast("cac", "Le Code a changé", "France Inter", "https://radiofrance-podcast.net/podcast09/rss_20786.xml", "Comment le numérique change nos vies."),
-        SeedPodcast("frag", "Fragmented", "Donn Felker & Kaushik Gopal", "https://feeds.simplecast.com/LpAGSLnY", "An Android developer podcast."),
+    private val feeds = listOf(
+        SeedFeed("Les Cast Codeurs Podcast", "https://lescastcodeurs.libsyn.com/rss", bob = false),
+        SeedFeed("Talking Kotlin", "https://anchor.fm/s/fdcf2fa8/podcast/rss", bob = true),
+        SeedFeed("Fragmented", "https://feeds.simplecast.com/LpAGSLnY", bob = false),
+        // Uses Podcast 2.0 chapters and transcripts.
+        SeedFeed("Podnews Weekly Review", "https://feeds.buzzsprout.com/1538779.rss", bob = true),
     )
 
-    // Most recent first; the first five match FakePodcastRepository.
-    private val episodes = listOf(
-        SeedEpisode("tk", "Compose Multiplatform for iOS is stable", "2026-10-12T06:00:00Z", 52),
-        SeedEpisode("lcc", "LCC 330 - Les nouveautés de Kotlin 2.4", "2026-10-10T05:00:00Z", 95),
-        SeedEpisode("frag", "KMP in production", "2026-10-08T12:00:00Z", 47),
-        SeedEpisode("cac", "Qui a inventé le copier-coller ?", "2026-10-05T04:30:00Z", 34),
-        SeedEpisode("tk", "Ktor 3 and server-side Kotlin", "2026-09-28T06:00:00Z", 61),
-        SeedEpisode("lcc", "LCC 329 - Rentrée 2026", "2026-09-19T05:00:00Z", 88),
-        SeedEpisode("frag", "Gradle, the good parts", "2026-09-15T12:00:00Z", 44),
-        SeedEpisode("cac", "Le premier bug informatique", "2026-09-07T04:30:00Z", 31),
-        SeedEpisode("tk", "Kotlin Multiplatform at scale", "2026-08-30T06:00:00Z", 58),
-    )
+    private val log = LoggerFactory.getLogger(DevSeed::class.java)
 
-    suspend fun seedIfEmpty(database: ServerDatabase) {
-        if (database.query { usersQueries.countUsers().executeAsOne() } == 0L) seed(database)
+    suspend fun seedIfEmpty(database: ServerDatabase, refresher: FeedRefresher) {
+        if (database.query { usersQueries.countUsers().executeAsOne() } == 0L) seed(database, refresher)
     }
 
-    suspend fun seed(database: ServerDatabase) {
+    suspend fun seed(database: ServerDatabase, refresher: FeedRefresher) {
         val accounts = Accounts(database)
-        val alice = accounts.create(ALICE, "Alice", ALICE_PASSWORD, Role.ADMIN)
-        val bob = accounts.create(BOB, "Bob", BOB_PASSWORD)
+        val alice = UserCatalog(database, accounts.create(ALICE, "Alice", ALICE_PASSWORD, Role.ADMIN).id)
+        val bob = UserCatalog(database, accounts.create(BOB, "Bob", BOB_PASSWORD).id)
 
-        val episodeIds = database.transaction {
-            val podcastIds = podcasts.associate { podcast ->
-                podcast.key to catalogQueries.insertPodcast(podcast.feedUrl, podcast.title, podcast.author, podcast.description, null, null).executeAsOne()
+        val podcastIds = feeds.map { feed ->
+            val podcastId = try {
+                refresher.podcastFor(feed.url)
+            } catch (offline: FeedException) {
+                // No network: the podcast waits for the background refresh.
+                log.warn("{} not read ({}); it will be read later", feed.title, offline.message)
+                database.query { catalogQueries.insertPendingPodcast(feed.url, feed.title).executeAsOneOrNull() }
+                    ?: database.query { catalogQueries.podcastIdByFeedUrl(feed.url).executeAsOne() }
             }
-            // RETURNING makes these queries: they only run when executed.
-            podcastIds.values.forEach { catalogQueries.insertSubscription(alice.id, it, null).executeAsOne() }
-            catalogQueries.insertSubscription(bob.id, podcastIds.getValue("tk"), "Le podcast officiel de JetBrains").executeAsOne()
-            catalogQueries.insertSubscription(bob.id, podcastIds.getValue("frag"), null).executeAsOne()
-
-            episodes.mapIndexed { index, episode ->
-                catalogQueries.insertEpisode(
-                    podcastId = podcastIds.getValue(episode.podcast),
-                    guid = "seed-${index + 1}",
-                    title = episode.title,
-                    description = "",
-                    publishedAt = Instant.parse(episode.publishedAt).toOffsetDateTime(),
-                    durationSeconds = episode.minutes * 60,
-                    audioUrl = "https://cdn.example.org/podcast/seed-${index + 1}.mp3",
-                ).executeAsOne()
-            }
+            alice.subscribe(podcastId)
+            if (feed.bob) bob.subscribe(podcastId)
+            podcastId
         }
 
-        // Separate statements so that "updated_at" orders the resume list (last one first).
-        database.query {
-            fun progress(user: Long, episode: Int, minutes: Int, status: EpisodeStatus) =
-                episodesQueries.saveProgress(user, episodeIds[episode - 1], minutes * 60, status.name)
+        // Some listening already started, so that "Continue listening" is not empty.
+        // (By id: reading a feed may update its address, e.g. itunes:new-feed-url.)
+        alice.startListening(podcastIds[0], fraction = 0.4)
+        alice.startListening(podcastIds[3], fraction = 0.7)
+        bob.startListening(podcastIds[1], fraction = 0.25)
+        log.info("Demo data ready (see DevSeed.kt for the accounts)")
+    }
 
-            progress(alice.id, 5, 61, EpisodeStatus.PLAYED)
-            progress(alice.id, 4, 25, EpisodeStatus.IN_PROGRESS)
-            progress(alice.id, 2, 38, EpisodeStatus.IN_PROGRESS)
-            progress(bob.id, 3, 47, EpisodeStatus.PLAYED)
-            progress(bob.id, 1, 10, EpisodeStatus.IN_PROGRESS)
-        }
+    /** Puts the newest episode of the podcast in progress at [fraction] of its duration. */
+    private suspend fun UserCatalog.startListening(podcastId: Long, fraction: Double) {
+        val newest = podcastEpisodes(podcastId.toString(), limit = 1, offset = 0)?.items?.firstOrNull()?.episode ?: return
+        val duration = newest.durationSeconds.takeIf { it > 0 } ?: 3600
+        updateProgress(newest.id, (duration * fraction).toInt())
+        check(episode(newest.id)?.status == EpisodeStatus.IN_PROGRESS)
     }
 }

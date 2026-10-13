@@ -2,6 +2,10 @@ package fr.podcast.server.dev
 
 import fr.podcast.server.ServerConfig
 import fr.podcast.server.db.ServerDatabase
+import fr.podcast.server.feeds.FeedFetcher
+import fr.podcast.server.feeds.FeedRefresher
+import fr.podcast.server.feeds.UrlGuard
+import fr.podcast.server.outgoingHttpClient
 import fr.podcast.server.startServer
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import kotlinx.coroutines.runBlocking
@@ -10,7 +14,8 @@ import java.nio.file.Path
 
 /**
  * `./gradlew :server:run`: starts the server with an embedded PostgreSQL (no Docker needed)
- * kept in `server/build/dev-postgres-<port>`, and demo data on first start (see [DevSeed]).
+ * kept in `server/build/dev-postgres-<port>`, and demo data read from real feeds on first start
+ * (see [DevSeed]). Downloaded files go to `server/build/dev-media-<port>`.
  *
  * With DATABASE_URL set, uses that database instead. PORT and SERVER_NAME allow running a
  * second server (e.g. `PORT=8081 SERVER_NAME="Serveur B"`) to try multi-server clients.
@@ -27,7 +32,10 @@ fun main() {
         ?.let { ServerDatabase.connect(it, System.getenv("DATABASE_USER") ?: "podcast", System.getenv("DATABASE_PASSWORD")) }
         ?: embeddedDatabase(config.port)
 
-    runBlocking { DevSeed.seedIfEmpty(database) }
+    // First start: demo accounts subscribed to real feeds, read now (if the network is there).
+    val client = outgoingHttpClient()
+    runBlocking { DevSeed.seedIfEmpty(database, FeedRefresher(database, FeedFetcher(client, UrlGuard(config.allowPrivateFeeds)))) }
+    client.close()
     println("Serveur « ${config.name} » : http://localhost:${config.port} — API : http://localhost:${config.port}/docs")
     println("Comptes de démo : voir server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt")
     startServer(config, database)
