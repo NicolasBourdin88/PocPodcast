@@ -2,6 +2,7 @@ package fr.podcast.shared.i18n
 
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
 
@@ -60,6 +61,45 @@ interface Strings {
     /** Label of a server action, by its HAL-FORMS template name (ADR 0003). */
     fun action(name: String): String
 
+    // Explore
+    val searchPlaceholder: String
+    val search: String
+    fun noResults(query: String): String
+    val addFeedTitle: String
+    val feedUrl: String
+    val subscribe: String
+    val subscribed: String
+    fun subscribedTo(title: String): String
+
+    // Library and podcast page
+    val emptyLibrary: String
+    val note: String
+    val notePlaceholder: String
+    val save: String
+    val autoDownload: String
+    val unsubscribe: String
+    fun unsubscribeConfirm(title: String): String
+    fun unsubscribedFrom(title: String): String
+    val episodes: String
+    val back: String
+    val refreshPending: String
+    val refreshFailed: String
+    val opmlExport: String
+    val opmlImport: String
+    fun opmlReport(imported: Int, alreadySubscribed: Int, failed: Int): String
+
+    // Files and marks (ADR 0007)
+    val kept: String
+    val chapters: String
+    val transcript: String
+    fun fileStatus(status: FileStatus): String?
+
+    // Server refusals (Problem Details types)
+    val feedUnreachable: String
+    val notAFeed: String
+    val forbiddenFeedAddress: String
+    val searchFailed: String
+
     // CLI
     val cliDescription: String
     val cliListDescription: String
@@ -74,5 +114,12 @@ interface Strings {
     val unknownAccount: String
     val signedOut: String
     fun accountSaved(username: String, server: String): String
+    val cliSearchDescription: String
+    val cliSubscribeDescription: String
+    val cliSubscriptionsDescription: String
+    val cliUnsubscribeDescription: String
+    val cliNoteDescription: String
+    val cliOpmlExportDescription: String
+    val cliOpmlImportDescription: String
     val tuiHelp: String
 }

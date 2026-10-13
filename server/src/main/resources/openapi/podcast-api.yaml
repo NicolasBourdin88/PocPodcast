@@ -487,7 +487,7 @@ components:
 
     Podcast:
       type: object
-      required: [id, title, author, feedUrl, artworkUrl, description, _links]
+      required: [id, title, author, feedUrl, artworkUrl, description, websiteUrl, language, refreshStatus, refreshedAt, _links]
       properties:
         id: { type: string }
         title: { type: string }
@@ -495,6 +495,13 @@ components:
         feedUrl: { type: string, format: uri }
         artworkUrl: { type: [string, "null"], format: uri }
         description: { type: string }
+        websiteUrl: { type: [string, "null"], format: uri }
+        language: { type: [string, "null"] }
+        refreshStatus: { $ref: "#/components/schemas/RefreshStatus" }
+        refreshedAt:
+          description: Dernière lecture réussie du flux par le serveur.
+          type: [string, "null"]
+          format: date-time
         _links:
           type: object
           required: [self, episodes, feed]
@@ -552,19 +559,33 @@ components:
       type: string
       enum: [NEW, IN_PROGRESS, PLAYED]
 
+    FileStatus:
+      description: "Fichier audio mutualisé sur le serveur : absent, en attente, en cours, prêt ou en échec."
+      type: string
+      enum: [NONE, PENDING, DOWNLOADING, READY, FAILED]
+
+    RefreshStatus:
+      description: "Dernière lecture du flux : en attente (abonnement tout juste importé), réussie ou en échec."
+      type: string
+      enum: [PENDING, OK, FAILED]
+
     Episode:
       description: Un épisode tel que le voit l'utilisateur connecté (catalogue + état d'écoute).
       type: object
-      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, _links, _embedded]
+      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, kept, fileStatus, _links, _embedded]
       properties:
         id: { type: string }
         podcastId: { type: string }
         title: { type: string }
         description: { type: string }
         publishedAt: { type: string, format: date-time }
-        durationSeconds: { type: integer, minimum: 0 }
+        durationSeconds: { type: integer, minimum: 0, description: "0 si le flux ne la donne pas." }
         positionSeconds: { type: integer, minimum: 0 }
         status: { $ref: "#/components/schemas/EpisodeStatus" }
+        kept:
+          type: boolean
+          description: Gardé par l'utilisateur ; son fichier sur le serveur n'est jamais purgé.
+        fileStatus: { $ref: "#/components/schemas/FileStatus" }
         _links:
           type: object
           required: [self, podcast, audio]

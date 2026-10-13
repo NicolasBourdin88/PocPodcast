@@ -1,5 +1,6 @@
 package fr.podcast.shared.i18n
 
+import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
 
@@ -57,9 +58,57 @@ object EnglishStrings : Strings {
         "mark-played" -> "Mark as played"
         "mark-unplayed" -> "Mark as unplayed"
         "update-progress" -> "Save position"
+        "keep" -> "Keep"
+        "unkeep" -> "Stop keeping"
+        "download" -> "Download to the server"
+        "subscribe" -> subscribe
+        "unsubscribe" -> unsubscribe
+        "update" -> save
+        "refresh" -> "Read the feed again"
         "logout" -> signOut
         else -> name
     }
+
+    override val searchPlaceholder = "Search podcasts"
+    override val search = "Search"
+    override fun noResults(query: String) = "No results for \"$query\"."
+    override val addFeedTitle = "Add an RSS feed"
+    override val feedUrl = "Feed address"
+    override val subscribe = "Subscribe"
+    override val subscribed = "Subscribed"
+    override fun subscribedTo(title: String) = "Subscribed to \"$title\"."
+
+    override val emptyLibrary = "No subscriptions yet. Find a podcast in Explore."
+    override val note = "Note"
+    override val notePlaceholder = "Add a note…"
+    override val save = "Save"
+    override val autoDownload = "Download new episodes to the server automatically"
+    override val unsubscribe = "Unsubscribe"
+    override fun unsubscribeConfirm(title: String) = "Unsubscribe from \"$title\"?"
+    override fun unsubscribedFrom(title: String) = "Unsubscribed from \"$title\"."
+    override val episodes = "Episodes"
+    override val back = "Back"
+    override val refreshPending = "Reading the feed…"
+    override val refreshFailed = "The feed could not be read."
+    override val opmlExport = "Export (OPML)"
+    override val opmlImport = "Import an OPML file"
+    override fun opmlReport(imported: Int, alreadySubscribed: Int, failed: Int) =
+        "$imported imported, $alreadySubscribed already followed, $failed failed."
+
+    override val kept = "Kept"
+    override val chapters = "Chapters"
+    override val transcript = "Transcript"
+    override fun fileStatus(status: FileStatus) = when (status) {
+        FileStatus.NONE -> null
+        FileStatus.PENDING, FileStatus.DOWNLOADING -> "Downloading…"
+        FileStatus.READY -> "On the server"
+        FileStatus.FAILED -> "Download failed"
+    }
+
+    override val feedUnreachable = "This feed cannot be read."
+    override val notAFeed = "This address is not a podcast feed."
+    override val forbiddenFeedAddress = "This address is not allowed."
+    override val searchFailed = "The search did not succeed."
 
     override val cliDescription = "Command-line client for the podcast system."
     override val cliListDescription = "Prints the Home screen as text."
@@ -74,5 +123,12 @@ object EnglishStrings : Strings {
     override val unknownAccount = "Unknown account."
     override val signedOut = "Signed out."
     override fun accountSaved(username: String, server: String) = "Signed in: $username on $server."
+    override val cliSearchDescription = "Searches podcasts (Apple Podcasts, Podcast Index)."
+    override val cliSubscribeDescription = "Subscribes to a feed: RSS address or number from the last search."
+    override val cliSubscriptionsDescription = "Lists subscriptions."
+    override val cliUnsubscribeDescription = "Unsubscribes (number from the subscriptions list)."
+    override val cliNoteDescription = "Annotates a subscription; without text, clears the note."
+    override val cliOpmlExportDescription = "Exports subscriptions as OPML."
+    override val cliOpmlImportDescription = "Imports an OPML file."
     override val tuiHelp = "↑/↓ move · q quit"
 }
