@@ -49,6 +49,7 @@ dependencies {
     implementation(libs.ktor.server.sessions)
     implementation(libs.ktor.server.swagger)
     implementation(libs.logback)
+    implementation(libs.ktor.client.cio)
 
     implementation(libs.sqldelight.jdbc.driver)
     implementation(libs.postgresql)
@@ -63,6 +64,7 @@ dependencies {
     testImplementation(libs.embedded.postgres)
     testImplementation(platform(libs.embedded.postgres.binaries.bom))
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.json.schema.validator)
 }

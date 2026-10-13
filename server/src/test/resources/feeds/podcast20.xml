@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Le Podcast de Test</title>
+    <link>https://test.example.org</link>
+    <language>fr</language>
+    <description><![CDATA[<p>Un podcast <b>de test</b> &amp; d'essai.</p>]]></description>
+    <itunes:author>Équipe Test</itunes:author>
+    <itunes:image href="https://test.example.org/cover.jpg"/>
+    <image><url>https://test.example.org/fallback.jpg</url><title>ignored</title></image>
+    <itunes:category text="Technology"><itunes:category text="Tech News"/></itunes:category>
+    <item>
+      <title>Épisode 3 : Podcast 2.0</title>
+      <guid isPermaLink="false">test-ep-3</guid>
+      <pubDate>Mon, 12 Oct 2026 06:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.org/ep3.mp3" length="31457280" type="audio/mpeg"/>
+      <itunes:duration>1:05:30</itunes:duration>
+      <content:encoded><![CDATA[<p>Chapitres et transcriptions.</p><p>Deuxième&nbsp;paragraphe.</p>]]></content:encoded>
+      <description>Short description</description>
+      <podcast:chapters url="https://test.example.org/ep3/chapters.json" type="application/json+chapters"/>
+      <podcast:transcript url="https://test.example.org/ep3/transcript.vtt" type="text/vtt" language="fr"/>
+      <podcast:transcript url="https://test.example.org/ep3/transcript.srt" type="application/x-subrip"/>
+    </item>
+    <item>
+      <title>Épisode 2</title>
+      <pubDate>Sat, 3 Oct 2026 09:30:00 PDT</pubDate>
+      <enclosure url="https://cdn.example.org/ep2.mp3" type="audio/mpeg"/>
+      <itunes:duration>2730</itunes:duration>
+      <description>&lt;b&gt;Sans guid&lt;/b&gt; : l'URL du fichier sert d'identifiant.</description>
+    </item>
+    <item>
+      <title>Article sans audio</title>
+      <guid>article-1</guid>
+      <description>Not an episode.</description>
+    </item>
+    <item>
+      <title>Épisode 1</title>
+      <guid>test-ep-1</guid>
+      <pubDate>not a date</pubDate>
+      <enclosure url="https://cdn.example.org/ep1.m4a" length="0" type="audio/x-m4a"/>
+      <itunes:duration>45:00</itunes:duration>
+    </item>
+  </channel>
+</rss>
