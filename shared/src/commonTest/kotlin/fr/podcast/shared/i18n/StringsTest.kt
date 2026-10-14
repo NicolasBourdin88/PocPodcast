@@ -31,6 +31,12 @@ class StringsTest {
         assertEquals("42 min", FrenchStrings.duration(42 * 60))
         assertEquals("1 hr 5 min", EnglishStrings.duration(65 * 60))
 
+        assertEquals("4:05", FrenchStrings.clock(245))
+        assertEquals("1:02:03", EnglishStrings.clock(3723))
+        assertEquals("1,5×", FrenchStrings.speed(1.5f))
+        assertEquals("1.5×", EnglishStrings.speed(1.5f))
+        assertEquals("2×", FrenchStrings.speed(2f))
+
         val date = LocalDate(2026, 9, 28)
         assertEquals("28 sept.", FrenchStrings.shortDate(date))
         assertEquals("Sep 28", EnglishStrings.shortDate(date))

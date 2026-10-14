@@ -3,6 +3,8 @@ package fr.podcast.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,10 +16,9 @@ import androidx.compose.ui.Modifier
 import fr.podcast.shared.account.AccountService
 import fr.podcast.shared.account.AccountStore
 import fr.podcast.shared.i18n.Language
-import fr.podcast.shared.repository.FakePodcastRepository
-import fr.podcast.shared.repository.RemotePodcastRepository
 import fr.podcast.ui.account.AccountsScreen
 import fr.podcast.ui.account.SignInScreen
+import fr.podcast.ui.player.LocalPlayback
 import fr.podcast.ui.theme.LocalStrings
 import fr.podcast.ui.theme.PodcastTheme
 import fr.podcast.ui.theme.platformLanguage
@@ -63,29 +64,38 @@ private fun AppRoot(environment: AppEnvironment) {
     }
 
     val usingDemo = active == null
-    val repository = remember(active) { active?.let { RemotePodcastRepository(it, environment.httpClient) } ?: FakePodcastRepository() }
-    MainScaffold(
-        client = repository,
-        accountLabel = active?.let { "${it.displayName} · ${it.serverName}" } ?: strings.demoAccount,
-        onSessionExpired = { active?.let { store.remove(it.id) } },
-        settings = { modifier ->
-            AccountsScreen(
-                state = accounts,
-                demo = usingDemo,
-                onSelect = { account ->
-                    demo = false
-                    store.select(account.id)
-                },
-                onAdd = { addingAccount = true },
-                onSignOut = { account ->
-                    scope.launch {
-                        service.signOut(account)
-                        store.remove(account.id)
-                    }
-                },
-                onLeaveDemo = { demo = false },
-                modifier = modifier,
-            )
-        },
-    )
+    val repository = remember(active) { environment.clientFor(active) }
+    // The demo plays without sound; an account plays on the platform's player (ADR 0008).
+    // Leaving the screens does not stop playback: it goes on in the background.
+    val playback = if (usingDemo) environment.demoPlayback else environment.playback
+    LaunchedEffect(playback, repository) {
+        environment.stopOtherThan(playback)
+        playback.attach(repository)
+    }
+    CompositionLocalProvider(LocalPlayback provides playback) {
+        MainScaffold(
+            client = repository,
+            accountLabel = active?.let { "${it.displayName} · ${it.serverName}" } ?: strings.demoAccount,
+            onSessionExpired = { active?.let { store.remove(it.id) } },
+            settings = { modifier ->
+                AccountsScreen(
+                    state = accounts,
+                    demo = usingDemo,
+                    onSelect = { account ->
+                        demo = false
+                        store.select(account.id)
+                    },
+                    onAdd = { addingAccount = true },
+                    onSignOut = { account ->
+                        scope.launch {
+                            service.signOut(account)
+                            store.remove(account.id)
+                        }
+                    },
+                    onLeaveDemo = { demo = false },
+                    modifier = modifier,
+                )
+            },
+        )
+    }
 }

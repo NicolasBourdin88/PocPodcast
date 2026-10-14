@@ -11,17 +11,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,7 +27,11 @@ import androidx.compose.ui.unit.dp
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.player.EpisodePlayButton
+import fr.podcast.ui.player.LocalPlayback
+import fr.podcast.ui.player.QueueToggleButton
 import fr.podcast.ui.theme.LocalStrings
+import kotlin.math.ceil
 
 /** Home screen content. [twoColumns] puts "resume" and "latest" side by side. */
 @Composable
@@ -73,6 +75,11 @@ private fun LazyListScope.latestSection(title: String, items: List<EpisodeItem>)
 private fun ResumeCard(item: EpisodeItem) {
     val strings = LocalStrings.current
     val episode = item.episode
+    // The episode playing shows the player's live position.
+    val nowPlaying by LocalPlayback.current.nowPlaying.collectAsState()
+    val live = nowPlaying?.takeIf { it.item.episode.id == episode.id }
+    val progress = live?.progress ?: episode.progress
+    val remainingMinutes = live?.let { ceil((it.durationSeconds - it.state.positionSeconds).coerceAtLeast(0.0) / 60).toInt() } ?: episode.remainingMinutes
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
@@ -88,13 +95,11 @@ private fun ResumeCard(item: EpisodeItem) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                LinearProgressIndicator(progress = { episode.progress }, modifier = Modifier.fillMaxWidth())
-                Text(strings.remaining(episode.remainingMinutes), style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Text(strings.remaining(remainingMinutes), style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.width(8.dp))
-            FilledTonalIconButton(onClick = {}) {
-                Icon(Icons.Default.PlayArrow, contentDescription = strings.resume)
-            }
+            EpisodePlayButton(episode.id)
         }
     }
 }
@@ -109,8 +114,9 @@ private fun EpisodeRow(item: EpisodeItem) {
         headlineContent = { Text(episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text("${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}") },
         trailingContent = {
-            FilledTonalIconButton(onClick = {}) {
-                Icon(Icons.Default.PlayArrow, contentDescription = strings.play)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                QueueToggleButton(episode.id)
+                EpisodePlayButton(episode.id)
             }
         },
     )

@@ -98,6 +98,33 @@ interface Strings {
     val transcript: String
     fun fileStatus(status: FileStatus): String?
 
+    // Player (ADR 0008)
+    val nowPlaying: String
+    val pause: String
+    fun skipBack(seconds: Int): String
+    fun skipForward(seconds: Int): String
+
+    /** Playback speed: "1.5×", "1,5×" in French. */
+    fun speed(value: Float): String
+    val next: String
+    val close: String
+    val emptyQueue: String
+    val addToQueue: String
+    val removeFromQueue: String
+    val playNext: String
+    val moveUp: String
+    val clearQueue: String
+    val playbackFailed: String
+
+    /** Position in an episode: "4:05", "1:02:03" (the same in every language). */
+    fun clock(seconds: Int): String {
+        val total = seconds.coerceAtLeast(0)
+        val hours = total / 3600
+        val minutes = total % 3600 / 60
+        val rest = (total % 60).toString().padStart(2, '0')
+        return if (hours > 0) "$hours:${minutes.toString().padStart(2, '0')}:$rest" else "$minutes:$rest"
+    }
+
     // Server refusals (Problem Details types)
     val feedUnreachable: String
     val notAFeed: String
@@ -127,5 +154,12 @@ interface Strings {
     val cliNoteDescription: String
     val cliOpmlExportDescription: String
     val cliOpmlImportDescription: String
+    val cliPlayDescription: String
+    val cliQueueDescription: String
+    val cliQueueAddDescription: String
+    val cliQueueRemoveDescription: String
+    val cliQueueClearDescription: String
+    val nothingToPlay: String
     val tuiHelp: String
+    val tuiPlayerHelp: String
 }

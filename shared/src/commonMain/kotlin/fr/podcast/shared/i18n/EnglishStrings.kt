@@ -66,6 +66,10 @@ object EnglishStrings : Strings {
         "update" -> save
         "refresh" -> "Read the feed again"
         "logout" -> signOut
+        "enqueue" -> addToQueue
+        "dequeue" -> removeFromQueue
+        "move" -> "Move in the queue"
+        "clear-queue" -> clearQueue
         else -> name
     }
 
@@ -109,6 +113,21 @@ object EnglishStrings : Strings {
         FileStatus.FAILED -> "Download failed"
     }
 
+    override val nowPlaying = "Now playing"
+    override val pause = "Pause"
+    override fun skipBack(seconds: Int) = "Back $seconds s"
+    override fun skipForward(seconds: Int) = "Forward $seconds s"
+    override fun speed(value: Float) = (if (value % 1f == 0f) value.toInt().toString() else value.toString()) + "×"
+    override val next = "Next episode"
+    override val close = "Close"
+    override val emptyQueue = "The queue is empty."
+    override val addToQueue = "Add to queue"
+    override val removeFromQueue = "Remove from queue"
+    override val playNext = "Play next"
+    override val moveUp = "Move up"
+    override val clearQueue = "Clear queue"
+    override val playbackFailed = "This episode cannot be played."
+
     override val feedUnreachable = "This feed cannot be read."
     override val notAFeed = "This address is not a podcast feed."
     override val forbiddenFeedAddress = "This address is not allowed."
@@ -136,5 +155,12 @@ object EnglishStrings : Strings {
     override val cliNoteDescription = "Annotates a subscription; without text, clears the note."
     override val cliOpmlExportDescription = "Exports subscriptions as OPML."
     override val cliOpmlImportDescription = "Imports an OPML file."
-    override val tuiHelp = "↑/↓ move · q quit"
+    override val cliPlayDescription = "Plays an episode in the terminal: its number in `list`, otherwise the one to resume or the first of the queue."
+    override val cliQueueDescription = "Shows the queue."
+    override val cliQueueAddDescription = "Adds an episode (number in `list`) to the queue; --next to play it next."
+    override val cliQueueRemoveDescription = "Removes an episode from the queue (number in the queue)."
+    override val cliQueueClearDescription = "Clears the queue."
+    override val nothingToPlay = "Nothing to play."
+    override val tuiHelp = "↑/↓ move · enter play · a queue · q quit"
+    override val tuiPlayerHelp = "space play/pause · ←/→ −15 s/+30 s · +/− speed · n next"
 }

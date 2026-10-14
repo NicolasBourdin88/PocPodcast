@@ -2,6 +2,8 @@ package fr.podcast.ui
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -9,7 +11,12 @@ import fr.podcast.shared.account.Account
 import fr.podcast.shared.account.AccountsState
 import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.navigation.Destination
+import fr.podcast.player.PlaybackController
+import fr.podcast.player.SimulatedAudioPlayer
 import fr.podcast.shared.repository.FakePodcastRepository
+import fr.podcast.ui.player.LocalPlayback
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import fr.podcast.ui.account.AccountsScreen
 import fr.podcast.ui.account.SignInScreen
 import fr.podcast.ui.theme.PodcastTheme
@@ -81,19 +88,55 @@ class ResponsiveSnapshotTest {
         }
     }
 
+    @Test
+    fun renderPlayer() {
+        for (language in Language.entries) {
+            val tag = language.tag
+            render("player-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Home, playing = "e2", playerOpen = true) }
+            render("player-compact-height-$tag", sizes.getValue("compact-height")) {
+                Home(language, Destination.Home, playing = "e2", playerOpen = true)
+            }
+            render("player-bar-large-$tag", sizes.getValue("large")) { Home(language, Destination.Home, playing = "e2") }
+        }
+    }
+
     @Composable
-    private fun Home(language: Language, destination: Destination, podcastId: String? = null, query: String = "") {
+    private fun Home(
+        language: Language,
+        destination: Destination,
+        podcastId: String? = null,
+        query: String = "",
+        playing: String? = null,
+        playerOpen: Boolean = false,
+    ) {
+        val repository = remember { FakePodcastRepository() }
+        // The demo player, paused on [playing], with two episodes in the queue.
+        val playback = remember {
+            val scope = CoroutineScope(Dispatchers.Unconfined)
+            PlaybackController(SimulatedAudioPlayer(scope), scope).apply {
+                attach(repository)
+                enqueue("e1")
+                enqueue("e3")
+                playing?.let {
+                    play(it)
+                    pause()
+                }
+            }
+        }
         // Same tree as App(): theme, then a Surface for background and content colors.
         PodcastTheme(language) {
             Surface {
-                MainScaffold(
-                    client = FakePodcastRepository(),
-                    accountLabel = "Alice · Podcast (dev)",
-                    initialDestination = destination,
-                    initialPodcastId = podcastId,
-                    initialQuery = query,
-                    settings = { modifier -> AccountsScreen(accounts, demo = false, {}, {}, {}, {}, modifier) },
-                )
+                CompositionLocalProvider(LocalPlayback provides playback) {
+                    MainScaffold(
+                        client = repository,
+                        accountLabel = "Alice · Podcast (dev)",
+                        initialDestination = destination,
+                        initialPodcastId = podcastId,
+                        initialQuery = query,
+                        initialPlayerOpen = playerOpen,
+                        settings = { modifier -> AccountsScreen(accounts, demo = false, {}, {}, {}, {}, modifier) },
+                    )
+                }
             }
         }
     }

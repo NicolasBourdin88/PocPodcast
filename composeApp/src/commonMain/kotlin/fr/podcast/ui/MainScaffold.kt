@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
@@ -23,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -33,9 +31,13 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +54,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.userMessage
-import fr.podcast.shared.home.HomeState
-import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.navigation.Destination
 import fr.podcast.shared.repository.PodcastClient
@@ -63,8 +63,16 @@ import fr.podcast.ui.home.HomeScreen
 import fr.podcast.ui.home.HomeUiState
 import fr.podcast.ui.home.loadHome
 import fr.podcast.ui.library.LibraryScreen
+import fr.podcast.player.PlaybackException
+import fr.podcast.player.PlayerStatus
+import fr.podcast.shared.home.EpisodeItem
+import fr.podcast.ui.player.LocalPlayback
 import fr.podcast.ui.player.MiniPlayer
+import fr.podcast.ui.player.PlayerBar
+import fr.podcast.ui.player.PlayerScreen
+import fr.podcast.ui.player.queueItems
 import fr.podcast.ui.theme.LocalStrings
+import kotlinx.coroutines.delay
 
 private val Destination.icon: ImageVector
     get() = when (this) {
@@ -84,12 +92,21 @@ fun MainScaffold(
     initialDestination: Destination = Destination.Home,
     initialPodcastId: String? = null,
     initialQuery: String = "",
+    initialPlayerOpen: Boolean = false,
 ) {
     var reloads by remember { mutableIntStateOf(0) }
     val state by produceState<HomeUiState>(HomeUiState.Loading, client, reloads) {
         // A reload after a library change keeps the current Home on screen until the new one is ready.
         if (value !is HomeUiState.Loaded) value = HomeUiState.Loading
         value = loadHome(client)
+    }
+    // Home follows playback: another episode, a pause or an end changes "Continue listening".
+    val nowPlaying by LocalPlayback.current.nowPlaying.collectAsState()
+    val playbackKey = nowPlaying?.item?.episode?.id to (nowPlaying?.state?.playing == true || nowPlaying?.state?.status == PlayerStatus.ENDED)
+    LaunchedEffect(playbackKey) {
+        if (playbackKey.first == null) return@LaunchedEffect
+        delay(1_500) // once the position has reached the server
+        reloads++
     }
     BoxWithConstraints {
         AdaptiveScaffold(
@@ -100,6 +117,7 @@ fun MainScaffold(
             initialDestination = initialDestination,
             initialPodcastId = initialPodcastId,
             initialQuery = initialQuery,
+            initialPlayerOpen = initialPlayerOpen,
             settings = settings,
             onReload = { reloads++ },
             onSessionExpired = onSessionExpired,
@@ -116,6 +134,7 @@ private fun AdaptiveScaffold(
     initialDestination: Destination,
     initialPodcastId: String?,
     initialQuery: String,
+    initialPlayerOpen: Boolean,
     settings: @Composable (Modifier) -> Unit,
     onReload: () -> Unit,
     onSessionExpired: () -> Unit,
@@ -131,7 +150,19 @@ private fun AdaptiveScaffold(
     }
     val home = (state as? HomeUiState.Loaded)?.home
     val subscriptions = (state as? HomeUiState.Loaded)?.subscriptions.orEmpty()
-    val nowPlaying = home?.resume?.firstOrNull()
+
+    val playback = LocalPlayback.current
+    val nowPlaying by playback.nowPlaying.collectAsState()
+    val queue by playback.queue.collectAsState()
+    // The episode playing, or else the one to resume.
+    val playerItem = nowPlaying?.item ?: home?.resume?.firstOrNull()
+    var playerOpen by rememberSaveable { mutableStateOf(initialPlayerOpen) }
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(playback) {
+        playback.failures.collect { failure ->
+            snackbar.showSnackbar(if (failure is PlaybackException) strings.playbackFailed else failure.userMessage(strings))
+        }
+    }
 
     val content: @Composable (Modifier) -> Unit = { modifier ->
         when {
@@ -153,100 +184,117 @@ private fun AdaptiveScaffold(
         }
     }
 
-    when {
-        layout == WindowLayout.Compact -> Scaffold(
-            bottomBar = {
-                Column {
-                    nowPlaying?.let { MiniPlayer(it, singleLine = false) }
-                    NavigationBar {
-                        Destination.entries.forEach { destination ->
-                            NavigationBarItem(
-                                selected = selected == destination,
-                                onClick = { select(destination) },
-                                icon = { Icon(destination.icon, contentDescription = null) },
-                                label = { Text(strings.destination(destination)) },
-                            )
+    Box(Modifier.fillMaxSize()) {
+        when {
+            layout == WindowLayout.Compact -> Scaffold(
+                bottomBar = {
+                    Column {
+                        playerItem?.let { MiniPlayer(it, nowPlaying, singleLine = false, onOpen = { playerOpen = true }) }
+                        NavigationBar {
+                            Destination.entries.forEach { destination ->
+                                NavigationBarItem(
+                                    selected = selected == destination,
+                                    onClick = { select(destination) },
+                                    icon = { Icon(destination.icon, contentDescription = null) },
+                                    label = { Text(strings.destination(destination)) },
+                                )
+                            }
                         }
                     }
-                }
-            },
-        ) { padding -> content(Modifier.padding(padding)) }
+                },
+            ) { padding -> content(Modifier.padding(padding)) }
 
-        layout.usesRail -> Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            NavigationRail {
-                Destination.entries.forEach { destination ->
-                    NavigationRailItem(
-                        selected = selected == destination,
-                        onClick = { select(destination) },
-                        icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(strings.destination(destination)) },
-                    )
-                }
-            }
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.weight(1f)) {
-                    content(Modifier.weight(1f))
-                    if (layout == WindowLayout.Expanded && home != null && selected == Destination.Home) {
-                        VerticalDivider()
-                        QueuePanel(home, width = 320.dp)
-                    }
-                }
-                nowPlaying?.let { MiniPlayer(it, singleLine = layout == WindowLayout.CompactHeight) }
-            }
-        }
-
-        else -> PermanentNavigationDrawer(
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
-            drawerContent = {
-                PermanentDrawerSheet(Modifier.width(280.dp)) {
-                    Text(
-                        strings.appName,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 16.dp),
-                    )
-                    Text(
-                        accountLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 28.dp, end = 28.dp, bottom = 16.dp),
-                    )
+            layout.usesRail -> Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                NavigationRail {
                     Destination.entries.forEach { destination ->
-                        NavigationDrawerItem(
+                        NavigationRailItem(
                             selected = selected == destination,
                             onClick = { select(destination) },
                             icon = { Icon(destination.icon, contentDescription = null) },
                             label = { Text(strings.destination(destination)) },
-                            modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
-                    if (subscriptions.isNotEmpty()) {
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp, horizontal = 28.dp))
-                        Text(
-                            strings.subscriptions,
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
-                        )
-                        SubscriptionItems(subscriptions, selectedId = openPodcastId.takeIf { selected == Destination.Library }) {
-                            openPodcastId = it.id
-                            selected = Destination.Library
+                }
+                Column(Modifier.weight(1f)) {
+                    Row(Modifier.weight(1f)) {
+                        content(Modifier.weight(1f))
+                        if (layout == WindowLayout.Expanded && home != null && selected == Destination.Home) {
+                            VerticalDivider()
+                            QueuePanel(queue, width = 320.dp)
+                        }
+                    }
+                    playerItem?.let { item ->
+                        if (layout == WindowLayout.Expanded) {
+                            PlayerBar(item, nowPlaying, onOpen = { playerOpen = true })
+                        } else {
+                            MiniPlayer(item, nowPlaying, singleLine = layout == WindowLayout.CompactHeight, onOpen = { playerOpen = true })
                         }
                     }
                 }
-            },
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.weight(1f)) {
-                    content(Modifier.weight(1f))
-                    if (home != null && selected == Destination.Home) {
-                        VerticalDivider()
-                        QueuePanel(home, width = 360.dp)
+            }
+
+            else -> PermanentNavigationDrawer(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+                drawerContent = {
+                    PermanentDrawerSheet(Modifier.width(280.dp)) {
+                        Text(
+                            strings.appName,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 16.dp),
+                        )
+                        Text(
+                            accountLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 28.dp, end = 28.dp, bottom = 16.dp),
+                        )
+                        Destination.entries.forEach { destination ->
+                            NavigationDrawerItem(
+                                selected = selected == destination,
+                                onClick = { select(destination) },
+                                icon = { Icon(destination.icon, contentDescription = null) },
+                                label = { Text(strings.destination(destination)) },
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                            )
+                        }
+                        if (subscriptions.isNotEmpty()) {
+                            HorizontalDivider(Modifier.padding(vertical = 12.dp, horizontal = 28.dp))
+                            Text(
+                                strings.subscriptions,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
+                            )
+                            SubscriptionItems(subscriptions, selectedId = openPodcastId.takeIf { selected == Destination.Library }) {
+                                openPodcastId = it.id
+                                selected = Destination.Library
+                            }
+                        }
                     }
+                },
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.weight(1f)) {
+                        content(Modifier.weight(1f))
+                        if (home != null && selected == Destination.Home) {
+                            VerticalDivider()
+                            QueuePanel(queue, width = 360.dp)
+                        }
+                    }
+                    playerItem?.let { PlayerBar(it, nowPlaying, onOpen = { playerOpen = true }) }
                 }
-                nowPlaying?.let { MiniPlayer(it, singleLine = false) }
             }
         }
+        if (playerOpen && playerItem != null) {
+            PlayerScreen(
+                item = playerItem,
+                nowPlaying = nowPlaying,
+                twoColumns = layout != WindowLayout.Compact && layout != WindowLayout.Medium,
+                onClose = { playerOpen = false },
+            )
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp))
     }
 }
 
@@ -263,28 +311,12 @@ private fun SubscriptionItems(subscriptions: List<Podcast>, selectedId: String?,
     }
 }
 
-/** Fake queue: unplayed episodes, in-progress first. */
+/** The queue beside Home on wide windows. */
 @Composable
-private fun QueuePanel(home: HomeState, width: Dp) {
-    val queue = (home.resume + home.latest)
-        .distinctBy { it.episode.id }
-        .filter { it.episode.status != EpisodeStatus.PLAYED }
-    LazyColumn(Modifier.width(width).fillMaxHeight()) {
-        item {
-            Text(
-                LocalStrings.current.queue,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp),
-            )
-        }
-        items(queue, key = { it.episode.id }) { item ->
-            ListItem(
-                leadingContent = { Artwork(item.podcast, size = 40.dp) },
-                headlineContent = { Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                supportingContent = { Text("${item.podcast.title} · ${LocalStrings.current.duration(item.episode.durationSeconds)}") },
-            )
-        }
-    }
+private fun QueuePanel(queue: List<EpisodeItem>, width: Dp) {
+    val playback = LocalPlayback.current
+    val strings = LocalStrings.current
+    LazyColumn(Modifier.width(width).fillMaxHeight()) { queueItems(queue, playback, strings) }
 }
 
 @Composable

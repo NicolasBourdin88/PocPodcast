@@ -68,6 +68,10 @@ object FrenchStrings : Strings {
         "update" -> save
         "refresh" -> "Relire le flux"
         "logout" -> signOut
+        "enqueue" -> addToQueue
+        "dequeue" -> removeFromQueue
+        "move" -> "Déplacer dans la file"
+        "clear-queue" -> clearQueue
         else -> name
     }
 
@@ -111,6 +115,21 @@ object FrenchStrings : Strings {
         FileStatus.FAILED -> "Échec du téléchargement"
     }
 
+    override val nowPlaying = "En cours de lecture"
+    override val pause = "Pause"
+    override fun skipBack(seconds: Int) = "Reculer de $seconds s"
+    override fun skipForward(seconds: Int) = "Avancer de $seconds s"
+    override fun speed(value: Float) = (if (value % 1f == 0f) value.toInt().toString() else value.toString().replace('.', ',')) + "×"
+    override val next = "Épisode suivant"
+    override val close = "Fermer"
+    override val emptyQueue = "La file d'attente est vide."
+    override val addToQueue = "Ajouter à la file d'attente"
+    override val removeFromQueue = "Retirer de la file d'attente"
+    override val playNext = "Lire ensuite"
+    override val moveUp = "Monter dans la file"
+    override val clearQueue = "Vider la file d'attente"
+    override val playbackFailed = "Impossible de lire cet épisode."
+
     override val feedUnreachable = "Impossible de lire ce flux."
     override val notAFeed = "Cette adresse n'est pas un flux de podcast."
     override val forbiddenFeedAddress = "Cette adresse n'est pas autorisée."
@@ -138,5 +157,12 @@ object FrenchStrings : Strings {
     override val cliNoteDescription = "Annote un abonnement ; sans texte, efface la note."
     override val cliOpmlExportDescription = "Exporte les abonnements en OPML."
     override val cliOpmlImportDescription = "Importe un fichier OPML."
-    override val tuiHelp = "↑/↓ naviguer · q quitter"
+    override val cliPlayDescription = "Lit un épisode dans le terminal : son numéro dans `list`, sinon celui à reprendre ou le premier de la file."
+    override val cliQueueDescription = "Affiche la file d'attente."
+    override val cliQueueAddDescription = "Ajoute un épisode (numéro dans `list`) à la file ; --next pour le lire ensuite."
+    override val cliQueueRemoveDescription = "Retire un épisode de la file (numéro dans la file)."
+    override val cliQueueClearDescription = "Vide la file d'attente."
+    override val nothingToPlay = "Rien à lire."
+    override val tuiHelp = "↑/↓ naviguer · entrée lire · a file d'attente · q quitter"
+    override val tuiPlayerHelp = "espace lecture/pause · ←/→ −15 s/+30 s · +/− vitesse · n suivant"
 }

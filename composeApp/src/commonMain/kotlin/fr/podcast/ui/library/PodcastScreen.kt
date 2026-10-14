@@ -52,6 +52,8 @@ import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.components.PodcastIcons
 import fr.podcast.ui.components.attempt
+import fr.podcast.ui.player.EpisodePlayButton
+import fr.podcast.ui.player.QueueToggleButton
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
 
@@ -230,19 +232,24 @@ private fun EpisodeRow(episode: Episode, onToggleKept: () -> Unit, onDownload: (
     ListItem(
         overlineContent = { Text("${strings.shortDate(episode.publishedOn())} · ${strings.duration(episode.durationSeconds)}") },
         headlineContent = { Text(episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(details.joinToString(" · ")) },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
-                    IconButton(onClick = onDownload) { Icon(PodcastIcons.Download, contentDescription = strings.action("download")) }
-                }
-                IconToggleButton(checked = episode.kept, onCheckedChange = { onToggleKept() }) {
-                    Icon(
-                        if (episode.kept) PodcastIcons.Bookmark else PodcastIcons.BookmarkBorder,
-                        contentDescription = strings.action(if (episode.kept) "unkeep" else "keep"),
-                    )
+        supportingContent = {
+            Column {
+                Text(details.joinToString(" · "))
+                // Secondary actions under the text, so that narrow screens keep room for the title.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    QueueToggleButton(episode.id)
+                    IconToggleButton(checked = episode.kept, onCheckedChange = { onToggleKept() }) {
+                        Icon(
+                            if (episode.kept) PodcastIcons.Bookmark else PodcastIcons.BookmarkBorder,
+                            contentDescription = strings.action(if (episode.kept) "unkeep" else "keep"),
+                        )
+                    }
+                    if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
+                        IconButton(onClick = onDownload) { Icon(PodcastIcons.Download, contentDescription = strings.action("download")) }
+                    }
                 }
             }
         },
+        trailingContent = { EpisodePlayButton(episode.id) },
     )
 }
