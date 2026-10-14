@@ -8,6 +8,8 @@ import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.repository.RemotePodcastRepository
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -95,6 +97,33 @@ class SdkTest {
         val refused = assertFailsWith<ApiException.Rejected> { repository.subscribe("https://feeds.test/not-a-feed.html") }
         assertEquals("/problems/not-a-feed", refused.type)
         assertEquals(Language.French.strings.notAFeed, refused.userMessage(Language.French.strings))
+    }
+
+    @Test
+    fun sdkPlaysFromTheQueue() = testApplication {
+        podcastServer()
+        val account = AccountService(client, deviceName = "SDK test").signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
+        val repository = RemotePodcastRepository(account, client)
+
+        repository.enqueue("1")
+        repository.enqueue("6")
+        repository.enqueue("9", position = 0)
+        assertEquals(listOf("9", "1", "6"), repository.queue().map { it.episode.id })
+        repository.moveInQueue("9", 2)
+        repository.dequeue("1")
+        assertEquals(listOf("6", "9"), repository.queue().map { it.episode.id })
+        assertTrue(repository.episode("6")!!.inQueue)
+
+        // A fresh episode for the player: its podcast, and an absolute signed link that opens without the token.
+        val item = repository.episodeItem("6")!!
+        assertEquals("Les Cast Codeurs", item.podcast.title)
+        val audio = item.episode.audioUrl!!
+        assertTrue(audio.startsWith("http://localhost/episodes/6/audio?expires="), audio)
+        val player = createClient { followRedirects = false }
+        assertEquals(HttpStatusCode.Found, player.get(audio).status)
+
+        repository.clearQueue()
+        assertEquals(emptyList(), repository.queue())
     }
 
     @Test

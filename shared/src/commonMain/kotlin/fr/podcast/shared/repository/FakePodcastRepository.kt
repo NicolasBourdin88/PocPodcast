@@ -1,5 +1,6 @@
 package fr.podcast.shared.repository
 
+import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
@@ -45,7 +46,10 @@ class FakePodcastRepository : PodcastClient {
             "e5", "p2", "Ktor 3 and server-side Kotlin", Instant.parse("2026-09-28T06:00:00Z"),
             durationSeconds = 61 * 60, positionSeconds = 61 * 60, status = EpisodeStatus.PLAYED,
         ),
-    )
+    ).map { it.copy(audioUrl = "$DEMO_AUDIO${it.id}") }.toMutableList()
+
+    /** Episode ids, in listening order. */
+    private val queueIds = mutableListOf<String>()
 
     /** A small directory for the demo search. */
     private val directory = listOf(
@@ -72,8 +76,10 @@ class FakePodcastRepository : PodcastClient {
     override suspend fun updateProgress(episodeId: String, positionSeconds: Int) =
         update(episodeId) { it.copy(positionSeconds = positionSeconds, status = EpisodeStatus.IN_PROGRESS) }
 
-    override suspend fun markPlayed(episodeId: String) =
+    override suspend fun markPlayed(episodeId: String) {
         update(episodeId) { it.copy(positionSeconds = it.durationSeconds, status = EpisodeStatus.PLAYED) }
+        dequeue(episodeId)
+    }
 
     override suspend fun markUnplayed(episodeId: String) =
         update(episodeId) { it.copy(positionSeconds = 0, status = EpisodeStatus.NEW) }
@@ -131,6 +137,36 @@ class FakePodcastRepository : PodcastClient {
     /** The demo has no server: the file is "downloaded" at once. */
     override suspend fun download(episodeId: String) = update(episodeId) { it.copy(fileStatus = FileStatus.READY) }
 
+    // --- PlaybackRepository ---
+
+    override suspend fun episodeItem(id: String): EpisodeItem? = mutex.withLock {
+        episodes.find { it.id == id }?.let { episode -> EpisodeItem(episode, podcasts.first { it.id == episode.podcastId }) }
+    }
+
+    override suspend fun queue(): List<EpisodeItem> = mutex.withLock {
+        queueIds.mapNotNull { id -> episodes.find { it.id == id } }.map { episode -> EpisodeItem(episode, podcasts.first { it.id == episode.podcastId }) }
+    }
+
+    override suspend fun enqueue(episodeId: String, position: Int?) = changeQueue {
+        if (episodes.any { it.id == episodeId }) {
+            remove(episodeId)
+            add(position?.coerceIn(0, size) ?: size, episodeId)
+        }
+    }
+
+    override suspend fun dequeue(episodeId: String) = changeQueue { remove(episodeId) }
+
+    override suspend fun moveInQueue(episodeId: String, position: Int) = changeQueue {
+        if (remove(episodeId)) add(position.coerceIn(0, size), episodeId)
+    }
+
+    override suspend fun clearQueue() = changeQueue { clear() }
+
+    private suspend fun changeQueue(change: MutableList<String>.() -> Unit) = mutex.withLock {
+        queueIds.change()
+        for (index in episodes.indices) episodes[index] = episodes[index].let { it.copy(inQueue = it.id in queueIds) }
+    }
+
     override suspend fun exportOpml(): String = buildString {
         appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
         appendLine("""<opml version="2.0"><head><title>Podcast (demo)</title></head><body>""")
@@ -151,4 +187,9 @@ class FakePodcastRepository : PodcastClient {
     }
 
     private fun String.escapeXml() = replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;")
+
+    companion object {
+        /** Audio "address" of the demo episodes: only the simulated player can open it. */
+        const val DEMO_AUDIO = "demo:"
+    }
 }

@@ -6,6 +6,7 @@ import fr.podcast.shared.api.HalResource
 import fr.podcast.shared.api.PodcastApi
 import fr.podcast.shared.api.expandUriTemplate
 import fr.podcast.shared.api.halResource
+import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
@@ -45,12 +46,12 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     override suspend fun podcast(id: String): Podcast? = orNullIfNotFound { api.get(link("podcast", mapOf("id" to id))).toPodcast() }
 
-    override suspend fun episode(id: String): Episode? = episodeResource(id)?.toEpisode()
+    override suspend fun episode(id: String): Episode? = episodeResource(id)?.asEpisode()
 
     override suspend fun latestEpisodes(limit: Int): List<Episode> =
-        api.get(link("episodes", mapOf("limit" to limit.coerceIn(1, MAX_PAGE)))).embedded("episodes").map { it.toEpisode() }
+        api.get(link("episodes", mapOf("limit" to limit.coerceIn(1, MAX_PAGE)))).embedded("episodes").map { it.asEpisode() }
 
-    override suspend fun inProgress(): List<Episode> = root(refresh = true).embedded("resume").map { it.toEpisode() }
+    override suspend fun inProgress(): List<Episode> = root(refresh = true).embedded("resume").map { it.asEpisode() }
 
     override suspend fun updateProgress(episodeId: String, positionSeconds: Int) =
         perform(episodeId, "update-progress", mapOf("positionSeconds" to JsonPrimitive(positionSeconds)))
@@ -92,7 +93,7 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     override suspend fun podcastEpisodes(podcastId: String, limit: Int): List<Episode> {
         val podcast = orNullIfNotFound { api.get(link("podcast", mapOf("id" to podcastId))) } ?: return emptyList()
         val href = expandUriTemplate(podcast.link("episodes") ?: return emptyList(), mapOf("limit" to limit.coerceIn(1, MAX_PAGE)))
-        return api.get(href).embedded("episodes").map { it.toEpisode() }
+        return api.get(href).embedded("episodes").map { it.asEpisode() }
     }
 
     override suspend fun search(query: String): List<SearchResult>? {
@@ -106,6 +107,25 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     override suspend fun download(episodeId: String) = perform(episodeId, "download")
 
+    // --- PlaybackRepository ---
+
+    override suspend fun episodeItem(id: String): EpisodeItem? = episodeResource(id)?.asEpisodeItem()
+
+    override suspend fun queue(): List<EpisodeItem> = queueResource().embedded("episodes").map { it.asEpisodeItem() }
+
+    override suspend fun enqueue(episodeId: String, position: Int?) =
+        perform(episodeId, "enqueue", position?.let { mapOf("position" to JsonPrimitive(it)) } ?: emptyMap())
+
+    override suspend fun dequeue(episodeId: String) = perform(episodeId, "dequeue")
+
+    override suspend fun moveInQueue(episodeId: String, position: Int) =
+        perform(episodeId, "move", mapOf("position" to JsonPrimitive(position)))
+
+    override suspend fun clearQueue() {
+        val queue = queueResource()
+        queue.template("clear-queue")?.let { api.submit(it, queue.link("self") ?: link("queue")) }
+    }
+
     override suspend fun exportOpml(): String =
         api.getText(subscriptionCollection().link("opml") ?: throw ApiException.Unexpected(200, "no opml link"), OPML)
 
@@ -117,6 +137,13 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     // --- Helpers ---
 
     private suspend fun subscriptionCollection(): HalResource = api.get(link("subscriptions"))
+
+    private suspend fun queueResource(): HalResource = api.get(link("queue"))
+
+    /** An episode whose audio link is absolute, ready for a player. */
+    private fun HalResource.asEpisode(): Episode = toEpisode().copy(audioUrl = link("audio")?.let(api::resolve))
+
+    private fun HalResource.asEpisodeItem(): EpisodeItem = EpisodeItem(asEpisode(), embedded("podcast").single().toPodcast())
 
     private suspend fun subscriptionResource(id: String): HalResource =
         subscriptionCollection().embedded("subscriptions").firstOrNull { it.string("id") == id }

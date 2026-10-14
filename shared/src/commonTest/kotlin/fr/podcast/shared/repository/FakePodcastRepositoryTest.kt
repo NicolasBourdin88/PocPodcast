@@ -55,3 +55,26 @@ class FakeLibraryTest {
         assertEquals(4, report.alreadySubscribed)
     }
 }
+
+class FakeQueueTest {
+
+    private val repository = FakePodcastRepository()
+
+    @Test
+    fun demoQueueKeepsItsOrder() = runTest {
+        repository.enqueue("e1")
+        repository.enqueue("e3")
+        repository.enqueue("e5", position = 0)
+        assertEquals(listOf("e5", "e1", "e3"), repository.queue().map { it.episode.id })
+        assertEquals(true, repository.episodeItem("e1")!!.episode.inQueue)
+
+        repository.moveInQueue("e5", 2)
+        repository.markPlayed("e1") // played episodes leave the queue
+        assertEquals(listOf("e3", "e5"), repository.queue().map { it.episode.id })
+        assertEquals(false, repository.episodeItem("e1")!!.episode.inQueue)
+
+        assertEquals("demo:e3", repository.episodeItem("e3")!!.episode.audioUrl)
+        repository.clearQueue()
+        assertEquals(emptyList(), repository.queue())
+    }
+}

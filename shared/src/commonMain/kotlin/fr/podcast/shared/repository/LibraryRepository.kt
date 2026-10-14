@@ -34,4 +34,4 @@ interface LibraryRepository {
 }
 
 /** Everything a client needs from a server, or from the demo data. */
-interface PodcastClient : PodcastRepository, LibraryRepository
+interface PodcastClient : PodcastRepository, LibraryRepository, PlaybackRepository
