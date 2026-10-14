@@ -18,6 +18,8 @@ data class ColorTokens(
     val onSurface: Int,
     val onSurfaceVariant: Int,
     val primary: Int,
+    /** Refusals, failures and destructive actions (unsubscribe). */
+    val error: Int,
 )
 
 object DesignTokens {
@@ -28,6 +30,7 @@ object DesignTokens {
         onSurface = 0x1D1B20,
         onSurfaceVariant = 0x625B71,
         primary = 0x6750A4,
+        error = 0xB3261E,
     )
 
     val dark = ColorTokens(
@@ -37,6 +40,7 @@ object DesignTokens {
         onSurface = 0xE6E0E9,
         onSurfaceVariant = 0xCAC4D0,
         primary = 0xD0BCFF,
+        error = 0xF2B8B5,
     )
 
     /** Placeholder artwork backgrounds, until real images are loaded. */

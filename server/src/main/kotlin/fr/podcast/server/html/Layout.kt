@@ -92,6 +92,7 @@ private fun ColorTokens.cssVariables() = listOf(
     "--text" to onSurface,
     "--muted" to onSurfaceVariant,
     "--accent" to primary,
+    "--error" to error,
 ).joinToString(" ") { (name, value) -> "$name: ${value.toCssHex()};" }
 
 private val STYLES = """
@@ -154,9 +155,9 @@ private val STYLES = """
     .note { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 4px 0; }
     .toggle { display: flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--muted); }
     .badge { align-self: flex-start; font-size: .75rem; padding: 2px 8px; border-radius: 999px; background: var(--card); }
-    .badge.warning, .error { color: #b3261e; }
+    .badge.warning, .error { color: var(--error); }
     .subscribed, .notice { font-size: .85rem; color: var(--accent); }
-    button.danger { color: #b3261e; }
+    button.danger { color: var(--error); }
     img.artwork { object-fit: cover; }
     .results .episode { align-items: center; }
     .empty { color: var(--muted); }
@@ -165,8 +166,7 @@ private val STYLES = """
     .login label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
     .login input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--card); background: var(--surface); color: var(--text); }
     .login button { background: var(--accent); color: var(--bg); padding: 10px 16px; }
-    .error { color: #b3261e; font-size: .9rem; margin: 0; }
-    @media (prefers-color-scheme: dark) { .error { color: #f2b8b5; } }
+    .error { font-size: .9rem; margin: 0; }
     body.anonymous main { margin: 0 auto; }
 
     @media (min-width: 840px) {

@@ -35,6 +35,7 @@ private fun ColorTokens.toColorScheme(dark: Boolean): ColorScheme {
         onSurface = rgb(onSurface),
         onBackground = rgb(onSurface),
         onSurfaceVariant = rgb(onSurfaceVariant),
+        error = rgb(error),
     )
 }
 
