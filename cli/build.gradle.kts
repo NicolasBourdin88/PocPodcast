@@ -11,6 +11,8 @@ application {
 
 dependencies {
     implementation(projects.shared)
+    // Playback in the terminal, on JavaFX Media (ADR 0008).
+    implementation(projects.player)
     implementation(libs.clikt)
     implementation(libs.mosaic.runtime)
     // Ktor logs through SLF4J: no output in a terminal tool.

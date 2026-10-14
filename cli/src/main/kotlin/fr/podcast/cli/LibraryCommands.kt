@@ -2,7 +2,6 @@ package fr.podcast.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.optional
@@ -94,8 +93,3 @@ class OpmlImportCommand : ServerCommand("import") {
 /** The subscription shown under [number] by `podcast subscriptions`. */
 private fun ServerCommand.subscription(number: Int): SubscriptionItem =
     call { client().subscriptionItems() }.getOrNull(number - 1) ?: fail(cli.strings.unknownNumber(number))
-
-private fun ServerCommand.fail(message: String): Nothing {
-    echo(message, err = true)
-    throw ProgramResult(1)
-}

@@ -26,6 +26,11 @@ class HomeTextTest {
         assertContains(french, "Nouveaux épisodes")
         assertContains(french, "LCC 330 - Les nouveautés de Kotlin 2.4")
 
+        // Numbered in the order shown, as used by `play` and `queue add`.
+        assertContains(french, " 1. LCC 330 - Les nouveautés de Kotlin 2.4 — Les Cast Codeurs")
+        assertContains(french, " 3. 12 oct.  Compose Multiplatform for iOS is stable")
+        assertEquals("e1", home.numbered[2].episode.id)
+
         val english = renderHomeText(home, Language.English.strings)
         assertContains(english, "Continue listening")
         assertContains(english, "57 min left")

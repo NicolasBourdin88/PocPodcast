@@ -27,6 +27,22 @@ class LibraryTextTest {
     }
 
     @Test
+    fun theQueueIsNumbered() = runBlocking<Unit> {
+        val repository = FakePodcastRepository()
+        assertEquals(strings.emptyQueue, renderQueueText(repository.queue(), strings))
+
+        repository.enqueue("e3")
+        repository.enqueue("e1", position = 0)
+        assertEquals(
+            listOf(
+                " 1. Compose Multiplatform for iOS is stable — Talking Kotlin · 52 min",
+                " 2. KMP in production — Fragmented · 47 min",
+            ).joinToString("\n"),
+            renderQueueText(repository.queue(), strings),
+        )
+    }
+
+    @Test
     fun subscriptionsShowNotesAndAutomaticDownload() = runBlocking<Unit> {
         val repository = FakePodcastRepository()
         val first = repository.subscriptionItems().first()

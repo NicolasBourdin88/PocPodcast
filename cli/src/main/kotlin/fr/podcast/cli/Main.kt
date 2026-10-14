@@ -8,12 +8,17 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.prompt
 import com.jakewharton.mosaic.runMosaicBlocking
+import fr.podcast.player.JavaFxAudioPlayer
+import fr.podcast.player.PlaybackController
+import fr.podcast.player.SimulatedAudioPlayer
 import fr.podcast.shared.account.AccountService
 import fr.podcast.shared.account.AccountStore
 import fr.podcast.shared.account.PreferencesKeyValueStore
@@ -26,9 +31,16 @@ import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.repository.FakePodcastRepository
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.shared.repository.RemotePodcastRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
+import java.util.concurrent.Executors
 import java.util.prefs.Preferences
+import kotlin.time.Duration.Companion.seconds
 
 /** Language of the system locale; also used for --help, which is shown before options are parsed. */
 internal val systemLanguage = Language.fromTag(Locale.getDefault().toLanguageTag()) ?: Language.Default
@@ -40,9 +52,12 @@ class CliContext(val strings: Strings, val demo: Boolean) {
     val accounts = AccountStore(PreferencesKeyValueStore(preferences))
     val accountService by lazy { AccountService(httpClient, "CLI (${System.getProperty("os.name")})") }
 
-    /** Demo data with --demo, otherwise the active account's server. */
-    fun repository(): PodcastClient? =
+    /** Demo data with --demo, otherwise the active account's server; one client per command. */
+    private val client: PodcastClient? by lazy {
         if (demo) FakePodcastRepository() else accounts.state.value.active?.let { RemotePodcastRepository(it, httpClient) }
+    }
+
+    fun repository(): PodcastClient? = client
 
     /** Feeds of the last `podcast search`, so that `podcast subscribe 2` works. */
     var lastSearch: List<String>
@@ -89,6 +104,34 @@ abstract class ServerCommand(name: String) : CliktCommand(name = name) {
         val client = client()
         return call { LoadHomeState(client)() }
     }
+
+    fun fail(message: String): Nothing {
+        echo(message, err = true)
+        throw ProgramResult(1)
+    }
+
+    /**
+     * The interactive screen, playing on JavaFX Media (ADR 0008), or silently with --demo; starts
+     * [autoplay] at once. The position reaches the server before the command ends.
+     */
+    protected fun runTui(home: HomeState, autoplay: String?) {
+        val client = client()
+        // One thread: playback commands run in the order they are given.
+        val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "playback").apply { isDaemon = true } }.asCoroutineDispatcher()
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val player = if (cli.demo) SimulatedAudioPlayer(scope) else JavaFxAudioPlayer()
+        val playback = PlaybackController(player, scope)
+        playback.attach(client)
+        autoplay?.let(playback::play)
+        try {
+            runMosaicBlocking { PodcastTui(home, playback, cli.strings) }
+        } finally {
+            runBlocking(dispatcher) { withTimeoutOrNull(3.seconds) { playback.flush() } }
+            player.release()
+            scope.cancel()
+            dispatcher.close()
+        }
+    }
 }
 
 class ListCommand : ServerCommand("list") {
@@ -98,9 +141,61 @@ class ListCommand : ServerCommand("list") {
 
 class TuiCommand : ServerCommand("tui") {
     override fun help(context: Context) = systemLanguage.strings.cliTuiDescription
+    override fun run() = runTui(loadHome(), autoplay = null)
+}
+
+class PlayCommand : ServerCommand("play") {
+    private val number by argument(help = "1, 2… (podcast list)").int().optional()
+
+    override fun help(context: Context) = systemLanguage.strings.cliPlayDescription
     override fun run() {
         val home = loadHome()
-        runMosaicBlocking { HomeTui(home, cli.strings) }
+        val episodeId = number?.let { home.numbered.getOrNull(it - 1)?.episode?.id ?: fail(cli.strings.unknownNumber(it)) }
+            ?: home.resume.firstOrNull()?.episode?.id
+            ?: call { client().queue() }.firstOrNull()?.episode?.id
+            ?: fail(cli.strings.nothingToPlay)
+        runTui(home, autoplay = episodeId)
+    }
+}
+
+/** `podcast queue`, and `queue add <n> [--next]`, `queue remove <n>`, `queue clear`. */
+class QueueCommand : ServerCommand("queue") {
+    override val invokeWithoutSubcommand = true
+
+    override fun help(context: Context) = systemLanguage.strings.cliQueueDescription
+    override fun run() {
+        if (currentContext.invokedSubcommand == null) echo(renderQueueText(call { client().queue() }, cli.strings))
+    }
+}
+
+class QueueAddCommand : ServerCommand("add") {
+    private val number by argument(help = "1, 2… (podcast list)").int()
+    private val next by option("--next", help = systemLanguage.strings.playNext).flag()
+
+    override fun help(context: Context) = systemLanguage.strings.cliQueueAddDescription
+    override fun run() {
+        val item = loadHome().numbered.getOrNull(number - 1) ?: fail(cli.strings.unknownNumber(number))
+        call { client().enqueue(item.episode.id, if (next) 0 else null) }
+        echo(renderQueueText(call { client().queue() }, cli.strings))
+    }
+}
+
+class QueueRemoveCommand : ServerCommand("remove") {
+    private val number by argument(help = "1, 2… (podcast queue)").int()
+
+    override fun help(context: Context) = systemLanguage.strings.cliQueueRemoveDescription
+    override fun run() {
+        val item = call { client().queue() }.getOrNull(number - 1) ?: fail(cli.strings.unknownNumber(number))
+        call { client().dequeue(item.episode.id) }
+        echo(renderQueueText(call { client().queue() }, cli.strings))
+    }
+}
+
+class QueueClearCommand : ServerCommand("clear") {
+    override fun help(context: Context) = systemLanguage.strings.cliQueueClearDescription
+    override fun run() {
+        call { client().clearQueue() }
+        echo(cli.strings.emptyQueue)
     }
 }
 
@@ -160,7 +255,8 @@ class LogoutCommand : ServerCommand("logout") {
 
 fun main(args: Array<String>) = PodcastCommand()
     .subcommands(
-        ListCommand(), TuiCommand(),
+        ListCommand(), TuiCommand(), PlayCommand(),
+        QueueCommand().subcommands(QueueAddCommand(), QueueRemoveCommand(), QueueClearCommand()),
         SearchCommand(), SubscribeCommand(), SubscriptionsCommand(), NoteCommand(), UnsubscribeCommand(),
         OpmlCommand().subcommands(OpmlExportCommand(), OpmlImportCommand()),
         LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand(),
