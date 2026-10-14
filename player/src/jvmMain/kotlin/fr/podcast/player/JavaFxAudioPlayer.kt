@@ -15,6 +15,8 @@ import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.logging.Level
+import java.util.logging.Logger
 import kotlin.math.abs
 import javafx.scene.media.Media as FxMedia
 import javafx.util.Duration as FxDuration
@@ -165,9 +167,14 @@ class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlaye
         @Volatile
         private var toolkitStarted = false
 
+        // JavaFX warns that it is loaded from the classpath rather than as modules: expected
+        // here, and it would print over the TUI. Kept in a field: JUL holds loggers weakly.
+        private val javafxLogger = Logger.getLogger("javafx")
+
         /** Once per process; also works when AWT (Compose Desktop) is already running. */
         private fun startToolkit() = synchronized(this) {
             if (toolkitStarted) return
+            javafxLogger.level = Level.SEVERE
             Platform.setImplicitExit(false)
             val started = CountDownLatch(1)
             try {

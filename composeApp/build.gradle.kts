@@ -58,9 +58,10 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Podcast"
             packageVersion = "1.0.0"
-            // From ./gradlew :composeApp:suggestRuntimeModules (java.prefs: saved accounts),
-            // plus the EC crypto provider, loaded dynamically, needed by HTTPS servers.
-            modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported", "jdk.crypto.ec")
+            // From ./gradlew :composeApp:suggestRuntimeModules (java.prefs: saved accounts;
+            // java.net.http and jdk.jfr: the JavaFX player), plus the EC crypto provider, loaded
+            // dynamically, needed by HTTPS servers.
+            modules("java.instrument", "java.management", "java.net.http", "java.prefs", "jdk.jfr", "jdk.unsupported", "jdk.crypto.ec")
         }
     }
 }
