@@ -20,6 +20,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class WebTest {
 
@@ -62,6 +63,43 @@ class WebTest {
         // Episode actions come from the same affordances as the HAL-FORMS templates.
         assertContains(home, "hx-post=\"/episodes/1/played\"")
         assertContains(home, "Marquer comme écouté")
+    }
+
+    @Test
+    fun theThinClientPlaysEpisodesAndShowsTheQueue() = testApplication {
+        podcastServer()
+        val browser = browser()
+        browser.login()
+        suspend fun page(path: String) = browser.get(path) {
+            header(HttpHeaders.Accept, "text/html")
+            header(HttpHeaders.AcceptLanguage, "fr")
+        }.bodyAsText()
+
+        // The player opens on the episode to resume (LCC 330), with a signed link; every episode can be played.
+        val home = page("/")
+        assertContains(home, "id=\"player\"")
+        assertContains(home, "data-episode=\"2\"")
+        assertContains(home, "data-audio=\"/episodes/2/audio?expires=")
+        assertContains(home, "data-play=\"1\"")
+        assertContains(home, "src=\"/static/player.js\"")
+        assertContains(home, "La file d'attente est vide.")
+
+        // htmx sends form fields, with HX-Request; "Play next" puts the episode first.
+        val added = browser.submitForm("/queue", parameters { append("episodeId", "1") }) { header("HX-Request", "true") }
+        assertEquals(HttpStatusCode.NoContent, added.status)
+        assertEquals("queue-changed, episodes-changed", added.headers["HX-Trigger"])
+        browser.submitForm("/queue", parameters { append("episodeId", "3"); append("position", "0") }) { header("HX-Request", "true") }
+        val queue = page("/fragments/queue")
+        assertTrue(queue.indexOf("KMP in production") < queue.indexOf("Compose Multiplatform for iOS is stable"))
+        assertContains(queue, "hx-delete=\"/queue/1\"")
+        assertContains(queue, "Monter dans la file")
+
+        // Without HX-Request a session cannot change the queue (CSRF, ADR 0005).
+        assertEquals(HttpStatusCode.Forbidden, browser.submitForm("/queue", parameters { append("episodeId", "4") }).status)
+
+        val script = browser.get("/static/player.js")
+        assertEquals(HttpStatusCode.OK, script.status)
+        assertContains(script.bodyAsText(), "playNext")
     }
 
     @Test

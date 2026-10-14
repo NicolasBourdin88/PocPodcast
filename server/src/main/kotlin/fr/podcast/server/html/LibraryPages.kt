@@ -132,6 +132,8 @@ fun HTML.explorePage(query: String, hits: List<SearchHit>?, subscribed: Set<Stri
     val strings = language.strings
     page(language, strings.destination(Destination.Explore), user, Destination.Explore, content = {
         form(action = "/search", method = FormMethod.get, classes = "search") {
+            // Boosted: searching keeps the player going.
+            attributes["hx-boost"] = "true"
             input(type = InputType.search, name = "q") {
                 value = query
                 placeholder = strings.searchPlaceholder

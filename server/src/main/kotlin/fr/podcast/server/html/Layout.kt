@@ -32,7 +32,10 @@ import kotlinx.html.unsafe
 
 private const val HTMX_URL = "https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js"
 
-/** Common page: navigation (when signed in), header, then [content]. */
+/**
+ * Common page: navigation (when signed in), header, then [content], and the player footer,
+ * opened on [player] when the page gives an episode (Home: the one to resume).
+ */
 fun HTML.page(
     language: Language,
     title: String,
@@ -40,6 +43,7 @@ fun HTML.page(
     current: Destination? = null,
     content: MAIN.() -> Unit,
     after: BODY.() -> Unit = {},
+    player: PlayerStart? = null,
 ) {
     val strings = language.strings
     lang = language.tag
@@ -48,11 +52,14 @@ fun HTML.page(
         meta(name = "viewport", content = "width=device-width, initial-scale=1")
         title("${strings.appName} — $title")
         script(src = HTMX_URL) {}
+        if (user != null) script(src = "/static/player.js") { attributes["defer"] = "" }
         style { unsafe { +STYLES } }
     }
     body(classes = if (user == null) "anonymous" else null) {
         if (user != null) {
             nav(classes = "nav") {
+                // Boosted by htmx: changing page keeps the player (and what it plays).
+                attributes["hx-boost"] = "true"
                 div("brand") { +strings.appName }
                 ul {
                     Destination.entries.forEach { destination ->
@@ -81,6 +88,7 @@ fun HTML.page(
             content()
         }
         after()
+        if (user != null) playerFooter(strings, player)
     }
 }
 
@@ -102,7 +110,7 @@ private val STYLES = """
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    main { padding: 16px 16px 160px; max-width: 960px; }
+    main { padding: 16px 16px 200px; max-width: 960px; }
     main > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
     h1 { font-size: 1.5rem; margin: 8px 0 16px; }
     h2 { font-size: 1.05rem; margin: 24px 0 12px; }
@@ -118,7 +126,7 @@ private val STYLES = """
     .account form { margin: 0; }
 
     .cards { display: grid; gap: 12px; }
-    .card, .episode, .mini-player { display: flex; gap: 12px; align-items: center; }
+    .card, .episode { display: flex; gap: 12px; align-items: center; }
     .card { background: var(--card); border-radius: 16px; padding: 12px; }
     .episode { padding: 10px 0; }
     .card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
@@ -139,9 +147,17 @@ private val STYLES = """
     button.action { font-size: .8rem; padding: 4px 12px; }
     .htmx-request.refresh, .htmx-request.action { opacity: .5; }
 
-    .mini-player { position: fixed; left: 0; right: 0; bottom: 52px; background: var(--surface); padding: 8px 16px; border-top: 3px solid var(--accent); }
-    .mini-player .artwork { width: 40px; height: 40px; font-size: .8rem; }
-    .mini-player .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player {
+      position: fixed; left: 0; right: 0; bottom: 52px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center;
+      gap: 4px 16px; background: var(--surface); padding: 8px 16px; border-top: 3px solid var(--accent);
+    }
+    .player[hidden] { display: none; }
+    .player-info { display: flex; flex-direction: column; min-width: 0; flex: 1 1 200px; }
+    .player-info .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player-controls { display: flex; align-items: center; gap: 8px; flex: 2 1 320px; }
+    .player audio { flex: 1; min-width: 160px; height: 40px; }
+    .player button { padding: 6px 12px; }
+    button.play { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
 
     a.button, .upload button, .search button, .add-feed button { display: inline-block; border-radius: 999px; background: var(--card); color: var(--text); padding: 8px 16px; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
@@ -177,6 +193,6 @@ private val STYLES = """
       .nav a[aria-current] { background: var(--card); }
       main { margin-left: 240px; padding: 24px 32px 120px; }
       .cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-      .mini-player { left: 240px; bottom: 0; }
+      .player { left: 240px; bottom: 0; }
     }
 """.trimIndent()

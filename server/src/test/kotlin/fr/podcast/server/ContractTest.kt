@@ -48,8 +48,8 @@ class ContractTest {
     private val schemas = SchemaRegistry.withDefaultDialect(Dialects.getOpenApi31())
     private val json = ObjectMapper()
 
-    /** Thin client pages and documentation: HTML only, outside the JSON API contract. */
-    private val outsideContract = listOf("/login", "/logout", "/fragments/", "/docs")
+    /** Thin client pages, its player script and documentation: outside the JSON API contract. */
+    private val outsideContract = listOf("/login", "/logout", "/fragments/", "/docs", "/static")
 
     private data class Operation(val method: HttpMethod, val path: String) {
         override fun toString() = "${method.value} $path"

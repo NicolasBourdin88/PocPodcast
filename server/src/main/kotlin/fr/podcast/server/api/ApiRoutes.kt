@@ -55,8 +55,10 @@ fun Route.apiRoutes(services: ServerServices) {
             when (val representation = call.representation()) {
                 Representation.Html -> {
                     if (user == null) return@get call.respondSeeOther("/login")
-                    val home = LoadHomeState(UserCatalog(services.database, user.id))()
-                    call.respondHtml { homePage(home, call.language(), user) }
+                    val catalog = UserCatalog(services.database, user.id)
+                    val home = LoadHomeState(catalog)()
+                    val queue = catalog.queue()
+                    call.respondHtml { homePage(home, queue, call.language(), user, services.audioLinks) }
                 }
                 else -> {
                     val home = user?.let { LoadHomeState(UserCatalog(services.database, it.id))() }

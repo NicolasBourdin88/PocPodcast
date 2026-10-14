@@ -3,9 +3,7 @@ package fr.podcast.server.html
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.hal.Affordance
 import fr.podcast.server.hal.Affordances
-import fr.podcast.shared.design.artworkColor
-import fr.podcast.shared.design.initials
-import fr.podcast.shared.design.toCssHex
+import fr.podcast.server.media.AudioLinks
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
 import fr.podcast.shared.i18n.Language
@@ -15,10 +13,8 @@ import kotlinx.html.FlowContent
 import kotlinx.html.HTML
 import kotlinx.html.UL
 import kotlinx.html.a
-import kotlinx.html.aside
 import kotlinx.html.button
 import kotlinx.html.div
-import kotlinx.html.footer
 import kotlinx.html.h2
 import kotlinx.html.id
 import kotlinx.html.li
@@ -28,31 +24,21 @@ import kotlinx.html.span
 import kotlinx.html.stream.createHTML
 import kotlinx.html.ul
 
-fun HTML.homePage(state: HomeState, language: Language, user: UserAccount) {
+/** Home: the player footer opens on the episode to resume (ADR 0008). */
+fun HTML.homePage(state: HomeState, queue: List<EpisodeItem>, language: Language, user: UserAccount, audio: AudioLinks) {
     val strings = language.strings
     page(
         language, strings.destination(Destination.Home), user, Destination.Home,
-        content = { homeContent(state, strings) },
-        after = {
-            state.resume.firstOrNull()?.let { item ->
-                footer("mini-player") {
-                    artwork(item)
-                    div("card-body") {
-                        span("title") { +item.episode.title }
-                        span("meta") { +item.podcast.title }
-                    }
-                    button(classes = "play") { attributes["aria-label"] = strings.play; +"▶" }
-                }
-            }
-        },
+        content = { homeContent(state, queue, strings, audio) },
+        player = state.resume.firstOrNull()?.let { PlayerStart(it, audio.path(it.episode.id)) },
     )
 }
 
 /**
  * Home sections. Reloaded by htmx (`/fragments/home`) on "Refresh" and whenever an
- * episode action answers with the `episodes-changed` trigger.
+ * episode action answers with the `episodes-changed` trigger; the queue also reloads alone.
  */
-fun FlowContent.homeContent(state: HomeState, strings: Strings) {
+fun FlowContent.homeContent(state: HomeState, queue: List<EpisodeItem>, strings: Strings, audio: AudioLinks) {
     div {
         id = "home"
         attributes["hx-get"] = "/fragments/home"
@@ -75,11 +61,13 @@ fun FlowContent.homeContent(state: HomeState, strings: Strings) {
                                 }
                                 span("meta") { +strings.remaining(item.episode.remainingMinutes) }
                             }
+                            playButton(item, strings, audio)
                         }
                     }
                 }
             }
         }
+        queueSection(queue, strings, audio)
         section {
             div("section-header") {
                 h2 { +strings.latestEpisodes }
@@ -92,21 +80,21 @@ fun FlowContent.homeContent(state: HomeState, strings: Strings) {
             }
             ul("episodes") {
                 id = "latest"
-                state.latest.forEach { item -> episodeRow(item, strings) }
+                state.latest.forEach { item -> episodeRow(item, strings, audio) }
             }
         }
     }
 }
 
 /** The `#home` element alone, for htmx. */
-fun homeFragmentHtml(state: HomeState, strings: Strings): String = buildString {
-    createHTML(prettyPrint = false).div { homeContent(state, strings) }.let { wrapped ->
+fun homeFragmentHtml(state: HomeState, queue: List<EpisodeItem>, strings: Strings, audio: AudioLinks): String = buildString {
+    createHTML(prettyPrint = false).div { homeContent(state, queue, strings, audio) }.let { wrapped ->
         // kotlinx.html needs a parent element: drop the wrapper, keep #home.
         append(wrapped.removePrefix("<div>").removeSuffix("</div>"))
     }
 }
 
-private fun UL.episodeRow(item: EpisodeItem, strings: Strings) {
+private fun UL.episodeRow(item: EpisodeItem, strings: Strings, audio: AudioLinks) {
     val episode = item.episode
     li("episode") {
         artwork(item)
@@ -124,8 +112,10 @@ private fun UL.episodeRow(item: EpisodeItem, strings: Strings) {
             // Same affordances as the HAL-FORMS templates; those without input become buttons.
             div("actions") {
                 Affordances.forEpisode(episode).filter { it.properties.isEmpty() }.forEach { affordanceButton(it, strings) }
+                enqueueButtons(item, strings)
             }
         }
+        playButton(item, strings, audio)
     }
 }
 
@@ -137,10 +127,3 @@ private fun FlowContent.affordanceButton(affordance: Affordance, strings: String
     }
 }
 
-private fun FlowContent.artwork(item: EpisodeItem) {
-    aside("artwork") {
-        attributes["style"] = "background: ${item.podcast.artworkColor.toCssHex()}"
-        attributes["aria-hidden"] = "true"
-        +item.podcast.initials
-    }
-}

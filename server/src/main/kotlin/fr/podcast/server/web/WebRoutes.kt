@@ -8,6 +8,8 @@ import fr.podcast.server.auth.authPrincipal
 import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.html.homeFragmentHtml
+import fr.podcast.server.html.queueFragmentHtml
+import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.html.loginPage
 import fr.podcast.server.http.respondSeeOther
 import fr.podcast.shared.home.LoadHomeState
@@ -17,6 +19,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.html.respondHtml
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.request.acceptLanguageItems
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondText
@@ -30,8 +33,10 @@ import io.ktor.server.sessions.set
 /** Interface language negotiated from Accept-Language (JSON stays language-neutral). */
 fun ApplicationCall.language(): Language = Language.negotiate(request.acceptLanguageItems().map { it.value })
 
-/** Thin client pages that only exist in HTML: sign-in, sign-out, htmx fragments. */
-fun Route.webRoutes(database: ServerDatabase, accounts: Accounts) {
+/** Thin client pages that only exist in HTML: sign-in, sign-out, htmx fragments, the player script. */
+fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLinks) {
+    staticResources("/static", "static")
+
     get("/login") {
         call.respondHtml { loginPage(call.language()) }
     }
@@ -55,9 +60,14 @@ fun Route.webRoutes(database: ServerDatabase, accounts: Accounts) {
 
     authenticate(SESSION_AUTH, BEARER_AUTH) {
         get("/fragments/home") {
-            val user = call.authPrincipal!!.user
-            val home = LoadHomeState(UserCatalog(database, user.id))()
-            call.respondText(homeFragmentHtml(home, call.language().strings), ContentType.Text.Html)
+            val catalog = UserCatalog(database, call.authPrincipal!!.user.id)
+            val home = LoadHomeState(catalog)()
+            call.respondText(homeFragmentHtml(home, catalog.queue(), call.language().strings, audio), ContentType.Text.Html)
+        }
+
+        get("/fragments/queue") {
+            val queue = UserCatalog(database, call.authPrincipal!!.user.id).queue()
+            call.respondText(queueFragmentHtml(queue, call.language().strings, audio), ContentType.Text.Html)
         }
     }
 }
