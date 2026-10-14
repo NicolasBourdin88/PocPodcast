@@ -97,6 +97,15 @@ class WebTest {
         // Without HX-Request a session cannot change the queue (CSRF, ADR 0005).
         assertEquals(HttpStatusCode.Forbidden, browser.submitForm("/queue", parameters { append("episodeId", "4") }).status)
 
+        // Navigation boosted by htmx (Accept: */*) gets pages, with the player to preserve.
+        val boosted = browser.get("/subscriptions") {
+            header("HX-Request", "true")
+            header("HX-Boosted", "true")
+            header(HttpHeaders.Accept, "*/*")
+        }
+        assertContains(boosted.headers[HttpHeaders.ContentType].orEmpty(), "text/html")
+        assertContains(boosted.bodyAsText(), "hx-preserve=\"true\"")
+
         val script = browser.get("/static/player.js")
         assertEquals(HttpStatusCode.OK, script.status)
         assertContains(script.bodyAsText(), "playNext")

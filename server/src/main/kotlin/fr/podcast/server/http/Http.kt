@@ -25,18 +25,22 @@ enum class Representation(val contentType: ContentType) {
     HalForms(HalFormsJson),
 }
 
-/** Picks the representation from Accept, in the client's order of preference. JSON when unspecified. */
+/**
+ * Picks the representation from Accept, in the client's order of preference. JSON when
+ * unspecified, except for htmx: it accepts any type and always wants HTML (boosted pages, fragments).
+ */
 fun ApplicationCall.representation(): Representation {
+    val unspecified = if (isHtmx) Representation.Html else Representation.Hal
     for (item in request.acceptItems()) {
         val accepted = runCatching { ContentType.parse(item.value).withoutParameters() }.getOrNull() ?: continue
         when {
             accepted == HalFormsJson -> return Representation.HalForms
             accepted == ContentType.Text.Html || accepted == ContentType("application", "xhtml+xml") -> return Representation.Html
             accepted == HalJson || accepted == ContentType.Application.Json -> return Representation.Hal
-            accepted.contentSubtype == "*" -> return Representation.Hal
+            accepted.contentSubtype == "*" -> return unspecified
         }
     }
-    return Representation.Hal
+    return unspecified
 }
 
 /** True for requests sent by htmx (thin client). */
