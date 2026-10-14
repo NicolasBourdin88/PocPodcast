@@ -30,6 +30,7 @@ dependencyResolutionManagement {
 }
 
 include(":shared")
+include(":player")
 include(":composeApp")
 include(":androidApp")
 include(":server")
