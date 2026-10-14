@@ -12,6 +12,7 @@ Système de gestion et d'écoute de podcasts (projet de master). Il se compose d
 | Module | Cibles | Rôle |
 |---|---|---|
 | `:shared` | JVM, Android, iOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository` : Accueil, abonnements, recherche, OPML) |
+| `:player` | JVM, Android, iOS | Lecture audio : interface `AudioPlayer`, contrôleur partagé, Media3, AVPlayer et JavaFX Media ([ADR 0008](docs/adr/0008-lecture-audio.md)) |
 | `:composeApp` | Android, iOS, Desktop (JVM) | UI Compose Multiplatform, responsive par taille de fenêtre |
 | `:androidApp` | Android | Point d'entrée Android (`MainActivity`) |
 | `iosApp/` | iOS | Projet Xcode qui héberge l'UI Compose |
@@ -119,14 +120,41 @@ cli/build/install/podcast/bin/podcast subscribe 2
 
 Ensuite : `subscriptions`, `note 3 À écouter dans le train` (sans texte, la note est effacée), `unsubscribe 3`, `opml export podcasts.opml` et `opml import podcasts.opml`. `subscribe` accepte aussi l'adresse d'un flux.
 
+## Écouter
+
+La position d'écoute suit l'utilisateur d'un client à l'autre, ainsi que la file d'attente : un épisode commencé sur le téléphone reprend au même endroit sur l'ordinateur ([ADR 0008](docs/adr/0008-lecture-audio.md)).
+
+- **Apps** :
+  - ▶ sur un épisode (Accueil, page d'un podcast) le lance, et ≡+ l'ajoute à la file d'attente ;
+  - le mini-lecteur, ou la barre de lecture sur grand écran, ouvre le lecteur plein écran ;
+  - Android et iOS continuent en arrière-plan (notification, écran verrouillé, casque) ;
+  - en mode démo, la lecture est simulée, sans son.
+- **Client léger** : ▶ sur l'Accueil ; le lecteur reste en bas de page quand on change de page.
+- **CLI** : `play` reprend l'épisode en cours, ou le premier de la file ; avec un numéro de `list`, il lance cet épisode.
+
+```bash
+cli/build/install/podcast/bin/podcast play 3
+```
+
+Dans la TUI (`play` ou `tui`) :
+- `entrée` lit l'épisode sélectionné ;
+- `espace` met en pause ou reprend ;
+- `←` / `→` reculent de 15 s ou avancent de 30 s ;
+- `+` / `-` changent la vitesse ;
+- `n` passe à l'épisode suivant de la file, `a` y ajoute l'épisode sélectionné ;
+- `q` quitte, après avoir envoyé la position.
+
+File d'attente : `queue`, `queue add 4` (`--next` pour le lire ensuite), `queue remove 1`, `queue clear`.
+
 ## Tests
 
 ```bash
-./gradlew :shared:allTests :composeApp:desktopTest :server:test :cli:test
+./gradlew :shared:allTests :player:jvmTest :composeApp:desktopTest :server:test :cli:test
 ```
 
 - `:server:test` démarre un PostgreSQL embarqué et contient trois garde-fous :
   - `ContractTest` vérifie que la spécification OpenAPI et les routes correspondent, et que chaque réponse respecte son schéma ;
   - `SdkTest` fait tourner le SDK de `:shared` contre le vrai serveur ;
   - `ApiTest` et `WebTest` couvrent l'API et le client léger.
+- `:player:jvmTest` vérifie le contrôleur de lecture avec un lecteur factice : envoi de la position, épisode suivant de la file, nouvel essai après une erreur.
 - `:composeApp:desktopTest` rend les écrans à chaque taille de fenêtre et dans chaque langue, dans `composeApp/build/snapshots/`.

@@ -125,7 +125,7 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 1. [x] **Format hypermédia** : HAL vs Siren vs JSON:API. Critère clé : peut-on décrire des *actions* (formulaires) et pas seulement des liens ? → **HAL + HAL-FORMS** (ADR 0003).
 2. [ ] **Synchronisation avec clients tiers** : gPodder API vs Open Podcast API, avec un vrai AntennaPod branché sur un serveur minimal. Attention : le cœur de la spec Open Podcast API ne couvre pour l'instant que les abonnements. → fiche `docs/etudes/02-…`.
-3. [ ] **Lecture audio multiplateforme** : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop) ; lecture en arrière-plan et contrôles système. → fiche `docs/etudes/03-…`.
+3. [x] **Lecture audio multiplateforme** : interface `Player` en `expect/actual` — Media3 (Android), AVPlayer (iOS), VLCJ ou AVFoundation (desktop) ; lecture en arrière-plan et contrôles système. → **module `:player` : Media3, AVPlayer, JavaFX Media sur desktop et CLI (pas de VLC à installer), liens audio signés, contrôleur partagé** (ADR 0008, POC `poc/player`).
 4. [ ] **Client léger** : htmx + kotlinx.html vs Compose Wasm (poids, temps de chargement, effort). → fiche `docs/etudes/04-…` (htmx déjà en place, à confirmer par des mesures).
 5. [x] **Persistance** : Exposed vs SQLDelight côté serveur ; SQLDelight / Room KMP côté client pour le hors-ligne. → **PostgreSQL + Flyway + SQLDelight**, SQLDelight aussi côté client (ADR 0004).
 6. [x] **Authentification et droits** : sessions (client léger) + jetons (clients riches, multiserveur) ; modèle de partage lecture / modification. → **Argon2id, cookie de session, jetons opaques par appareil, Basic + mots de passe d'application pour gPodder, partages READ/WRITE** (ADR 0005).
@@ -174,9 +174,21 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 5 — Lecture
 
-- [ ] Lecteur sur chaque client (`expect/actual`), écran lecteur plein écran responsive.
-- [ ] Position de lecture synchronisée, file d'attente.
-- [ ] Lecture en arrière-plan et contrôles système sur mobile.
+- [x] Lecteur sur chaque client (`expect/actual`), écran lecteur plein écran responsive. → interface `AudioPlayer` injectée par chaque point d'entrée (ADR 0008) ; mini-lecteur, barre de lecture sur grand écran, lecteur plein écran à une ou deux colonnes ; `<audio>` conservé de page en page dans le client léger ; lecteur dans la TUI.
+- [x] Position de lecture synchronisée, file d'attente. → `PlaybackController` partagé (toutes les 15 s et à la pause, reprise là où un autre appareil s'est arrêté) ; file d'attente côté serveur (`/queue`), épisode suivant à la fin d'un épisode.
+- [x] Lecture en arrière-plan et contrôles système sur mobile. → service Media3 (notification, écran verrouillé, casque) ; mode d'arrière-plan audio, Now Playing et commandes à distance sur iOS.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| L1 | Contrôleur : position envoyée (périodique, pause, déplacement), épisode suivant de la file, nouvel essai avec un lien frais | `./gradlew :player:jvmTest` |
+| L2 | Liens audio signés (expiration, falsification), file d'attente (ordre, retraits, purge), contrat à jour | `./gradlew :server:test` (`AudioLinksTest`, `QueueTest`, `ContractTest`, `SdkTest`) |
+| L3 | Client léger : lecteur conservé entre les pages, boutons de lecture, file d'attente par htmx | `./gradlew :server:test` (`WebTest`), puis http://localhost:8080 |
+| L4 | Apps : mini-lecteur, barre de lecture, lecteur plein écran à une ou deux colonnes, file d'attente | `./gradlew :composeApp:desktopTest` (captures `player-*`), puis chaque app |
+| L5 | Android : lecture en arrière-plan avec notification, touche média, épisode suivant de la file | émulateur, `adb shell dumpsys media_session` |
+| L6 | iOS : la lecture continue en arrière-plan, la position avance sur le serveur | simulateur |
+| L7 | CLI : `play`, `queue`, TUI (espace, flèches, vitesse, suivant) | `podcast play` (voir `README.md`) |
 
 ## Étape 6 — Multi-utilisateurs
 

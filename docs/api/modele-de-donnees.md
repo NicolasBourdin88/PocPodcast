@@ -25,6 +25,8 @@ erDiagram
     users ||--o{ playback_states : "écoute"
     episodes ||--o{ playback_states : "écouté par"
     episodes ||--o| media_files : "fichier mutualisé"
+    users ||--o{ queue_items : "file d'attente"
+    episodes ||--o{ queue_items : "en file"
     users ||--o{ playlists : "possède"
     playlists ||--o{ playlist_items : "contient"
     episodes ||--o{ playlist_items : "figure dans"
@@ -106,6 +108,17 @@ erDiagram
         boolean kept "jamais purgé"
         timestamptz updated_at
     }
+    queue_items {
+        bigint user_id PK
+        bigint episode_id PK
+        int position "0 = suivant"
+        timestamptz added_at
+    }
+    server_secrets {
+        text name PK
+        bytea value "clé des liens audio signés"
+        timestamptz created_at
+    }
     media_files {
         bigint episode_id PK
         text status "PENDING | DOWNLOADING | READY | FAILED"
@@ -150,6 +163,8 @@ erDiagram
 | `playback_states` | Position et statut par utilisateur et par épisode | Étape 3 (`V1`) |
 | `episode_transcripts` | Transcriptions Podcast 2.0 | Étape 4 (`V2`) |
 | `media_files` | Fichiers audio téléchargés et mutualisés, purge | Étape 4 (`V2`) |
+| `queue_items` | File d'attente de chaque utilisateur (« à suivre ») | Étape 5 (`V3`) |
+| `server_secrets` | Clés générées par le serveur (signature des liens audio) | Étape 5 (`V3`) |
 | `shares` | Partages et droits | Étape 6 |
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 |
 
@@ -162,3 +177,8 @@ erDiagram
 - **Lecture des flux** : `refresh_status` vaut `PENDING` tant que le flux n'a jamais été lu (import OPML), `FAILED` si la dernière lecture a échoué (`refresh_error` dit pourquoi). `last_attempt_at` règle le rafraîchissement périodique.
 - **Unicité** : `(podcast_id, guid)` identifie un épisode lors des rafraîchissements du flux. `feed_url` identifie un podcast ; elle suit les déménagements du flux.
 - **Fichiers** : au plus un par épisode (`media_files.episode_id`), partagé par tous les utilisateurs. La ligne disparaît quand le fichier est purgé.
+- **File d'attente** (ADR 0008) :
+  - positions denses à partir de 0, recalculées dans la même transaction à chaque ajout, déplacement ou retrait ;
+  - un épisode en sort quand il est marqué comme écouté, ou quand l'utilisateur se désabonne de son podcast ;
+  - un épisode en file d'attente n'est jamais purgé.
+- **Position d'écoute** : elle peut dépasser la durée annoncée par le flux, jusqu'à 24 heures (ADR 0008).

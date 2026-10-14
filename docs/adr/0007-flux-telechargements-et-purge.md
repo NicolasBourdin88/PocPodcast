@@ -71,7 +71,8 @@ Toutes les heures, le serveur supprime :
 
 Un fichier n'est **jamais** purgé tant que :
 - au moins un utilisateur a marqué l'épisode comme **gardé** (`kept`, templates `keep` et `unkeep`, `PUT`/`DELETE /episodes/{id}/kept`) ;
-- quelqu'un a l'épisode **en cours d'écoute** et l'a écouté pendant la durée de rétention.
+- quelqu'un a l'épisode **en cours d'écoute** et l'a écouté pendant la durée de rétention ;
+- l'épisode est dans la **file d'attente** de quelqu'un (étape 5, ADR 0008).
 
 Les épisodes **en playlist** rejoindront ces exceptions à l'étape 7.
 

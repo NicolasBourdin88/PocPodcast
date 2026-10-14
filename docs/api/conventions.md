@@ -14,15 +14,19 @@ Chaque ressource a **une seule URL** et le format est négocié avec l'en-tête 
 
 Les réponses portent `Vary: Accept, Accept-Language`. Le JSON est **neutre en langue** : seul le HTML est traduit (ADR 0002).
 
+Sans type précis (`*/*`), la réponse est du JSON, sauf pour htmx : une requête `HX-Request` reçoit du HTML tant qu'elle ne demande pas explicitement du JSON. C'est ce qui permet la navigation boostée du client léger.
+
 Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`) et la Bibliothèque (`/subscriptions`). Les autres arrivent avec leurs fonctionnalités.
 
-**Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, toujours en `200`, car htmx n'insère que les réponses réussies. Un refus y est donc un fragment d'erreur traduit, et non un Problem Details. Quand une action change la liste des abonnements, l'en-tête `HX-Trigger: subscriptions-changed` demande à la page de la recharger.
+**Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, toujours en `200`, car htmx n'insère que les réponses réussies. Un refus y est donc un fragment d'erreur traduit, et non un Problem Details. Quand une action change la liste des abonnements, l'en-tête `HX-Trigger: subscriptions-changed` demande à la page de la recharger ; `queue-changed` et `episodes-changed` font de même pour la file d'attente et les épisodes.
+
+**Lecteur du client léger** : un `<audio>` dans un pied de page `hx-preserve`, conservé de page en page grâce à `hx-boost` sur la navigation, et piloté par `static/player.js`. Ses requêtes de modification portent aussi `HX-Request`.
 
 ## Point d'entrée et navigation
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `episodes`, `search` (gabarit `/search{?q}`), `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
+- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
 - **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
@@ -85,6 +89,7 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
 | `/problems/not-a-feed` | 422 | La réponse n'est pas un flux RSS |
 | `/problems/not-an-opml` | 422 | Fichier OPML illisible |
 | `/problems/search-failed` | 502 | Aucun annuaire n'a répondu |
+| `/problems/audio-link-expired` | 403 | Lien audio signé expiré : relire l'épisode pour en obtenir un nouveau |
 
 ## Formats
 
@@ -94,7 +99,8 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
 - **Champs dérivés** (progression, minutes restantes) : non exposés, les clients les calculent. Le SDK le fait dans `Episode`.
 - **Énumérations** : en majuscules (`NEW`, `IN_PROGRESS`, `PLAYED`).
 - **OPML** : `text/x-opml`, par le lien `opml` de la collection des abonnements. `GET` exporte et `POST` importe (corps brut, ou formulaire `multipart` depuis le client léger). L'import répond par un bilan : importés, déjà suivis, refusés avec leur cause.
-- **Audio** : `GET /episodes/{id}/audio` sert le fichier téléchargé par le serveur (requêtes `Range` acceptées), sinon redirige vers l'enclosure de l'éditeur.
+- **Audio** : le lien `audio` d'un épisode est **signé** (`?expires=…&signature=…`) et valable 24 heures, car les lecteurs (Media3, AVPlayer, JavaFX, `<audio>`) n'envoient pas de jeton. Il s'ouvre sans authentification et se donne tel quel au lecteur. Il sert le fichier téléchargé par le serveur (requêtes `Range` acceptées), sinon redirige vers l'enclosure de l'éditeur. Sans signature, une session ou un jeton donne aussi accès (ADR 0008).
+- **File d'attente** : `GET /queue` (lien `queue` de la racine) donne les épisodes dans l'ordre d'écoute. Chaque épisode indique `inQueue` et porte `enqueue` (hors de la file), ou `dequeue` et `move` (dans la file). `enqueue` envoie `episodeId` (pré-rempli, `readOnly`) et une `position` facultative : `0` pour « lire ensuite », absente pour la fin de la file.
 
 ## Évolution
 
