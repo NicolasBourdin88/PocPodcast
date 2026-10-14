@@ -26,7 +26,8 @@ import javafx.util.Duration as FxDuration
  *   the app's own is set instead;
  * - java.net does not follow a redirect from http to https: the redirects are resolved first,
  *   and JavaFX gets the final address.
- * The JavaFX toolkit starts with the first player; [release] stops it, so that the JVM can exit.
+ * The JavaFX toolkit starts with the first episode loaded (not with the app, which opens faster);
+ * [release] stops it, so that the JVM can exit.
  */
 class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlayer {
     private val mutableState = MutableStateFlow(PlayerState())
@@ -47,7 +48,6 @@ class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlaye
 
     init {
         if (System.getProperty("http.agent") == null) System.setProperty("http.agent", userAgent)
-        startToolkit()
     }
 
     override fun load(media: Media, startSeconds: Double, play: Boolean) {
@@ -57,6 +57,7 @@ class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlaye
         }
         onFx { dispose() }
         resolver.execute {
+            startToolkit()
             val url = try {
                 resolve(media.url)
             } catch (failure: Exception) {
@@ -96,7 +97,7 @@ class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlaye
     override fun release() {
         stop()
         resolver.shutdownNow()
-        Platform.exit()
+        if (toolkitStarted) Platform.exit()
     }
 
     /** Opens [url] on the JavaFX thread; the position and intent to play are read from the state. */
@@ -152,7 +153,9 @@ class JavaFxAudioPlayer(private val userAgent: String = USER_AGENT) : AudioPlaye
         return response.uri().toString()
     }
 
+    /** Before the first load there is no JavaFX object to act on. */
     private fun onFx(block: () -> Unit) {
+        if (!toolkitStarted) return
         if (Platform.isFxApplicationThread()) block() else Platform.runLater(block)
     }
 

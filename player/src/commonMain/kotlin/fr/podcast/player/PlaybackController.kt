@@ -159,6 +159,9 @@ class PlaybackController(
         scope.launch { mutex.withLock { save() } }
     }
 
+    /** Sends the position and waits for the answer, before the app closes. */
+    suspend fun flush() = mutex.withLock { save() }
+
     private fun queueChange(change: suspend (PodcastClient) -> Unit) {
         scope.launch {
             mutex.withLock {
