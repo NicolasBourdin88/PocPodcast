@@ -48,6 +48,7 @@ data class FieldError(val field: String, val message: String)
 object ProblemTypes {
     const val NOT_AN_OPML = "/problems/not-an-opml"
     const val SEARCH_FAILED = "/problems/search-failed"
+    const val AUDIO_LINK_EXPIRED = "/problems/audio-link-expired"
 }
 
 /** Problem Details (RFC 9457). */

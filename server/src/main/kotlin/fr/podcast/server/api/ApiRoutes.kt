@@ -15,6 +15,8 @@ import fr.podcast.server.hal.userResource
 import fr.podcast.server.html.homePage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.HalJson
+import fr.podcast.server.http.ProblemTypes
+import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.http.Representation
 import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
@@ -58,9 +60,36 @@ fun Route.apiRoutes(services: ServerServices) {
                 }
                 else -> {
                     val home = user?.let { LoadHomeState(UserCatalog(services.database, it.id))() }
-                    call.respondResource(rootResource(services.config.name, user, home, representation.forms), representation)
+                    call.respondResource(rootResource(services.config.name, user, home, representation.forms, services.audioLinks), representation)
                 }
             }
+        }
+
+        // Players cannot send credentials: a signed link (ADR 0008) or the session/token gives access.
+        // The server's copy when it has one (with byte ranges for seeking), the original file otherwise.
+        get("/episodes/{id}/audio") {
+            val episodeId = call.parameters["id"]!!
+            val parameters = call.request.queryParameters
+            when (services.audioLinks.check(episodeId, parameters["expires"], parameters["signature"])) {
+                AudioLinks.Check.Valid -> Unit
+                AudioLinks.Check.Expired -> return@get call.respondProblem(
+                    HttpStatusCode.Forbidden, "This audio link has expired: read the episode again for a new one",
+                    type = ProblemTypes.AUDIO_LINK_EXPIRED,
+                )
+                AudioLinks.Check.Invalid -> if (call.authPrincipal == null) {
+                    call.response.header(HttpHeaders.WWWAuthenticate, "Bearer realm=\"podcast\"")
+                    return@get call.respondProblem(HttpStatusCode.Unauthorized, "Signed link or authentication required")
+                }
+            }
+            val audioUrl = services.database.query { catalogQueries.episodeAudio(episodeId.toLongOrNull() ?: -1).executeAsOneOrNull() }
+                ?: return@get call.respondNotFound("Episode")
+            val file = services.media.file(episodeId.toLong())
+            if (file != null) {
+                val (path, mimeType) = file
+                return@get call.respond(LocalPathContent(path, ContentType.parse(mimeType)))
+            }
+            call.response.header(HttpHeaders.Location, audioUrl)
+            call.respond(HttpStatusCode.Found)
         }
     }
 
@@ -116,7 +145,7 @@ fun Route.apiRoutes(services: ServerServices) {
             val page = catalog(call).podcastEpisodes(podcastId, paging.limit, paging.offset)
                 ?: return@get call.respondNotFound("Podcast")
             val representation = call.representation()
-            call.respondResource(episodeCollection(page, "/podcasts/$podcastId/episodes", emptyMap(), representation.forms), representation)
+            call.respondResource(episodeCollection(page, "/podcasts/$podcastId/episodes", emptyMap(), representation.forms, services.audioLinks), representation)
         }
 
         get("/episodes") {
@@ -129,13 +158,13 @@ fun Route.apiRoutes(services: ServerServices) {
             val page = catalog(call).latest(status, paging.limit, paging.offset)
             val query = status?.let { mapOf("status" to it.name) } ?: emptyMap()
             val representation = call.representation()
-            call.respondResource(episodeCollection(page, "/episodes", query, representation.forms), representation)
+            call.respondResource(episodeCollection(page, "/episodes", query, representation.forms, services.audioLinks), representation)
         }
 
         get("/episodes/{id}") {
             val item = catalog(call).episodeItem(call.parameters["id"]!!) ?: return@get call.respondNotFound("Episode")
             val representation = call.representation()
-            call.respondResource(episodeResource(item, representation.forms), representation)
+            call.respondResource(episodeResource(item, representation.forms, services.audioLinks), representation)
         }
 
         put("/episodes/{id}/progress") {
@@ -144,12 +173,11 @@ fun Route.apiRoutes(services: ServerServices) {
             val episode = catalog.episode(call.parameters["id"]!!) ?: return@put call.respondNotFound("Episode")
             val position = call.receiveJsonObject()?.get("positionSeconds") as? JsonPrimitive
             val seconds = position?.takeUnless { it.isString }?.intOrNull
-            // Some feeds do not give the duration (0): only the lower bound applies then.
-            val maximum = episode.durationSeconds.takeIf { it > 0 } ?: Int.MAX_VALUE
-            if (seconds == null || seconds !in 0..maximum) {
+            // Not bounded by the feed's duration, which is often approximate (or 0 when unknown).
+            if (seconds == null || seconds !in 0..MAX_POSITION_SECONDS) {
                 return@put call.respondProblem(
                     HttpStatusCode.UnprocessableEntity, "Invalid progress",
-                    listOf(FieldError("positionSeconds", "integer between 0 and the episode duration expected")),
+                    listOf(FieldError("positionSeconds", "integer between 0 and $MAX_POSITION_SECONDS expected")),
                 )
             }
             catalog.updateProgress(episode.id, seconds)
@@ -196,17 +224,8 @@ fun Route.apiRoutes(services: ServerServices) {
             call.respond(HttpStatusCode.Accepted)
         }
 
-        // The server's copy when it has one (with byte ranges for seeking), the original file otherwise.
-        get("/episodes/{id}/audio") {
-            val episodeId = call.parameters["id"]!!
-            val audioUrl = catalog(call).audioUrl(episodeId) ?: return@get call.respondNotFound("Episode")
-            val file = services.media.file(episodeId.toLong())
-            if (file != null) {
-                val (path, mimeType) = file
-                return@get call.respond(LocalPathContent(path, ContentType.parse(mimeType)))
-            }
-            call.response.header(HttpHeaders.Location, audioUrl)
-            call.respond(HttpStatusCode.Found)
-        }
     }
 }
+
+/** A day: more than any episode, and a bound for the integer the clients send. */
+private const val MAX_POSITION_SECONDS = 24 * 3600

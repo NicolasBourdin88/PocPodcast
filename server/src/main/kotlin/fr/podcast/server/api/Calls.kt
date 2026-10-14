@@ -18,6 +18,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -98,6 +99,19 @@ internal fun Map<String, JsonElement>.booleanField(name: String): Boolean? {
         "false", "off", "0" -> false
         else -> null
     }
+}
+
+/** True when the field holds something (not absent, not null, not an empty form value). */
+internal fun Map<String, JsonElement>.hasField(name: String): Boolean {
+    val value = get(name) as? JsonPrimitive ?: return false
+    return value !is JsonNull && value.content.isNotBlank()
+}
+
+/** An integer from JSON (number) or from a form (digits); null when absent or not an integer. */
+internal fun Map<String, JsonElement>.intField(name: String): Int? {
+    val value = get(name) as? JsonPrimitive ?: return null
+    if (value is JsonNull) return null
+    return value.content.trim().toIntOrNull()
 }
 
 internal fun JsonObject.string(name: String): String? = (get(name) as? JsonPrimitive)?.takeIf { it.isString }?.content

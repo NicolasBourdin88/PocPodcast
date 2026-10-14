@@ -3,6 +3,7 @@ package fr.podcast.server.hal
 import fr.podcast.server.auth.IssuedToken
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.catalog.Page
+import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.search.SearchHit
 import fr.podcast.server.search.normalizedFeed
 import io.ktor.http.encodeURLParameter
@@ -76,7 +77,7 @@ private fun JsonObjectBuilder.templates(forms: Boolean, affordances: List<Afford
     if (forms && affordances.isNotEmpty()) put("_templates", affordances.toHalFormsTemplates())
 }
 
-fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms: Boolean): JsonObject = buildJsonObject {
+fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
     put("name", serverName)
     put("apiVersion", API_VERSION)
     if (user == null) {
@@ -88,6 +89,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "tokens" to "/auth/tokens",
             "me" to "/me",
             "subscriptions" to "/subscriptions",
+            "queue" to "/queue",
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
@@ -95,8 +97,8 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
         )
         if (home != null) {
             putJsonObject("_embedded") {
-                put("resume", buildJsonArray { home.resume.forEach { add(episodeResource(it, forms)) } })
-                put("latest", buildJsonArray { home.latest.forEach { add(episodeResource(it, forms)) } })
+                put("resume", buildJsonArray { home.resume.forEach { add(episodeResource(it, forms, audio)) } })
+                put("latest", buildJsonArray { home.latest.forEach { add(episodeResource(it, forms, audio)) } })
             }
         }
     }
@@ -144,14 +146,15 @@ fun subscriptionCollection(items: List<SubscriptionItem>, forms: Boolean): JsonO
     templates(forms, listOf(Affordances.subscribe))
 }
 
-fun episodeResource(item: EpisodeItem, forms: Boolean): JsonObject = buildJsonObject {
+/** An episode; its `audio` link is signed, for players that cannot send credentials (ADR 0008). */
+fun episodeResource(item: EpisodeItem, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
     val episode: Episode = item.episode
     fields(Episode.serializer(), episode)
     links(
         single = listOf(
             "self" to "/episodes/${episode.id}",
             "podcast" to "/podcasts/${episode.podcastId}",
-            "audio" to "/episodes/${episode.id}/audio",
+            "audio" to audio.path(episode.id),
         ),
         // Podcast 2.0: external resources announced by the feed.
         extra = listOfNotNull(episode.chaptersUrl?.let { "chapters" to Link(it, type = "application/json+chapters") }),
@@ -162,7 +165,7 @@ fun episodeResource(item: EpisodeItem, forms: Boolean): JsonObject = buildJsonOb
 }
 
 /** A page of episodes; [path] plus [query] (without paging) rebuild the page links. */
-fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, String>, forms: Boolean): JsonObject = buildJsonObject {
+fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, String>, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
     fun pageHref(offset: Int) = path + "?" + (query + mapOf("offset" to "$offset", "limit" to "${page.limit}"))
         .entries.joinToString("&") { (key, value) -> "$key=$value" }
 
@@ -178,8 +181,18 @@ fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, 
         },
     )
     putJsonObject("_embedded") {
-        put("episodes", buildJsonArray { page.items.forEach { add(episodeResource(it, forms)) } })
+        put("episodes", buildJsonArray { page.items.forEach { add(episodeResource(it, forms, audio)) } })
     }
+}
+
+/** The user's queue, in listening order; each episode carries its `dequeue` and `move` templates. */
+fun queueResource(items: List<EpisodeItem>, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
+    put("count", items.size)
+    links("self" to "/queue")
+    putJsonObject("_embedded") {
+        put("episodes", buildJsonArray { items.forEach { add(episodeResource(it, forms, audio)) } })
+    }
+    templates(forms, if (items.isEmpty()) emptyList() else listOf(Affordances.clearQueue))
 }
 
 fun opmlImportResource(report: OpmlImportReport): JsonObject = buildJsonObject {

@@ -23,6 +23,10 @@ import io.ktor.server.routing.RoutingNode
 import io.ktor.server.routing.RoutingRoot
 import io.ktor.server.routing.getAllRoutes
 import io.ktor.server.testing.testApplication
+import fr.podcast.server.media.AudioLinks
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration.Companion.hours
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.dataformat.yaml.YAMLMapper
@@ -162,6 +166,13 @@ class ContractTest {
         check(post, "/episodes/999/played", "/episodes/{episodeId}/played", HttpStatusCode.NotFound)
         check(delete, "/episodes/3/played", "/episodes/{episodeId}/played", HttpStatusCode.NoContent)
         check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.Found, http = noRedirects)
+        // Signed links: players open them without credentials (ADR 0008).
+        val signed = client.getJson("/episodes/1", alice)["_links"]!!.jsonObject["audio"]!!.jsonObject["href"]!!.jsonPrimitive.content
+        check(get, signed, "/episodes/{episodeId}/audio", HttpStatusCode.Found, token = null, http = noRedirects)
+        check(get, "/episodes/1/audio", "/episodes/{episodeId}/audio", HttpStatusCode.Unauthorized, token = null, http = noRedirects)
+        val key = TestDatabase.database.query { secretsQueries.secret("audio-links").executeAsOne() }
+        check(get, AudioLinks(key, validity = (-2).hours).path("1"), "/episodes/{episodeId}/audio", HttpStatusCode.Forbidden,
+            token = null, http = noRedirects)
         check(post, "/episodes/1/download", "/episodes/{episodeId}/download", HttpStatusCode.Accepted)
         check(post, "/episodes/999/download", "/episodes/{episodeId}/download", HttpStatusCode.NotFound)
         services.media.downloadNext()
@@ -192,6 +203,19 @@ class ContractTest {
         check(post, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.UnprocessableEntity, bodyType = opml, body = "<rss/>")
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NoContent)
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
+
+        check(get, "/queue", "/queue", HttpStatusCode.OK)
+        check(post, "/queue", "/queue", HttpStatusCode.OK, body = """{"episodeId":"1"}""")
+        check(post, "/queue", "/queue", HttpStatusCode.OK, body = """{"episodeId":"2","position":0}""")
+        check(post, "/queue", "/queue", HttpStatusCode.UnprocessableEntity, body = """{"episodeId":"999"}""")
+        check(get, "/queue", "/queue", HttpStatusCode.OK) // with episodes and `clear-queue`
+        check(put, "/queue/1", "/queue/{episodeId}", HttpStatusCode.OK, body = """{"position":0}""")
+        check(put, "/queue/1", "/queue/{episodeId}", HttpStatusCode.UnprocessableEntity, body = """{"position":-1}""")
+        check(put, "/queue/5", "/queue/{episodeId}", HttpStatusCode.NotFound, body = """{"position":0}""")
+        check(get, "/episodes/1", "/episodes/{episodeId}", HttpStatusCode.OK) // queued: `dequeue` and `move`
+        check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NoContent)
+        check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NotFound)
+        check(delete, "/queue", "/queue", HttpStatusCode.NoContent)
 
         val missing = documented - exercised
         assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")

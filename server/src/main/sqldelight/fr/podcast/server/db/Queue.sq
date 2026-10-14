@@ -1,0 +1,33 @@
+-- The queue of each user ("up next"). Positions are kept dense (0, 1, 2…) by shifting the
+-- following items, inside the same transaction as the insert, move or delete.
+
+queuePositionOf:
+SELECT position FROM queue_items WHERE user_id = :userId AND episode_id = :episodeId;
+
+queueSize:
+SELECT count(*) FROM queue_items WHERE user_id = :userId;
+
+-- Makes room at :position.
+shiftFrom:
+UPDATE queue_items SET position = position + 1 WHERE user_id = :userId AND position >= :position;
+
+-- Closes the gap left at :position.
+closeGap:
+UPDATE queue_items SET position = position - 1 WHERE user_id = :userId AND position > :position;
+
+insertQueueItem:
+INSERT INTO queue_items(user_id, episode_id, position) VALUES (:userId, :episodeId, :position);
+
+deleteQueueItem:
+DELETE FROM queue_items WHERE user_id = :userId AND episode_id = :episodeId;
+
+clearQueue:
+DELETE FROM queue_items WHERE user_id = :userId;
+
+-- After an unsubscription: the podcast's episodes leave the user's queue.
+removePodcastFromQueue:
+DELETE FROM queue_items
+WHERE user_id = :userId AND episode_id IN (SELECT id FROM episodes WHERE podcast_id = :podcastId);
+
+episodeExists:
+SELECT count(*) FROM episodes WHERE id = :id;

@@ -1,6 +1,7 @@
 package fr.podcast.server
 
 import fr.podcast.server.api.apiRoutes
+import fr.podcast.server.api.queueRoutes
 import fr.podcast.server.api.searchRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
@@ -9,6 +10,7 @@ import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.FeedFetcher
 import fr.podcast.server.feeds.FeedRefresher
 import fr.podcast.server.feeds.UrlGuard
+import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.media.MediaService
 import fr.podcast.server.media.MediaStore
 import fr.podcast.server.search.AppleSource
@@ -34,6 +36,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
@@ -106,6 +109,8 @@ class ServerServices(
 ) {
     val accounts = Accounts(database)
     val guard = UrlGuard(config.allowPrivateFeeds)
+    /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
+    val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
     val media = MediaService(database, outgoing, guard, MediaStore(config.mediaDirectory), config.maxFileBytes, config.autoDownloadLatest)
     val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard), onEpisodesStored = media::scheduleAutomatic)
     val search = PodcastSearch(
@@ -165,6 +170,7 @@ fun Application.module(services: ServerServices) {
     routing {
         apiRoutes(services)
         subscriptionRoutes(services)
+        queueRoutes(services)
         searchRoutes(services)
         webRoutes(database, services.accounts)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")

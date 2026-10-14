@@ -36,6 +36,10 @@ data class Episode(
     /** Marked by the user to be kept: its server file is never purged. */
     val kept: Boolean = false,
     val fileStatus: FileStatus = FileStatus.NONE,
+    /** In the user's queue ("up next"). */
+    val inQueue: Boolean = false,
+    /** Address a player can open without credentials (signed, it expires); filled by the SDK. */
+    @Transient val audioUrl: String? = null,
     /** Podcast 2.0 chapters; sent as a link by the API, filled by the SDK. */
     @Transient val chaptersUrl: String? = null,
     /** Podcast 2.0 transcripts; sent as links by the API, filled by the SDK. */

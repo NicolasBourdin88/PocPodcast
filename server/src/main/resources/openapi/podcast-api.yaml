@@ -21,6 +21,7 @@ tags:
   - name: abonnements
   - name: podcasts
   - name: épisodes
+  - name: file d'attente
 security:
   - bearer: []
   - session: []
@@ -467,7 +468,20 @@ paths:
       description: |
         Sert le fichier mutualisé du serveur quand il est téléchargé (`fileStatus: READY`), avec
         les requêtes partielles (`Range`) pour avancer dans l'épisode ; sinon redirige vers le
-        fichier d'origine (enclosure RSS). Les clients utilisent toujours ce lien.
+        fichier d'origine (enclosure RSS). Les clients utilisent toujours le lien `audio` de
+        l'épisode : il est **signé** (`expires`, `signature`) et valable 24 heures, car les
+        lecteurs audio (Media3, AVPlayer, JavaFX, `<audio>`) n'envoient pas de jeton (ADR 0008).
+        Sans signature, une session ou un jeton donne aussi accès.
+      security: [{}, { bearer: [] }, { session: [] }]
+      parameters:
+        - name: expires
+          in: query
+          description: Fin de validité du lien (secondes depuis l'époque Unix), fixée par le serveur.
+          schema: { type: integer }
+        - name: signature
+          in: query
+          description: HMAC-SHA256 de l'épisode et de `expires`, par le serveur.
+          schema: { type: string }
       responses:
         "200":
           description: Fichier du serveur
@@ -485,6 +499,91 @@ paths:
             Location:
               schema: { type: string, format: uri }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "Lien signé expiré (`type` : `/problems/audio-link-expired`) : relire l'épisode pour en obtenir un nouveau."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /queue:
+    get:
+      tags: [file d'attente]
+      operationId: getQueue
+      summary: File d'attente de l'utilisateur (« à suivre »), dans l'ordre d'écoute
+      responses:
+        "200":
+          description: File d'attente
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [file d'attente]
+      operationId: enqueue
+      summary: Ajouter un épisode à la file (template `enqueue`)
+      description: |
+        Sans `position`, l'épisode va à la fin ; `0` le place en tête (« lire ensuite »).
+        Un épisode déjà dans la file y change de place.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueueRequest" }
+      responses:
+        "200":
+          description: File d'attente modifiée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [file d'attente]
+      operationId: clearQueue
+      summary: Vider la file (template `clear-queue`)
+      responses:
+        "204": { description: File vidée }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /queue/{episodeId}:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [file d'attente]
+      operationId: moveInQueue
+      summary: Déplacer un épisode de la file (template `move`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueueMove" }
+      responses:
+        "200":
+          description: File d'attente modifiée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Queue" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [file d'attente]
+      operationId: dequeue
+      summary: Retirer un épisode de la file (template `dequeue`)
+      responses:
+        "204": { description: Épisode retiré de la file }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
 components:
@@ -640,6 +739,7 @@ components:
             tokens: { $ref: "#/components/schemas/Link" }
             me: { $ref: "#/components/schemas/Link" }
             subscriptions: { $ref: "#/components/schemas/Link" }
+            queue: { $ref: "#/components/schemas/Link" }
             episodes: { $ref: "#/components/schemas/Link" }
             episode:
               description: "Gabarit `/episodes/{id}` : un épisode à partir de son identifiant."
@@ -916,7 +1016,7 @@ components:
     Episode:
       description: Un épisode tel que le voit l'utilisateur connecté (catalogue + état d'écoute).
       type: object
-      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, kept, fileStatus, _links, _embedded]
+      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, kept, fileStatus, inQueue, _links, _embedded]
       properties:
         id: { type: string }
         podcastId: { type: string }
@@ -930,13 +1030,16 @@ components:
           type: boolean
           description: Gardé par l'utilisateur ; son fichier sur le serveur n'est jamais purgé.
         fileStatus: { $ref: "#/components/schemas/FileStatus" }
+        inQueue: { type: boolean, description: Dans la file d'attente de l'utilisateur. }
         _links:
           type: object
           required: [self, podcast, audio]
           properties:
             self: { $ref: "#/components/schemas/Link" }
             podcast: { $ref: "#/components/schemas/Link" }
-            audio: { $ref: "#/components/schemas/Link" }
+            audio:
+              description: Fichier audio, par un lien signé valable 24 heures, à donner tel quel au lecteur.
+              $ref: "#/components/schemas/Link"
             chapters:
               description: "Podcast 2.0 : chapitres annoncés par le flux (JSON Chapters)."
               $ref: "#/components/schemas/Link"
@@ -955,7 +1058,8 @@ components:
           description: |
             Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté,
             `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`,
-            `download` tant que le serveur n'a pas le fichier (`NONE` ou `FAILED`).
+            `download` tant que le serveur n'a pas le fichier (`NONE` ou `FAILED`),
+            `enqueue` hors de la file, `dequeue` et `move` dans la file.
           type: object
           properties:
             update-progress: { $ref: "#/components/schemas/Template" }
@@ -964,6 +1068,9 @@ components:
             keep: { $ref: "#/components/schemas/Template" }
             unkeep: { $ref: "#/components/schemas/Template" }
             download: { $ref: "#/components/schemas/Template" }
+            enqueue: { $ref: "#/components/schemas/Template" }
+            dequeue: { $ref: "#/components/schemas/Template" }
+            move: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 
@@ -1000,5 +1107,51 @@ components:
         positionSeconds:
           type: integer
           minimum: 0
-          description: Ne doit pas dépasser la durée de l'épisode.
+          maximum: 86400
+          description: Peut dépasser la durée donnée par le flux, souvent approximative.
+      additionalProperties: false
+
+    Queue:
+      description: File d'attente de l'utilisateur (« à suivre »). Un épisode marqué comme écouté en sort.
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [episodes]
+          properties:
+            episodes:
+              type: array
+              items: { $ref: "#/components/schemas/Episode" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            clear-queue: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    QueueRequest:
+      type: object
+      required: [episodeId]
+      properties:
+        episodeId: { type: string }
+        position:
+          type: [integer, "null"]
+          minimum: 0
+          description: "Place dans la file : 0 en tête ; absente ou au-delà de la fin, en dernier."
+      additionalProperties: false
+
+    QueueMove:
+      type: object
+      required: [position]
+      properties:
+        position: { type: integer, minimum: 0, description: Nouvelle place ; au-delà de la fin, en dernier. }
       additionalProperties: false

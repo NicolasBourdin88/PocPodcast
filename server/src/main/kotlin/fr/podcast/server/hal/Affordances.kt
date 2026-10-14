@@ -29,6 +29,8 @@ data class AffordanceProperty(
     val name: String,
     val type: String? = null,
     val required: Boolean = false,
+    /** Filled in by the server ([value]); the client sends it back unchanged. */
+    val readOnly: Boolean = false,
     val value: JsonPrimitive? = null,
     val min: Int? = null,
     val max: Int? = null,
@@ -46,6 +48,8 @@ object Affordances {
 
     val logout = Affordance("logout", HttpMethod.Delete, "/auth/tokens/current")
 
+    val clearQueue = Affordance("clear-queue", HttpMethod.Delete, "/queue")
+
     val subscribe = Affordance(
         "subscribe", HttpMethod.Post, "/subscriptions",
         listOf(AffordanceProperty("feedUrl", type = "url", required = true)),
@@ -59,18 +63,16 @@ object Affordances {
 
     /**
      * `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new;
-     * `keep` or `unkeep` (kept episodes are never purged); `download` until the server has the file.
+     * `keep` or `unkeep` (kept episodes are never purged); `download` until the server has the file;
+     * `enqueue` outside the queue, `dequeue` and `move` inside it.
      */
     fun forEpisode(episode: Episode): List<Affordance> = buildList {
         add(
             Affordance(
                 "update-progress", HttpMethod.Put, "/episodes/${episode.id}/progress",
                 listOf(
-                    AffordanceProperty(
-                        "positionSeconds", type = "number", required = true, value = JsonPrimitive(episode.positionSeconds),
-                        // Some feeds do not give the duration (0): no upper bound then.
-                        min = 0, max = episode.durationSeconds.takeIf { it > 0 },
-                    ),
+                    // No upper bound: the duration given by the feed is often approximate.
+                    AffordanceProperty("positionSeconds", type = "number", required = true, value = JsonPrimitive(episode.positionSeconds), min = 0),
                 ),
             ),
         )
@@ -83,6 +85,21 @@ object Affordances {
         }
         if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
             add(Affordance("download", HttpMethod.Post, "/episodes/${episode.id}/download"))
+        }
+        if (episode.inQueue) {
+            add(Affordance("dequeue", HttpMethod.Delete, "/queue/${episode.id}"))
+            add(Affordance("move", HttpMethod.Put, "/queue/${episode.id}", listOf(AffordanceProperty("position", type = "number", required = true, min = 0))))
+        } else {
+            add(
+                Affordance(
+                    "enqueue", HttpMethod.Post, "/queue",
+                    listOf(
+                        AffordanceProperty("episodeId", required = true, readOnly = true, value = JsonPrimitive(episode.id)),
+                        // Absent: at the end of the queue; 0: next.
+                        AffordanceProperty("position", type = "number", min = 0),
+                    ),
+                ),
+            )
         }
     }
 
@@ -116,6 +133,7 @@ fun List<Affordance>.toHalFormsTemplates(): JsonObject = buildJsonObject {
                             put("name", property.name)
                             property.type?.let { put("type", it) }
                             if (property.required) put("required", true)
+                            if (property.readOnly) put("readOnly", true)
                             property.value?.let { put("value", it) }
                             property.min?.let { put("min", it) }
                             property.max?.let { put("max", it) }

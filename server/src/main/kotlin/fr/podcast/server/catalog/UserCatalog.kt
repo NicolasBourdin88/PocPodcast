@@ -55,11 +55,13 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
         database.query { episodesQueries.saveProgress(userId, id, positionSeconds, EpisodeStatus.IN_PROGRESS.name) }
     }
 
+    /** A played episode also leaves the queue. */
     override suspend fun markPlayed(episodeId: String) {
         val id = episodeId.toLongOrNull() ?: return
         database.transaction {
             val duration = catalogQueries.episodeDuration(id).executeAsOneOrNull() ?: return@transaction
             episodesQueries.saveProgress(userId, id, duration, EpisodeStatus.PLAYED.name)
+            removeFromQueue(id)
         }
     }
 
@@ -128,15 +130,72 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
     }
 
     /**
-     * Removes the subscription. Returns the podcast id when nobody follows that podcast any more
-     * (the caller removes it with its files), 0 when others still do, null if not found.
+     * Removes the subscription and the podcast's episodes from the user's queue. Returns the
+     * podcast id when nobody follows that podcast any more (the caller removes it with its
+     * files), 0 when others still do, null if not found.
      */
     suspend fun unsubscribe(id: String): Long? {
         val subscriptionId = id.toLongOrNull() ?: return null
         return database.transaction {
             val podcastId = catalogQueries.deleteSubscription(subscriptionId, userId).executeAsOneOrNull() ?: return@transaction null
+            queueQueries.removePodcastFromQueue(userId, podcastId)
+            renumberQueue()
             if (catalogQueries.countSubscribers(podcastId).executeAsOne() == 0L) podcastId else 0L
         }
+    }
+
+    // --- Queue ("up next", ADR 0008) ---
+
+    suspend fun queue(): List<EpisodeItem> =
+        database.query { withTranscripts(episodesQueries.queueForUser(userId, ::episodeItem).executeAsList()) }
+
+    /**
+     * Puts the episode at [position] in the queue (0 = next; null or too far = last). An episode
+     * already queued moves there. False when the episode does not exist.
+     */
+    suspend fun enqueue(episodeId: String, position: Int?): Boolean {
+        val id = episodeId.toLongOrNull() ?: return false
+        return database.transaction {
+            if (queueQueries.episodeExists(id).executeAsOne() == 0L) return@transaction false
+            removeFromQueue(id)
+            val size = queueQueries.queueSize(userId).executeAsOne().toInt()
+            val target = position?.coerceIn(0, size) ?: size
+            queueQueries.shiftFrom(userId, target)
+            queueQueries.insertQueueItem(userId, id, target)
+            true
+        }
+    }
+
+    /** Moves a queued episode to [position]; false when it is not in the queue. */
+    suspend fun moveInQueue(episodeId: String, position: Int): Boolean {
+        val id = episodeId.toLongOrNull() ?: return false
+        val queued = database.query { queueQueries.queuePositionOf(userId, id).executeAsOneOrNull() } != null
+        return queued && enqueue(episodeId, position)
+    }
+
+    /** False when the episode was not in the queue. */
+    suspend fun dequeue(episodeId: String): Boolean {
+        val id = episodeId.toLongOrNull() ?: return false
+        return database.transaction { removeFromQueue(id) }
+    }
+
+    suspend fun clearQueue() {
+        database.query { queueQueries.clearQueue(userId) }
+    }
+
+    /** Removes the episode and closes the gap it leaves; false when it was not queued. */
+    private fun PodcastDb.removeFromQueue(episodeId: Long): Boolean {
+        val position = queueQueries.queuePositionOf(userId, episodeId).executeAsOneOrNull() ?: return false
+        queueQueries.deleteQueueItem(userId, episodeId)
+        queueQueries.closeGap(userId, position)
+        return true
+    }
+
+    /** Dense positions again after removing several items at once. */
+    private fun PodcastDb.renumberQueue() {
+        val ids = episodesQueries.queueForUser(userId).executeAsList().map { it.id }
+        queueQueries.clearQueue(userId)
+        ids.forEachIndexed { index, id -> queueQueries.insertQueueItem(userId, id, index) }
     }
 
     /**
@@ -177,11 +236,6 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
 
     suspend fun subscribedFeedUrls(): Set<String> =
         database.query { catalogQueries.subscribedFeedUrls(userId).executeAsList().toSet() }
-
-    suspend fun audioUrl(episodeId: String): String? {
-        val id = episodeId.toLongOrNull() ?: return null
-        return database.query { catalogQueries.episodeAudio(id).executeAsOneOrNull() }
-    }
 }
 
 /** Adds the Podcast 2.0 transcripts, in one query for the whole list. */
@@ -219,7 +273,7 @@ private fun episodeItem(
     chapters_url: String?, chapters_type: String?, file_status: String,
     podcast_title: String, podcast_author: String, podcast_description: String, podcast_feed_url: String, podcast_artwork_url: String?,
     podcast_website_url: String?, podcast_language: String?, podcast_refresh_status: String, podcast_refreshed_at: OffsetDateTime?,
-    position_seconds: Int, status: String, kept: Boolean,
+    position_seconds: Int, status: String, kept: Boolean, queue_position: Int?,
 ) = EpisodeItem(
     episode = Episode(
         id = id.toString(),
@@ -232,6 +286,7 @@ private fun episodeItem(
         description = description,
         kept = kept,
         fileStatus = FileStatus.valueOf(file_status),
+        inQueue = queue_position != null,
         chaptersUrl = chapters_url,
     ),
     podcast = podcast(
