@@ -20,7 +20,9 @@ kotlinx-html = "0.12.0"
 kotlinx-serialization = "1.11.0"
 ktor = "3.6.0"
 logback = "1.6.5"
+media3 = "1.11.1"
 mosaic = "0.18.0"
+openjfx = "21.0.12"
 password4j = "1.8.4"
 postgresql = "42.7.14"
 slf4j = "2.0.20"
@@ -41,6 +43,9 @@ embedded-postgres-binaries-bom = { module = "io.zonky.test.postgres:embedded-pos
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+javafx-base = { module = "org.openjfx:javafx-base", version.ref = "openjfx" }
+javafx-graphics = { module = "org.openjfx:javafx-graphics", version.ref = "openjfx" }
+javafx-media = { module = "org.openjfx:javafx-media", version.ref = "openjfx" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -64,6 +69,8 @@ ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = 
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version.ref = "mosaic" }
 password4j = { module = "com.password4j:password4j", version.ref = "password4j" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }

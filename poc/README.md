@@ -16,8 +16,13 @@ Les POC réutilisent le wrapper et le catalogue de versions du projet :
 ./gradlew -p poc/auth test
 ```
 
+```bash
+./gradlew -p poc/player run
+```
+
 | POC | Étude | ADR |
 |---|---|---|
 | `hypermedia/` | 1. Format hypermédia | [0003](../docs/adr/0003-format-hypermedia.md) |
 | `persistence/` | 5. Persistance | [0004](../docs/adr/0004-persistance.md) |
 | `auth/` | 6. Authentification et droits | [0005](../docs/adr/0005-authentification-et-droits.md) |
+| `player/` | 3. Lecture audio (desktop : JavaFX Media sur de vrais épisodes, son coupé ; rapport dans `build/poc-report.md`) | [0008](../docs/adr/0008-lecture-audio.md) |
