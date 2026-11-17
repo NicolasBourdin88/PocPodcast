@@ -52,7 +52,10 @@ class ApiTest {
             root["_embedded"]!!.jsonObject["resume"]!!.jsonArray.first().jsonObject["title"]!!.jsonPrimitive.content
         assertEquals("LCC 330 - Les nouveautés de Kotlin 2.4", firstResumed(alice))
         assertEquals("Compose Multiplatform for iOS is stable", firstResumed(bob))
-        assertEquals("/episodes{?status,offset,limit}", alice["_links"]!!.jsonObject["episodes"]!!.jsonObject["href"]!!.jsonPrimitive.content)
+        fun link(rel: String) = alice["_links"]!!.jsonObject[rel]!!.jsonObject["href"]!!.jsonPrimitive.content
+        assertEquals("/episodes{?status,offset,limit}", link("episodes"))
+        // A subscription shared with the user is not in their list: they reach it by this link.
+        assertEquals("/subscriptions/{id}", link("subscription"))
     }
 
     @Test

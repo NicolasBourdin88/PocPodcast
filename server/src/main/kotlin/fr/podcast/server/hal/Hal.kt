@@ -107,6 +107,8 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
+            "subscription" to "/subscriptions/{id}",
+            "share" to "/shares/{id}",
             "search" to "/search{?q}",
         )
         if (home != null) {

@@ -1090,6 +1090,12 @@ components:
             podcast:
               description: "Gabarit `/podcasts/{id}` : un podcast à partir de son identifiant."
               $ref: "#/components/schemas/Link"
+            subscription:
+              description: "Gabarit `/subscriptions/{id}` : un abonnement, de l'utilisateur ou partagé avec lui."
+              $ref: "#/components/schemas/Link"
+            share:
+              description: "Gabarit `/shares/{id}` : un partage, vu par son propriétaire ou son destinataire."
+              $ref: "#/components/schemas/Link"
             search:
               description: "Gabarit `/search{?q}` : recherche dans les annuaires."
               $ref: "#/components/schemas/Link"
