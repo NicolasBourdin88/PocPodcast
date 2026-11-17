@@ -25,10 +25,15 @@ data class ShareRecord(val share: Share, val resourceId: Long) {
 }
 
 /** A share received, with its resource as the grantee sees it. */
-data class SharedEntry(val record: ShareRecord, val subscription: SubscriptionItem? = null, val episode: EpisodeItem? = null)
+data class SharedEntry(
+    val record: ShareRecord,
+    val subscription: SubscriptionItem? = null,
+    val episode: EpisodeItem? = null,
+    val playlist: PlaylistView? = null,
+)
 
 /** Shares between users (ADR 0009): who sees what, and the shares themselves. Rights are checked with `can`. */
-class Sharing(private val database: ServerDatabase) {
+class Sharing(private val database: ServerDatabase, private val playlists: Playlists) {
 
     /** The subscription if [viewer] may read it, with their access; null otherwise. */
     suspend fun subscription(viewer: UserAccount, id: String): SubscriptionView? {
@@ -76,7 +81,7 @@ class Sharing(private val database: ServerDatabase) {
                 ShareType.SUBSCRIPTION ->
                     database.query { subscriptionView(viewer, record.resourceId) }?.let { SharedEntry(record, subscription = it.item) }
                 ShareType.EPISODE -> catalog.episodeItem(record.resourceId.toString())?.let { SharedEntry(record, episode = it) }
-                ShareType.PLAYLIST -> null // step 7
+                ShareType.PLAYLIST -> playlists.view(viewer, record.resourceId.toString())?.let { SharedEntry(record, playlist = it) }
             }
         }
     }

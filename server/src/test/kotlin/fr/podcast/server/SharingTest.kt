@@ -160,6 +160,52 @@ class SharingTest {
     }
 
     @Test
+    fun aPlaylistIsSharedToReadOrToModify() = testApplication {
+        podcastServer()
+        val alice = client.token()
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+        val playlist = client.send(HttpMethod.Post, "/playlists", alice, """{"title":"Pour le train"}""").json()["id"]!!.jsonPrimitive.content
+        client.send(HttpMethod.Post, "/playlists/$playlist/episodes", alice, """{"episodeId":"2"}""") // Alice listened to 38 min
+
+        val share = client.send(HttpMethod.Post, "/playlists/$playlist/shares", alice, """{"userId":"2"}""").json()["id"]!!.jsonPrimitive.content
+        val seen = client.getJson("/playlists/$playlist", bob)
+        assertEquals("READ", seen["access"]!!.jsonPrimitive.content)
+        assertEquals("Alice", seen["ownerName"]!!.jsonPrimitive.content)
+        assertEquals(emptySet(), seen.templates())
+        val episode = seen["_embedded"]!!.jsonObject["episodes"]!!.jsonArray.single().jsonObject
+        assertEquals(0, episode["positionSeconds"]!!.jsonPrimitive.content.toInt()) // Bob's own state
+        assertEquals(HttpStatusCode.Forbidden, client.send(HttpMethod.Post, "/playlists/$playlist/episodes", bob, """{"episodeId":"3"}""").status)
+        assertEquals(HttpStatusCode.Forbidden, client.send(HttpMethod.Get, "/playlists/$playlist/shares", bob).status)
+        assertEquals("PLAYLIST", client.shared(bob).single()["type"]!!.jsonPrimitive.content)
+
+        // Read and modify: Bob adds an episode, he still cannot delete it nor share it.
+        client.send(HttpMethod.Patch, "/shares/$share", alice, """{"permission":"WRITE"}""")
+        assertEquals(setOf("update-playlist", "add-episode"), client.getJson("/playlists/$playlist", bob).templates())
+        assertEquals(HttpStatusCode.OK, client.send(HttpMethod.Post, "/playlists/$playlist/episodes", bob, """{"episodeId":"3"}""").status)
+        assertEquals(HttpStatusCode.Forbidden, client.send(HttpMethod.Delete, "/playlists/$playlist", bob).status)
+        assertEquals(2, client.getJson("/playlists/$playlist", alice)["episodeCount"]!!.jsonPrimitive.content.toInt())
+
+        // The playlist takes its shares with it.
+        client.send(HttpMethod.Delete, "/playlists/$playlist", alice)
+        assertTrue(client.shared(bob).isEmpty())
+    }
+
+    @Test
+    fun aSharedDynamicPlaylistStaysComputedOnItsOwnersLibrary() = testApplication {
+        podcastServer()
+        val alice = client.token()
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+        val playlist = client.send(HttpMethod.Post, "/playlists", alice, """{"title":"Kotlin","kind":"DYNAMIC","keywords":"kotlin"}""")
+            .json()["id"]!!.jsonPrimitive.content
+        client.send(HttpMethod.Post, "/playlists/$playlist/shares", alice, """{"userId":"2"}""")
+
+        // LCC 330 (episode 2) is in it although Bob does not follow Les Cast Codeurs.
+        val ids = client.getJson("/playlists/$playlist", bob)["_embedded"]!!.jsonObject["episodes"]!!.jsonArray
+            .map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        assertEquals(listOf("1", "2", "5", "9"), ids)
+    }
+
+    @Test
     fun administratorsSeeEveryonesSubscriptions() = testApplication {
         podcastServer()
         val alice = client.token()

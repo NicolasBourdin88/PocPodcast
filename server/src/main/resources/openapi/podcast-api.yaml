@@ -1105,6 +1105,50 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /playlists/{playlistId}/shares:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+    get:
+      tags: [partages, playlists]
+      operationId: listPlaylistShares
+      summary: Avec qui la playlist est partagée (propriétaire)
+      responses:
+        "200":
+          description: Partages de la playlist
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/PlaylistShares" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/PlaylistShares" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [partages, playlists]
+      operationId: sharePlaylist
+      summary: Partager la playlist (propriétaire, template `share`)
+      description: |
+        `READ` : voir la playlist et écouter ses épisodes. `WRITE` : la modifier aussi (titre, description,
+        règles, épisodes d'une playlist statique), sans la supprimer ni la partager. Une playlist dynamique
+        reste calculée sur la bibliothèque de son propriétaire (ADR 0010).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareRequest" }
+      responses:
+        "200":
+          description: Partage enregistré
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Share" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Share" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /playlists/{playlistId}/shuffle:
     parameters:
       - $ref: "#/components/parameters/playlistId"
@@ -1624,6 +1668,7 @@ components:
           properties:
             subscription: { $ref: "#/components/schemas/Subscription" }
             episode: { $ref: "#/components/schemas/Episode" }
+            playlist: { $ref: "#/components/schemas/Playlist" }
           additionalProperties: false
         _templates:
           type: object
@@ -1654,6 +1699,33 @@ components:
           properties:
             self: { $ref: "#/components/schemas/Link" }
             subscription: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [shares]
+          properties:
+            shares:
+              type: array
+              items: { $ref: "#/components/schemas/Share" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            share: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    PlaylistShares:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self, playlist]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            playlist: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
         _embedded:
           type: object
@@ -1882,6 +1954,7 @@ components:
           required: [self]
           properties:
             self: { $ref: "#/components/schemas/Link" }
+            shares: { $ref: "#/components/schemas/Link", description: Avec qui elle est partagée (propriétaire). }
           additionalProperties: false
         _embedded:
           description: "Ses épisodes, dans une représentation de la playlist seule (pas dans une collection)."
@@ -1895,13 +1968,14 @@ components:
         _templates:
           description: |
             Selon les droits de l'utilisateur : `update-playlist` s'il peut la modifier, avec `add-episode`
-            pour une playlist statique et `shuffle` pour une playlist en ordre aléatoire ; `delete-playlist`
-            pour son propriétaire.
+            pour une playlist statique et `shuffle` pour une playlist en ordre aléatoire ; `share` et
+            `delete-playlist` pour son propriétaire.
           type: object
           properties:
             update-playlist: { $ref: "#/components/schemas/Template" }
             add-episode: { $ref: "#/components/schemas/Template" }
             shuffle: { $ref: "#/components/schemas/Template" }
+            share: { $ref: "#/components/schemas/Template" }
             delete-playlist: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false

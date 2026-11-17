@@ -315,6 +315,18 @@ class ContractTest {
         check(delete, "/playlists/1/episodes/2", item, HttpStatusCode.NoContent)
         check(delete, "/playlists/1/episodes/2", item, HttpStatusCode.NotFound)
         check(delete, "/playlists/2/episodes/1", item, HttpStatusCode.Conflict)
+        // Playlist 1 shared read-only with Bob.
+        check(get, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.OK)
+        check(post, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.OK, body = """{"userId":"2","message":"Pour le train"}""")
+        check(post, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.UnprocessableEntity, body = """{"userId":"1"}""")
+        check(post, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.Forbidden, token = bob, body = """{"userId":"1"}""")
+        check(post, "/playlists/999/shares", "/playlists/{playlistId}/shares", HttpStatusCode.NotFound, body = """{"userId":"2"}""")
+        check(get, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.OK) // with Bob
+        check(get, "/playlists/1/shares", "/playlists/{playlistId}/shares", HttpStatusCode.Forbidden, token = bob)
+        check(get, "/playlists/2/shares", "/playlists/{playlistId}/shares", HttpStatusCode.NotFound, token = bob)
+        check(get, "/playlists/1", playlist, HttpStatusCode.OK, token = bob) // read-only
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.Forbidden, token = bob, body = """{"episodeId":"1"}""")
+        check(get, "/shared", "/shared", HttpStatusCode.OK, token = bob) // with the playlist
         check(post, "/playlists", "/playlists", HttpStatusCode.Created, body = """{"title":"Éphémère"}""")
         check(delete, "/playlists/3", playlist, HttpStatusCode.NotFound, token = bob)
         check(delete, "/playlists/3", playlist, HttpStatusCode.NoContent)

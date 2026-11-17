@@ -118,8 +118,8 @@ class ServerServices(
 ) {
     val accounts = Accounts(database)
     val loginThrottle = LoginThrottle()
-    val sharing = Sharing(database)
     val playlists = Playlists(database)
+    val sharing = Sharing(database, playlists)
     val guard = UrlGuard(config.allowPrivateFeeds)
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }

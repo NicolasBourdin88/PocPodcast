@@ -10,6 +10,8 @@ import fr.podcast.server.auth.can
 import fr.podcast.server.catalog.ShareRecord
 import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.server.hal.episodeResource
+import fr.podcast.server.hal.playlistResource
+import fr.podcast.server.hal.playlistShares
 import fr.podcast.server.hal.shareResource
 import fr.podcast.server.hal.sharedWithMe
 import fr.podcast.server.hal.subscriptionResource
@@ -93,6 +95,27 @@ fun Route.shareRoutes(services: ServerServices) {
             call.respondShare(record, user, done = call.language().strings.sharedWithUser(record.share.grantee.displayName))
         }
 
+        get("/playlists/{id}/shares") {
+            val user = call.user
+            val view = services.playlists.view(user, call.parameters["id"]!!) ?: return@get call.respondNotFound("Playlist")
+            if (!user.can(Action.SHARE, view.ownerId, view.permission)) {
+                return@get call.respondProblem(HttpStatusCode.Forbidden, "Only its owner sees whom a playlist is shared with")
+            }
+            val representation = call.representation()
+            call.respondResource(playlistShares(view, sharing.sharesOf(ShareType.PLAYLIST, view.id), user, representation.forms), representation)
+        }
+
+        post("/playlists/{id}/shares") {
+            val user = call.mutatingUser() ?: return@post
+            val view = services.playlists.view(user, call.parameters["id"]!!) ?: return@post call.respondNotFound("Playlist")
+            if (!user.can(Action.SHARE, view.ownerId, view.permission)) {
+                return@post call.respondProblem(HttpStatusCode.Forbidden, "Only its owner can share a playlist")
+            }
+            val request = call.receiveShareRequest(services, view.ownerId, permissionAllowed = true) ?: return@post
+            val record = sharing.share(ShareType.PLAYLIST, view.id, view.ownerId, request.granteeId, request.permission, request.message)
+            call.respondShare(record, user, done = call.language().strings.sharedWithUser(record.share.grantee.displayName))
+        }
+
         // A recommendation: any episode of the catalog, to anyone, READ only.
         post("/episodes/{id}/shares") {
             val user = call.mutatingUser() ?: return@post
@@ -110,7 +133,8 @@ fun Route.shareRoutes(services: ServerServices) {
                 ShareType.SUBSCRIPTION -> sharing.subscription(user, record.resourceId.toString())?.let { subscriptionResource(it.item, representation.forms) }
                 ShareType.EPISODE -> UserCatalog(services.database, user.id).episodeItem(record.resourceId.toString())
                     ?.let { episodeResource(it, representation.forms, services.audioLinks) }
-                ShareType.PLAYLIST -> null
+                ShareType.PLAYLIST -> services.playlists.view(user, record.resourceId.toString())
+                    ?.let { playlistResource(it, user, representation.forms, services.audioLinks) }
             }
             call.respondResource(shareResource(record, user, representation.forms, resource), representation)
         }

@@ -181,19 +181,20 @@ object Affordances {
         }
         if (subscription.access == Access.OWNER) {
             add(Affordance("unsubscribe", HttpMethod.Delete, "/subscriptions/${subscription.id}"))
-            add(
-                Affordance(
-                    "share", HttpMethod.Post, "/subscriptions/${subscription.id}/shares",
-                    listOf(
-                        AffordanceProperty("userId", required = true),
-                        AffordanceProperty("permission", value = JsonPrimitive("READ"), options = listOf("READ", "WRITE")),
-                        AffordanceProperty("message", type = "textarea"),
-                    ),
-                ),
-            )
+            add(share("/subscriptions/${subscription.id}/shares"))
         }
         if (subscription.ownerName != null) add(subscribeTo(item.podcast.feedUrl))
     }
+
+    /** Shares a subscription or a playlist: with whom, read-only or not, with a word (ADR 0009). */
+    private fun share(target: String) = Affordance(
+        "share", HttpMethod.Post, target,
+        listOf(
+            AffordanceProperty("userId", required = true),
+            AffordanceProperty("permission", value = JsonPrimitive("READ"), options = listOf("READ", "WRITE")),
+            AffordanceProperty("message", type = "textarea"),
+        ),
+    )
 
     /** Recommends an episode to someone (a READ share, ADR 0009). */
     fun recommend(episodeId: String) = Affordance(
@@ -240,7 +241,7 @@ object Affordances {
     /**
      * By the viewer's rights (ADR 0010): `update-playlist` (title, description and rules) for whoever
      * may modify it, with `add-episode` on a static playlist and `shuffle` on a RANDOM one;
-     * `delete-playlist` for its owner.
+     * `share` and `delete-playlist` for its owner.
      */
     fun forPlaylist(playlist: Playlist, canModify: Boolean, owner: Boolean): List<Affordance> = buildList {
         val id = playlist.id
@@ -260,7 +261,10 @@ object Affordances {
             }
             if (playlist.rules?.order == PlaylistOrder.RANDOM) add(Affordance("shuffle", HttpMethod.Post, "/playlists/$id/shuffle"))
         }
-        if (owner) add(Affordance("delete-playlist", HttpMethod.Delete, "/playlists/$id"))
+        if (owner) {
+            add(share("/playlists/$id/shares"))
+            add(Affordance("delete-playlist", HttpMethod.Delete, "/playlists/$id"))
+        }
     }
 
     /** On each episode of a static playlist the viewer may modify. */

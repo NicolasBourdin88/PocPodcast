@@ -241,7 +241,9 @@ fun sharedWithMe(entries: List<SharedEntry>, viewer: UserAccount, forms: Boolean
             "shares",
             buildJsonArray {
                 for (entry in entries) {
-                    val resource = entry.subscription?.let { subscriptionResource(it, forms) } ?: entry.episode?.let { episodeResource(it, forms, audio) }
+                    val resource = entry.subscription?.let { subscriptionResource(it, forms) }
+                        ?: entry.episode?.let { episodeResource(it, forms, audio) }
+                        ?: entry.playlist?.let { playlistResource(it, viewer, forms, audio) }
                     add(shareResource(entry.record, viewer, forms, resource))
                 }
             },
@@ -290,7 +292,12 @@ fun playlistResource(view: PlaylistView, viewer: UserAccount, forms: Boolean, au
         val canModify = viewer.can(Action.MODIFY, view.ownerId, view.permission)
         val owner = viewer.can(Action.SHARE, view.ownerId, view.permission)
         fields(Playlist.serializer(), playlist)
-        links("self" to "/playlists/${playlist.id}")
+        links(
+            buildList {
+                add("self" to "/playlists/${playlist.id}")
+                if (owner) add("shares" to "/playlists/${playlist.id}/shares")
+            },
+        )
         episodes?.let { items ->
             val editable = canModify && playlist.kind == PlaylistKind.STATIC
             putJsonObject("_embedded") {
@@ -307,6 +314,17 @@ fun playlistResource(view: PlaylistView, viewer: UserAccount, forms: Boolean, au
         }
         templates(forms, Affordances.forPlaylist(playlist, canModify, owner))
     }
+
+/** Whom a playlist is shared with, and the `share` template to add someone. */
+fun playlistShares(view: PlaylistView, records: List<ShareRecord>, viewer: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
+    val id = view.playlist.id
+    put("count", records.size)
+    links("self" to "/playlists/$id/shares", "playlist" to "/playlists/$id")
+    putJsonObject("_embedded") {
+        put("shares", buildJsonArray { records.forEach { add(shareResource(it, viewer, forms)) } })
+    }
+    templates(forms, Affordances.forPlaylist(view.playlist, canModify = false, owner = true).filter { it.name == "share" })
+}
 
 /** The user's own playlists; those shared with them are in /shared. */
 fun playlistCollection(views: List<PlaylistView>, viewer: UserAccount, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
