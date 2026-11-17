@@ -8,6 +8,8 @@ import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.PlaylistOrder
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.repository.RemotePodcastRepository
@@ -197,6 +199,49 @@ class SdkTest {
         // Alice takes her share back: the subscription is out of Bob's sight.
         alice.unshare(share.id)
         assertNull(bob.subscription(cast.subscription.id))
+    }
+
+    @Test
+    fun sdkManagesPlaylists() = testApplication {
+        podcastServer()
+        val service = AccountService(client, deviceName = "SDK test")
+        val alice = RemotePodcastRepository(service.signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD), client)
+        val bob = RemotePodcastRepository(service.signIn("http://localhost", TestSeed.BOB, TestSeed.BOB_PASSWORD), client)
+
+        val train = alice.createPlaylist("Pour le train", "Les trajets").playlist.id
+        alice.addToPlaylist(train, "6")
+        alice.addToPlaylist(train, "2", position = 0)
+        alice.moveInPlaylist(train, "6", 0)
+        assertEquals(listOf("6", "2"), alice.playlist(train)!!.episodes.map { it.episode.id })
+        alice.removeFromPlaylist(train, "2")
+
+        // A dynamic playlist on Alice's marks.
+        alice.setFavorite("7", true)
+        alice.rate("7", 5)
+        assertEquals(5, alice.episode("7")!!.rating)
+        val favorites = alice.createPlaylist("Favoris", rules = PlaylistRules(favoritesOnly = true, minRating = 4))
+        assertEquals(listOf("7"), favorites.episodes.map { it.episode.id })
+        val renamed = alice.updatePlaylist(favorites.playlist.id, "Mes favoris", null, PlaylistRules(favoritesOnly = true))
+        assertEquals("Mes favoris", renamed.playlist.title)
+        alice.rate("7", null)
+        assertNull(alice.episode("7")!!.rating)
+        val random = alice.createPlaylist("Surprise", rules = PlaylistRules(order = PlaylistOrder.RANDOM))
+        assertEquals(random.episodes.size, alice.shufflePlaylist(random.playlist.id).episodes.size)
+
+        // Shared with Bob, read-only; published for any podcast app.
+        alice.sharePlaylist(train, bob.me().id)
+        assertEquals("Pour le train", bob.sharedWithMe().single().playlist!!.title)
+        assertFailsWith<ApiException.NotOffered> { bob.addToPlaylist(train, "1") }
+        assertEquals(listOf("Bob"), alice.sharesOfPlaylist(train).map { it.grantee.displayName })
+        val feed = alice.publishFeed(train)
+        assertTrue(feed.startsWith("http://localhost/feeds/"), feed)
+        assertEquals(HttpStatusCode.OK, client.get(feed).status)
+        alice.unpublishFeed(train)
+        assertNull(alice.playlist(train)!!.playlist.feedUrl)
+
+        alice.deletePlaylist(favorites.playlist.id)
+        assertNull(alice.playlist(favorites.playlist.id))
+        assertEquals(listOf("Pour le train", "Surprise"), alice.playlists().map { it.title })
     }
 
     @Test

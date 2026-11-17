@@ -70,6 +70,8 @@ interface Strings {
     val lastAdministrator: String
     val noSuchUser: String
     fun messageTooLong(maximum: Int): String
+    fun playlistTitleInvalid(maximum: Int): String
+    fun keywordsInvalid(count: Int, length: Int): String
 
     /** Label of a server action, by its HAL-FORMS template name (ADR 0003). */
     fun action(name: String): String

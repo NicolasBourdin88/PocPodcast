@@ -33,6 +33,10 @@ interface LibraryRepository {
     suspend fun keep(episodeId: String)
     suspend fun unkeep(episodeId: String)
 
+    /** The user's favorites and ratings (1 to 5; null clears it), which dynamic playlists select on (ADR 0010). */
+    suspend fun setFavorite(episodeId: String, favorite: Boolean)
+    suspend fun rate(episodeId: String, rating: Int?)
+
     /** Asks the server to keep a copy of the audio file (shared by every user). */
     suspend fun download(episodeId: String)
 
@@ -41,4 +45,4 @@ interface LibraryRepository {
 }
 
 /** Everything a client needs from a server, or from the demo data. */
-interface PodcastClient : PodcastRepository, LibraryRepository, PlaybackRepository, AccountRepository, SharingRepository
+interface PodcastClient : PodcastRepository, LibraryRepository, PlaybackRepository, AccountRepository, SharingRepository, PlaylistRepository

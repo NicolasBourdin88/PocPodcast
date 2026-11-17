@@ -10,6 +10,9 @@ import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.model.Device
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.OpmlImportReport
+import fr.podcast.shared.model.Playlist
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
 import fr.podcast.shared.model.Share
@@ -108,6 +111,11 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     override suspend fun download(episodeId: String) = perform(episodeId, "download")
 
+    override suspend fun setFavorite(episodeId: String, favorite: Boolean) = perform(episodeId, if (favorite) "favorite" else "unfavorite")
+
+    override suspend fun rate(episodeId: String, rating: Int?) =
+        if (rating == null) perform(episodeId, "clear-rating") else perform(episodeId, "rate", mapOf("rating" to JsonPrimitive(rating)))
+
     // --- PlaybackRepository ---
 
     override suspend fun episodeItem(id: String): EpisodeItem? = episodeResource(id)?.asEpisodeItem()
@@ -189,6 +197,7 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
             share = share.toShare(),
             subscription = share.embedded("subscription").firstOrNull()?.toSubscriptionItem(),
             episode = share.embedded("episode").firstOrNull()?.asEpisodeItem(),
+            playlist = share.embedded("playlist").firstOrNull()?.toPlaylist(),
         )
     }
 
@@ -215,6 +224,61 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
         shareResource(shareId).submit("unshare")
     }
 
+    override suspend fun sharePlaylist(playlistId: String, userId: String, permission: SharePermission, message: String?): Share {
+        val values = mapOf("userId" to JsonPrimitive(userId), "permission" to JsonPrimitive(permission.name), "message" to message.orNull())
+        return playlistResource(playlistId).submit("share", values).resource().toShare()
+    }
+
+    override suspend fun sharesOfPlaylist(playlistId: String): List<Share> {
+        val href = playlistResource(playlistId).link("shares") ?: throw ApiException.NotOffered("shares")
+        return api.get(href).embedded("shares").map { it.toShare() }
+    }
+
+    // --- PlaylistRepository ---
+
+    override suspend fun playlists(): List<Playlist> = api.get(link("playlists")).embedded("playlists").map { it.toPlaylist() }
+
+    override suspend fun playlist(id: String): PlaylistDetails? = orNullIfNotFound { playlistResource(id).toPlaylistDetails() }
+
+    override suspend fun createPlaylist(title: String, description: String?, rules: PlaylistRules?): PlaylistDetails {
+        val kind = if (rules == null) PlaylistKind.STATIC else PlaylistKind.DYNAMIC
+        val values = playlistValues(title, description, rules) + ("kind" to JsonPrimitive(kind.name))
+        return api.get(link("playlists")).submit("create-playlist", values).resource().toPlaylistDetails()
+    }
+
+    override suspend fun updatePlaylist(id: String, title: String, description: String?, rules: PlaylistRules?): PlaylistDetails =
+        playlistResource(id).submit("update-playlist", playlistValues(title, description, rules)).resource().toPlaylistDetails()
+
+    override suspend fun deletePlaylist(id: String) {
+        playlistResource(id).submit("delete-playlist")
+    }
+
+    override suspend fun addToPlaylist(playlistId: String, episodeId: String, position: Int?) {
+        val values = buildMap {
+            put("episodeId", JsonPrimitive(episodeId))
+            position?.let { put("position", JsonPrimitive(it)) }
+        }
+        playlistResource(playlistId).submit("add-episode", values)
+    }
+
+    override suspend fun removeFromPlaylist(playlistId: String, episodeId: String) {
+        playlistEpisode(playlistId, episodeId).submit("remove-from-playlist")
+    }
+
+    override suspend fun moveInPlaylist(playlistId: String, episodeId: String, position: Int) {
+        playlistEpisode(playlistId, episodeId).submit("move-in-playlist", mapOf("position" to JsonPrimitive(position)))
+    }
+
+    override suspend fun shufflePlaylist(id: String): PlaylistDetails = playlistResource(id).submit("shuffle").resource().toPlaylistDetails()
+
+    override suspend fun publishFeed(playlistId: String): String =
+        playlistResource(playlistId).submit("publish-feed").resource().toPlaylist().feedUrl
+            ?: throw ApiException.Unexpected(200, "no feed link after publish-feed")
+
+    override suspend fun unpublishFeed(playlistId: String) {
+        playlistResource(playlistId).submit("unpublish-feed")
+    }
+
     // --- Helpers ---
 
     private suspend fun subscriptionCollection(): HalResource = api.get(link("subscriptions"))
@@ -234,6 +298,32 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
         userCollection().embedded("users").firstOrNull { it.string("id") == id } ?: throw ApiException.NotFound("user $id")
 
     private suspend fun shareResource(id: String): HalResource = api.get(link("share", mapOf("id" to id)))
+
+    private suspend fun playlistResource(id: String): HalResource = api.get(link("playlist", mapOf("id" to id)))
+
+    /** An episode of the playlist, with the playlist's actions on it. */
+    private suspend fun playlistEpisode(playlistId: String, episodeId: String): HalResource =
+        playlistResource(playlistId).embedded("episodes").firstOrNull { it.string("id") == episodeId }
+            ?: throw ApiException.NotFound("episode $episodeId in playlist $playlistId")
+
+    /** The fields of the playlist templates; the rules only for a dynamic playlist. */
+    private fun playlistValues(title: String, description: String?, rules: PlaylistRules?): Map<String, JsonElement> = buildMap {
+        put("title", JsonPrimitive(title))
+        put("description", description.orNull())
+        rules?.let {
+            put("keywords", JsonPrimitive(it.keywords.joinToString(", ")))
+            put("favoritesOnly", JsonPrimitive(it.favoritesOnly))
+            put("minRating", JsonPrimitive(it.minRating))
+            put("unplayedOnly", JsonPrimitive(it.unplayedOnly))
+            put("order", JsonPrimitive(it.order.name))
+            put("limit", JsonPrimitive(it.limit))
+        }
+    }
+
+    /** With its feed address made absolute. */
+    private fun HalResource.toPlaylist(): Playlist = decode(Playlist.serializer()).copy(feedUrl = link("feed")?.let(api::resolve))
+
+    private fun HalResource.toPlaylistDetails(): PlaylistDetails = PlaylistDetails(toPlaylist(), embedded("episodes").map { it.asEpisodeItem() })
 
     /** Submits the resource's [template]; refused with [ApiException.NotOffered] when the server does not offer it. */
     private suspend fun HalResource.submit(template: String, values: Map<String, JsonElement> = emptyMap(), self: String? = null): HttpResponse {

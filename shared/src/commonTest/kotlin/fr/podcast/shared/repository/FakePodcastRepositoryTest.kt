@@ -6,6 +6,7 @@ import fr.podcast.shared.i18n.EnglishStrings
 import fr.podcast.shared.i18n.FrenchStrings
 import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.ShareType
 import fr.podcast.shared.model.UserRole
@@ -96,7 +97,7 @@ class FakeSharingTest {
     @Test
     fun whatOthersShareBehavesAsOnAServer() = runTest {
         val received = repository.sharedWithMe()
-        assertEquals(listOf(ShareType.SUBSCRIPTION, ShareType.EPISODE), received.map { it.share.type })
+        assertEquals(listOf(ShareType.SUBSCRIPTION, ShareType.EPISODE, ShareType.PLAYLIST), received.map { it.share.type })
 
         // Alice's subscription, read-only: it can be listened to, not changed.
         val methode = received.first().subscription!!
@@ -117,7 +118,7 @@ class FakeSharingTest {
         assertEquals("KMP in production", received[1].episode!!.episode.title)
         assertEquals("Bob", received[1].share.owner.displayName)
         repository.unshare(received[1].share.id)
-        assertEquals(1, repository.sharedWithMe().size)
+        assertEquals(2, repository.sharedWithMe().size)
     }
 
     @Test
@@ -177,5 +178,63 @@ class FakeAccountsTest {
         repository.deleteUser(repository.users().single { it.username == "bob" }.id)
         assertEquals(listOf(ShareType.SUBSCRIPTION), repository.sharedWithMe().map { it.share.type })
         assertTrue(repository.sharesOf("s2").isEmpty())
+    }
+}
+
+class FakePlaylistsTest {
+
+    private val repository = FakePodcastRepository()
+
+    private suspend fun ids(playlistId: String) = repository.playlist(playlistId)!!.episodes.map { it.episode.id }
+
+    @Test
+    fun demoPlaylistsBehaveAsOnAServer() = runTest {
+        assertEquals(listOf("Kotlin", "Pour le train"), repository.playlists().map { it.title })
+        assertEquals(listOf("e2", "e3"), ids("pl1"))
+        assertEquals(listOf("e1", "e2"), ids("pl2")) // Kotlin, not played: e5 is played
+
+        repository.addToPlaylist("pl1", "e4", position = 0)
+        repository.moveInPlaylist("pl1", "e3", 1)
+        repository.removeFromPlaylist("pl1", "e2")
+        assertEquals(listOf("e4", "e3"), ids("pl1"))
+        assertFailsWith<ApiException.Rejected> { repository.addToPlaylist("pl2", "e4") } // computed
+
+        // Bob's, shared read-only.
+        val android = repository.playlist("pl3")!!.playlist
+        assertEquals(Access.READ, android.access)
+        assertEquals("Bob", android.ownerName)
+        assertEquals(EnglishStrings.notAllowed, assertFailsWith<ApiException.Rejected> { repository.addToPlaylist("pl3", "e4") }.userMessage(EnglishStrings))
+        assertEquals("Android", repository.sharedWithMe().single { it.share.type == ShareType.PLAYLIST }.playlist!!.title)
+    }
+
+    @Test
+    fun favoritesAndRatingsDriveDynamicPlaylists() = runTest {
+        val favorites = repository.createPlaylist("Favoris", rules = PlaylistRules(favoritesOnly = true))
+        assertEquals(listOf("e2"), favorites.episodes.map { it.episode.id })
+        repository.setFavorite("e3", true)
+        assertEquals(listOf("e2", "e3"), ids(favorites.playlist.id))
+
+        val rated = repository.createPlaylist("Les meilleurs", rules = PlaylistRules(minRating = 4))
+        assertEquals(listOf("e1"), rated.episodes.map { it.episode.id })
+        repository.rate("e1", null)
+        assertEquals(emptyList(), ids(rated.playlist.id))
+        assertFailsWith<ApiException.Rejected> { repository.rate("e1", 6) }
+
+        val refused = assertFailsWith<ApiException.Rejected> { repository.createPlaylist(" ") }
+        assertEquals(FrenchStrings.playlistTitleInvalid(100), refused.userMessage(FrenchStrings))
+    }
+
+    @Test
+    fun onlyTheOwnerPublishesTheFeed() = runTest {
+        val url = repository.publishFeed("pl1")
+        assertEquals(url, repository.playlist("pl1")!!.playlist.feedUrl)
+        assertFailsWith<ApiException.Rejected> { repository.publishFeed("pl3") }
+        repository.unpublishFeed("pl1")
+        assertEquals(null, repository.playlist("pl1")!!.playlist.feedUrl)
+
+        repository.sharePlaylist("pl1", repository.users().single { it.username == "alice" }.id, SharePermission.WRITE)
+        assertEquals(listOf("Alice"), repository.sharesOfPlaylist("pl1").map { it.grantee.displayName })
+        repository.deletePlaylist("pl1")
+        assertEquals(null, repository.playlist("pl1"))
     }
 }

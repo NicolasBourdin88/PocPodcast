@@ -67,6 +67,8 @@ object FrenchStrings : Strings {
     override val lastAdministrator = "Le serveur doit garder au moins un administrateur."
     override val noSuchUser = "Ce compte n'existe pas."
     override fun messageTooLong(maximum: Int) = "Le message est trop long ($maximum caractères au plus)."
+    override fun playlistTitleInvalid(maximum: Int) = "Le titre doit contenir de 1 à $maximum caractères."
+    override fun keywordsInvalid(count: Int, length: Int) = "Au plus $count mots-clés, de $length caractères au plus chacun."
 
     override fun action(name: String) = when (name) {
         "mark-played" -> "Marquer comme écouté"

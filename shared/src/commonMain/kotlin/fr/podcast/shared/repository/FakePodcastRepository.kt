@@ -8,6 +8,11 @@ import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.model.OpmlImportReport
+import fr.podcast.shared.model.Playlist
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistLimits
+import fr.podcast.shared.model.PlaylistOrder
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
 import fr.podcast.shared.model.Share
@@ -21,12 +26,14 @@ import fr.podcast.shared.repository.FakeAccountRepository.Companion.BOB
 import fr.podcast.shared.repository.FakeAccountRepository.Companion.ME
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.random.Random
 import kotlin.time.Instant
 
 /**
  * In-memory data, used by the demo mode and the tests. Nothing leaves the device.
  * Besides the demo user's library, Alice shares a subscription with them and Bob recommends an
- * episode; the demo user shares Talking Kotlin with Bob (ADR 0009).
+ * episode; the demo user shares Talking Kotlin with Bob (ADR 0009). The demo user has a static and
+ * a dynamic playlist, and Bob shares one with them (ADR 0010).
  */
 class FakePodcastRepository private constructor(
     private val accounts: FakeAccountRepository,
@@ -60,11 +67,14 @@ class FakePodcastRepository private constructor(
 
     // Ordered from most recent to oldest.
     private val episodes = mutableListOf(
-        Episode("e1", "p2", "Compose Multiplatform for iOS is stable", Instant.parse("2026-10-12T06:00:00Z"), durationSeconds = 52 * 60),
+        Episode(
+            "e1", "p2", "Compose Multiplatform for iOS is stable", Instant.parse("2026-10-12T06:00:00Z"),
+            durationSeconds = 52 * 60, rating = 4,
+        ),
         Episode("e6", "p5", "Les trous noirs ont-ils une mémoire ?", Instant.parse("2026-10-11T15:00:00Z"), durationSeconds = 58 * 60),
         Episode(
             "e2", "p1", "LCC 330 - Les nouveautés de Kotlin 2.4", Instant.parse("2026-10-10T05:00:00Z"),
-            durationSeconds = 95 * 60, positionSeconds = 38 * 60, status = EpisodeStatus.IN_PROGRESS,
+            durationSeconds = 95 * 60, positionSeconds = 38 * 60, status = EpisodeStatus.IN_PROGRESS, favorite = true,
         ),
         Episode("e3", "p4", "KMP in production", Instant.parse("2026-10-08T12:00:00Z"), durationSeconds = 47 * 60),
         Episode(
@@ -97,8 +107,31 @@ class FakePodcastRepository private constructor(
         DemoShare("sh1", ShareType.SUBSCRIPTION, "s5", ALICE, ME, SharePermission.READ, "Pour tes trajets", Instant.parse("2026-10-11T19:00:00Z")),
         DemoShare("sh2", ShareType.EPISODE, "e3", BOB, ME, SharePermission.READ, "À écouter à partir de 12 min", Instant.parse("2026-10-09T08:30:00Z")),
         DemoShare("sh3", ShareType.SUBSCRIPTION, "s2", ME, BOB, SharePermission.WRITE, null, Instant.parse("2026-10-01T10:00:00Z")),
+        DemoShare("sh4", ShareType.PLAYLIST, "pl3", BOB, ME, SharePermission.READ, "Pour découvrir", Instant.parse("2026-10-07T18:00:00Z")),
     )
-    private var nextShare = 4
+    private var nextShare = 5
+
+    /** A playlist, by the ids of its owner and of its episodes (in order, for a static one). */
+    private data class DemoPlaylist(
+        val id: String,
+        val ownerId: String,
+        val title: String,
+        val description: String?,
+        /** Null for a static playlist. */
+        val rules: PlaylistRules?,
+        val items: List<String> = emptyList(),
+        val seed: Int = 1,
+        val feedUrl: String? = null,
+        val createdAt: Instant = Instant.parse("2026-10-01T09:00:00Z"),
+    )
+
+    private val playlists = mutableListOf(
+        DemoPlaylist("pl1", ME, "Pour le train", "Les trajets du lundi", rules = null, items = listOf("e2", "e3")),
+        DemoPlaylist("pl2", ME, "Kotlin", null, PlaylistRules(keywords = listOf("kotlin"), unplayedOnly = true)),
+        DemoPlaylist("pl3", BOB, "Android", "Ce que j'écoute en ce moment", rules = null, items = listOf("e3", "e1")),
+    )
+    private var nextPlaylist = 4
+    private var nextFeed = 1
 
     /** A small directory for the demo search. */
     private val directory = listOf(
@@ -199,6 +232,13 @@ class FakePodcastRepository private constructor(
 
     override suspend fun unkeep(episodeId: String) = update(episodeId) { it.copy(kept = false) }
 
+    override suspend fun setFavorite(episodeId: String, favorite: Boolean) = update(episodeId) { it.copy(favorite = favorite) }
+
+    override suspend fun rate(episodeId: String, rating: Int?) {
+        if (rating != null && rating !in 1..5) throw invalid("rating")
+        update(episodeId) { it.copy(rating = rating) }
+    }
+
     /** The demo has no server: the file is "downloaded" at once. */
     override suspend fun download(episodeId: String) = update(episodeId) { it.copy(fileStatus = FileStatus.READY) }
 
@@ -259,7 +299,7 @@ class FakePodcastRepository private constructor(
             when (share.type) {
                 ShareType.SUBSCRIPTION -> subscription(share.resourceId)?.let { SharedItem(share.toShare(), subscription = it) }
                 ShareType.EPISODE -> episodeItem(share.resourceId)?.let { SharedItem(share.toShare(), episode = it) }
-                ShareType.PLAYLIST -> null
+                ShareType.PLAYLIST -> playlist(share.resourceId)?.let { SharedItem(share.toShare(), playlist = it.playlist) }
             }
         }
     }
@@ -293,7 +333,163 @@ class FakePodcastRepository private constructor(
         mutex.withLock { shares.remove(share) }
     }
 
+    override suspend fun sharePlaylist(playlistId: String, userId: String, permission: SharePermission, message: String?): Share {
+        ownPlaylist(playlistId)
+        return save(ShareType.PLAYLIST, playlistId, userId, permission, message)
+    }
+
+    override suspend fun sharesOfPlaylist(playlistId: String): List<Share> {
+        ownPlaylist(playlistId)
+        return mutex.withLock { shares.filter { it.type == ShareType.PLAYLIST && it.resourceId == playlistId } }.map { it.toShare() }
+    }
+
+    // --- PlaylistRepository ---
+
+    override suspend fun playlists(): List<Playlist> {
+        val own = mutex.withLock { playlists.filter { it.ownerId == ME }.sortedBy { it.title.lowercase() }.map { it to episodesOf(it).size } }
+        return own.map { (playlist, count) -> playlist.toModel(Access.OWNER, count) }
+    }
+
+    override suspend fun playlist(id: String): PlaylistDetails? {
+        val (playlist, access, items) = mutex.withLock {
+            visiblePlaylist(id)?.let { (playlist, access) -> Triple(playlist, access, episodesOf(playlist).map(::itemOf)) }
+        } ?: return null
+        return PlaylistDetails(playlist.toModel(access, items.size), items)
+    }
+
+    override suspend fun createPlaylist(title: String, description: String?, rules: PlaylistRules?): PlaylistDetails {
+        checkPlaylist(title, rules)
+        val id = mutex.withLock {
+            "pl${nextPlaylist++}".also { playlists += DemoPlaylist(it, ME, title.trim(), description?.trim()?.ifEmpty { null }, rules, createdAt = NOW) }
+        }
+        return playlist(id)!!
+    }
+
+    override suspend fun updatePlaylist(id: String, title: String, description: String?, rules: PlaylistRules?): PlaylistDetails {
+        checkPlaylist(title, rules)
+        changePlaylist(id, ownerOnly = false) {
+            it.copy(title = title.trim(), description = description?.trim()?.ifEmpty { null }, rules = it.rules?.let { current -> rules ?: current })
+        }
+        return playlist(id)!!
+    }
+
+    override suspend fun deletePlaylist(id: String) {
+        mutex.withLock {
+            val (playlist, access) = visiblePlaylist(id) ?: throw ApiException.NotFound("playlist $id")
+            if (access != Access.OWNER) throw forbidden("Only its owner can do that")
+            playlists.remove(playlist)
+            shares.removeAll { it.type == ShareType.PLAYLIST && it.resourceId == id }
+        }
+    }
+
+    override suspend fun addToPlaylist(playlistId: String, episodeId: String, position: Int?) {
+        if (episode(episodeId) == null) throw invalid("episodeId")
+        changeItems(playlistId) { items ->
+            val rest = items - episodeId
+            rest.toMutableList().apply { add(position?.coerceIn(0, rest.size) ?: rest.size, episodeId) }
+        }
+    }
+
+    override suspend fun removeFromPlaylist(playlistId: String, episodeId: String) = changeItems(playlistId) { items ->
+        if (episodeId !in items) throw ApiException.NotFound("episode $episodeId in playlist $playlistId")
+        items - episodeId
+    }
+
+    override suspend fun moveInPlaylist(playlistId: String, episodeId: String, position: Int) = changeItems(playlistId) { items ->
+        if (episodeId !in items) throw ApiException.NotFound("episode $episodeId in playlist $playlistId")
+        val rest = items - episodeId
+        rest.toMutableList().apply { add(position.coerceIn(0, rest.size), episodeId) }
+    }
+
+    override suspend fun shufflePlaylist(id: String): PlaylistDetails {
+        changePlaylist(id, ownerOnly = false) {
+            if (it.rules?.order != PlaylistOrder.RANDOM) throw ApiException.Rejected(409, null, "Only a dynamic playlist in random order is shuffled")
+            it.copy(seed = Random.nextInt(1, 1_000_000))
+        }
+        return playlist(id)!!
+    }
+
+    /** The demo publishes nothing: the address only looks like one. */
+    override suspend fun publishFeed(playlistId: String): String {
+        val url = mutex.withLock { "https://podcast.example/feeds/demo-$playlistId-${nextFeed++}" }
+        changePlaylist(playlistId, ownerOnly = true) { it.copy(feedUrl = url) }
+        return url
+    }
+
+    override suspend fun unpublishFeed(playlistId: String) = changePlaylist(playlistId, ownerOnly = true) { it.copy(feedUrl = null) }
+
     // --- Helpers ---
+
+    /** The playlist if the demo user may read it, with their access (in the lock). */
+    private fun visiblePlaylist(id: String): Pair<DemoPlaylist, Access>? {
+        val playlist = playlists.find { it.id == id } ?: return null
+        if (playlist.ownerId == ME) return playlist to Access.OWNER
+        val share = shares.find { it.type == ShareType.PLAYLIST && it.resourceId == id && it.granteeId == ME } ?: return null
+        return playlist to if (share.permission == SharePermission.WRITE) Access.WRITE else Access.READ
+    }
+
+    /** Its episodes (in the lock): a static playlist's items, or what its rules select on its owner's library. */
+    private fun episodesOf(playlist: DemoPlaylist): List<Episode> {
+        val rules = playlist.rules ?: return playlist.items.mapNotNull { id -> episodes.find { it.id == id } }
+        val followed = subscriptions.filter { it.ownerId == playlist.ownerId }.map { it.podcastId }.toSet()
+        val selected = episodes.filter { episode ->
+            val podcast = podcasts.first { it.id == episode.podcastId }
+            val texts = listOf(episode.title, episode.description, podcast.title)
+            episode.podcastId in followed &&
+                (rules.keywords.isEmpty() || rules.keywords.any { keyword -> texts.any { it.contains(keyword, ignoreCase = true) } }) &&
+                (!rules.favoritesOnly || episode.favorite) &&
+                (episode.rating ?: 0) >= rules.minRating &&
+                (!rules.unplayedOnly || episode.status != EpisodeStatus.PLAYED)
+        }
+        val ordered = when (rules.order) {
+            PlaylistOrder.NEWEST -> selected
+            PlaylistOrder.OLDEST -> selected.reversed()
+            PlaylistOrder.RANDOM -> selected.shuffled(Random(playlist.seed))
+        }
+        return ordered.take(rules.limit)
+    }
+
+    private suspend fun DemoPlaylist.toModel(access: Access, count: Int) = Playlist(
+        id = id,
+        title = title,
+        description = description,
+        kind = if (rules == null) PlaylistKind.STATIC else PlaylistKind.DYNAMIC,
+        rules = rules,
+        episodeCount = count,
+        access = access,
+        ownerName = if (ownerId == ME) null else accounts.user(ownerId)?.displayName,
+        createdAt = createdAt,
+        feedUrl = feedUrl.takeIf { ownerId == ME },
+    )
+
+    /** Changes the playlist if the demo user may: modify it, or only as its owner. */
+    private suspend fun changePlaylist(id: String, ownerOnly: Boolean, change: (DemoPlaylist) -> DemoPlaylist) {
+        mutex.withLock {
+            val (playlist, access) = visiblePlaylist(id) ?: throw ApiException.NotFound("playlist $id")
+            if (access == Access.READ || (ownerOnly && access != Access.OWNER)) throw forbidden("This playlist is shared with you read-only")
+            playlists[playlists.indexOf(playlist)] = change(playlist)
+        }
+    }
+
+    private suspend fun changeItems(playlistId: String, change: (List<String>) -> List<String>) = changePlaylist(playlistId, ownerOnly = false) {
+        if (it.rules != null) throw ApiException.Rejected(409, null, "A dynamic playlist is computed from its rules")
+        it.copy(items = change(it.items))
+    }
+
+    private suspend fun ownPlaylist(id: String) {
+        val access = mutex.withLock { visiblePlaylist(id)?.second } ?: throw ApiException.NotFound("playlist $id")
+        if (access != Access.OWNER) throw forbidden("Only its owner can do that")
+    }
+
+    private fun checkPlaylist(title: String, rules: PlaylistRules?) {
+        val errors = buildList {
+            if (!PlaylistLimits.validTitle(title)) add(FieldError("title", "invalid"))
+            rules?.let { PlaylistLimits.invalidFields(it).forEach { field -> add(FieldError(field, "invalid")) } }
+        }
+        if (errors.isNotEmpty()) throw ApiException.Rejected(422, null, "Invalid playlist", errors)
+    }
+
+    private fun invalid(field: String) = ApiException.Rejected(422, null, "Invalid $field", listOf(FieldError(field, "invalid")))
 
     /** The subscription if the demo user may read it, with what they may do with it. */
     private fun visibleSubscription(id: String): Pair<Followed, Access>? {

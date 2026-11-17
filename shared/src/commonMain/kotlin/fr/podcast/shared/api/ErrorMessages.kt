@@ -2,6 +2,8 @@ package fr.podcast.shared.api
 
 import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.model.AccountRules
+import fr.podcast.shared.model.PlaylistLimits
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.ShareRules
 
 /** What to tell the user about a failure, in their language. */
@@ -18,7 +20,7 @@ fun Throwable.userMessage(strings: Strings): String = when (this) {
         "not-an-opml" -> strings.notAnOpml
         "search-failed" -> strings.searchFailed
         else -> when {
-            status == 403 -> strings.notAllowed
+            status == 403 || status == 409 -> strings.notAllowed
             errors.isNotEmpty() -> errors.first().userMessage(strings)
             else -> strings.loadingError
         }
@@ -36,5 +38,7 @@ fun FieldError.userMessage(strings: Strings): String = when (field) {
     "userId" -> strings.noSuchUser
     "message" -> strings.messageTooLong(ShareRules.MAX_MESSAGE_LENGTH)
     "feedUrl" -> strings.notAFeed
+    "title" -> strings.playlistTitleInvalid(PlaylistLimits.MAX_TITLE_LENGTH)
+    "keywords" -> strings.keywordsInvalid(PlaylistRules.MAX_KEYWORDS, PlaylistRules.MAX_KEYWORD_LENGTH)
     else -> strings.loadingError
 }
