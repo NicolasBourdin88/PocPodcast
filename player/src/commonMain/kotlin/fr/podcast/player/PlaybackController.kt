@@ -144,6 +144,16 @@ class PlaybackController(
 
     fun enqueue(episodeId: String, next: Boolean = false) = queueChange { it.enqueue(episodeId, if (next) 0 else null) }
 
+    /**
+     * Plays a list (a playlist, ADR 0010): the first episode now, the others first in the queue, in
+     * order, before what was already there.
+     */
+    fun playAll(episodeIds: List<String>) {
+        val first = episodeIds.firstOrNull() ?: return
+        queueChange { client -> episodeIds.drop(1).forEachIndexed { index, id -> client.enqueue(id, index) } }
+        play(first)
+    }
+
     fun dequeue(episodeId: String) = queueChange { it.dequeue(episodeId) }
 
     fun moveInQueue(episodeId: String, position: Int) = queueChange { it.moveInQueue(episodeId, position) }

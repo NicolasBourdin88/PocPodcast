@@ -97,6 +97,17 @@ class PlaybackControllerTest {
     }
 
     @Test
+    fun aPlaylistPlaysInItsOrderBeforeTheQueue() = runTest {
+        repository.enqueue("e4")
+        val controller = controller()
+
+        controller.playAll(listOf("e5", "e1", "e3"))
+        runCurrent()
+        assertEquals("e5", controller.nowPlaying.value!!.item.episode.id)
+        assertEquals(listOf("e1", "e3", "e4"), controller.queue.value.map { it.episode.id })
+    }
+
+    @Test
     fun theNextEpisodeOfTheQueueFollows() = runTest {
         repository.enqueue("e3")
         val controller = controller()
