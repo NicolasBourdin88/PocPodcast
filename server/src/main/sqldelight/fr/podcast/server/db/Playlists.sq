@@ -1,0 +1,76 @@
+-- Playlists (ADR 0010). Their episodes are read by Episodes.sq (staticPlaylistEpisodes,
+-- dynamicPlaylistEpisodes), with the same columns as every episode.
+-- Every playlist query below returns the same columns, so a single mapper builds a playlist.
+
+playlistById:
+SELECT p.id, p.owner_id, u.display_name AS owner_name, p.title, p.description, p.kind,
+       p.keywords, p.favorites_only, p.min_rating, p.unplayed_only, p.sort_order, p.max_episodes, p.shuffle_seed,
+       p.created_at, f.secret AS feed_secret,
+       (SELECT count(*) FROM playlist_items i WHERE i.playlist_id = p.id) AS item_count
+FROM playlists p
+JOIN users u ON u.id = p.owner_id
+LEFT JOIN playlist_feeds f ON f.playlist_id = p.id
+WHERE p.id = :id;
+
+playlistsOfOwner:
+SELECT p.id, p.owner_id, u.display_name AS owner_name, p.title, p.description, p.kind,
+       p.keywords, p.favorites_only, p.min_rating, p.unplayed_only, p.sort_order, p.max_episodes, p.shuffle_seed,
+       p.created_at, f.secret AS feed_secret,
+       (SELECT count(*) FROM playlist_items i WHERE i.playlist_id = p.id) AS item_count
+FROM playlists p
+JOIN users u ON u.id = p.owner_id
+LEFT JOIN playlist_feeds f ON f.playlist_id = p.id
+WHERE p.owner_id = :ownerId
+ORDER BY lower(p.title), p.id;
+
+playlistByFeedSecret:
+SELECT p.id, p.owner_id, u.display_name AS owner_name, p.title, p.description, p.kind,
+       p.keywords, p.favorites_only, p.min_rating, p.unplayed_only, p.sort_order, p.max_episodes, p.shuffle_seed,
+       p.created_at, f.secret AS feed_secret,
+       (SELECT count(*) FROM playlist_items i WHERE i.playlist_id = p.id) AS item_count
+FROM playlist_feeds f
+JOIN playlists p ON p.id = f.playlist_id
+JOIN users u ON u.id = p.owner_id
+WHERE f.secret = :secret;
+
+insertPlaylist:
+INSERT INTO playlists(owner_id, title, description, kind, keywords, favorites_only, min_rating, unplayed_only, sort_order, max_episodes, shuffle_seed)
+VALUES (:ownerId, :title, :description, :kind, :keywords, :favoritesOnly, :minRating, :unplayedOnly, :sortOrder, :maxEpisodes, :shuffleSeed)
+RETURNING id;
+
+updatePlaylist:
+UPDATE playlists
+SET title = :title, description = :description, keywords = :keywords, favorites_only = :favoritesOnly,
+    min_rating = :minRating, unplayed_only = :unplayedOnly, sort_order = :sortOrder, max_episodes = :maxEpisodes,
+    updated_at = now()
+WHERE id = :id;
+
+setShuffleSeed:
+UPDATE playlists SET shuffle_seed = :seed, updated_at = now() WHERE id = :id;
+
+deletePlaylist:
+DELETE FROM playlists WHERE id = :id;
+
+-- Items of a static playlist, in order. Positions are rewritten 0, 1, 2… after every change.
+playlistItemIds:
+SELECT episode_id FROM playlist_items WHERE playlist_id = :playlistId ORDER BY position, added_at;
+
+insertPlaylistItem:
+INSERT INTO playlist_items(playlist_id, episode_id, position) VALUES (:playlistId, :episodeId, :position);
+
+setPlaylistItemPosition:
+UPDATE playlist_items SET position = :position WHERE playlist_id = :playlistId AND episode_id = :episodeId;
+
+deletePlaylistItem:
+DELETE FROM playlist_items WHERE playlist_id = :playlistId AND episode_id = :episodeId;
+
+touchPlaylist:
+UPDATE playlists SET updated_at = now() WHERE id = :id;
+
+-- The feed address: a new secret replaces the old one, which stops working (ADR 0005).
+setFeedSecret:
+INSERT INTO playlist_feeds(playlist_id, secret) VALUES (:playlistId, :secret)
+ON CONFLICT (playlist_id) DO UPDATE SET secret = excluded.secret, created_at = now();
+
+deleteFeed:
+DELETE FROM playlist_feeds WHERE playlist_id = :playlistId;

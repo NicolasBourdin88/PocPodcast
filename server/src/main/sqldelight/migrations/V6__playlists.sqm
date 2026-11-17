@@ -1,0 +1,40 @@
+-- Step 7: playlists (ADR 0010). A static playlist lists episodes in the order its users chose;
+-- a dynamic one keeps rules and is computed on its owner's subscriptions and marks.
+CREATE TABLE playlists (
+    id BIGSERIAL PRIMARY KEY,
+    owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    kind TEXT NOT NULL CHECK (kind IN ('STATIC', 'DYNAMIC')),
+    -- The rules of a dynamic playlist (ignored for a static one).
+    keywords TEXT NOT NULL DEFAULT '',
+    favorites_only BOOLEAN NOT NULL DEFAULT FALSE,
+    min_rating INTEGER NOT NULL DEFAULT 0 CHECK (min_rating BETWEEN 0 AND 5),
+    unplayed_only BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order TEXT NOT NULL DEFAULT 'NEWEST' CHECK (sort_order IN ('NEWEST', 'OLDEST', 'RANDOM')),
+    max_episodes INTEGER NOT NULL DEFAULT 50 CHECK (max_episodes BETWEEN 1 AND 100),
+    -- RANDOM order: stable until the playlist is shuffled again.
+    shuffle_seed INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX playlists_by_owner ON playlists(owner_id);
+
+CREATE TABLE playlist_items (
+    playlist_id BIGINT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    episode_id BIGINT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL CHECK (position >= 0),
+    added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (playlist_id, episode_id)
+);
+
+-- The purge looks episodes up here: a file in a static playlist is never purged.
+CREATE INDEX playlist_items_by_episode ON playlist_items(episode_id);
+
+-- The secret address of a playlist's RSS feed, once its owner publishes it (ADR 0005, 0010).
+CREATE TABLE playlist_feeds (
+    playlist_id BIGINT PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
+    secret TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

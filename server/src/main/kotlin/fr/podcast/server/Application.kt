@@ -5,8 +5,10 @@ import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
 import fr.podcast.server.api.searchRoutes
 import fr.podcast.server.api.shareRoutes
+import fr.podcast.server.api.playlistRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
+import fr.podcast.server.catalog.Playlists
 import fr.podcast.server.catalog.Sharing
 import fr.podcast.server.auth.LoginThrottle
 import fr.podcast.server.auth.Role
@@ -117,6 +119,7 @@ class ServerServices(
     val accounts = Accounts(database)
     val loginThrottle = LoginThrottle()
     val sharing = Sharing(database)
+    val playlists = Playlists(database)
     val guard = UrlGuard(config.allowPrivateFeeds)
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
@@ -204,6 +207,7 @@ fun Application.module(services: ServerServices) {
         queueRoutes(services)
         accountRoutes(services)
         shareRoutes(services)
+        playlistRoutes(services)
         searchRoutes(services)
         webRoutes(database, services.accounts, services.audioLinks, services.loginThrottle)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")

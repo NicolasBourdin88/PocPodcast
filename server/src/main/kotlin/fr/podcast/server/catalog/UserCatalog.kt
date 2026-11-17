@@ -280,7 +280,7 @@ internal fun podcast(
 
 // Every episode query returns the same columns (see Episodes.sq).
 @Suppress("FunctionParameterNaming", "UnusedParameter")
-private fun episodeItem(
+internal fun episodeItem(
     id: Long, podcast_id: Long, title: String, description: String, published_at: OffsetDateTime, duration_seconds: Int,
     chapters_url: String?, chapters_type: String?, file_status: String,
     podcast_title: String, podcast_author: String, podcast_description: String, podcast_feed_url: String, podcast_artwork_url: String?,

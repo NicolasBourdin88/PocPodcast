@@ -4,6 +4,10 @@ import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.Playlist
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistOrder
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SubscriptionItem
 import io.ktor.http.HttpMethod
@@ -212,6 +216,61 @@ object Affordances {
             )
         }
     }
+
+    /** The rules of a dynamic playlist (ADR 0010), filled with [rules]; `keywords` are separated by commas. */
+    private fun ruleProperties(rules: PlaylistRules) = listOf(
+        AffordanceProperty("keywords", value = JsonPrimitive(rules.keywords.joinToString(", "))),
+        AffordanceProperty("favoritesOnly", type = "checkbox", value = JsonPrimitive(rules.favoritesOnly)),
+        AffordanceProperty("minRating", type = "number", value = JsonPrimitive(rules.minRating), min = 0, max = 5),
+        AffordanceProperty("unplayedOnly", type = "checkbox", value = JsonPrimitive(rules.unplayedOnly)),
+        AffordanceProperty("order", value = JsonPrimitive(rules.order.name), options = PlaylistOrder.entries.map { it.name }),
+        AffordanceProperty("limit", type = "number", value = JsonPrimitive(rules.limit), min = 1, max = PlaylistRules.MAX_LIMIT),
+    )
+
+    /** A static playlist, or a dynamic one with its rules (the rules are ignored for a static one). */
+    val createPlaylist = Affordance(
+        "create-playlist", HttpMethod.Post, "/playlists",
+        listOf(
+            AffordanceProperty("title", required = true),
+            AffordanceProperty("description", type = "textarea"),
+            AffordanceProperty("kind", value = JsonPrimitive(PlaylistKind.STATIC.name), options = PlaylistKind.entries.map { it.name }),
+        ) + ruleProperties(PlaylistRules()),
+    )
+
+    /**
+     * By the viewer's rights (ADR 0010): `update-playlist` (title, description and rules) for whoever
+     * may modify it, with `add-episode` on a static playlist and `shuffle` on a RANDOM one;
+     * `delete-playlist` for its owner.
+     */
+    fun forPlaylist(playlist: Playlist, canModify: Boolean, owner: Boolean): List<Affordance> = buildList {
+        val id = playlist.id
+        if (canModify) {
+            val fields = listOf(
+                AffordanceProperty("title", value = JsonPrimitive(playlist.title)),
+                AffordanceProperty("description", type = "textarea", value = JsonPrimitive(playlist.description)),
+            )
+            add(Affordance("update-playlist", HttpMethod.Patch, "/playlists/$id", fields + playlist.rules?.let(::ruleProperties).orEmpty()))
+            if (playlist.kind == PlaylistKind.STATIC) {
+                add(
+                    Affordance(
+                        "add-episode", HttpMethod.Post, "/playlists/$id/episodes",
+                        listOf(AffordanceProperty("episodeId", required = true), AffordanceProperty("position", type = "number", min = 0)),
+                    ),
+                )
+            }
+            if (playlist.rules?.order == PlaylistOrder.RANDOM) add(Affordance("shuffle", HttpMethod.Post, "/playlists/$id/shuffle"))
+        }
+        if (owner) add(Affordance("delete-playlist", HttpMethod.Delete, "/playlists/$id"))
+    }
+
+    /** On each episode of a static playlist the viewer may modify. */
+    fun inPlaylist(playlistId: String, episodeId: String) = listOf(
+        Affordance("remove-from-playlist", HttpMethod.Delete, "/playlists/$playlistId/episodes/$episodeId"),
+        Affordance(
+            "move-in-playlist", HttpMethod.Put, "/playlists/$playlistId/episodes/$episodeId",
+            listOf(AffordanceProperty("position", type = "number", required = true, min = 0)),
+        ),
+    )
 
     fun forPodcast(podcast: Podcast): List<Affordance> =
         listOf(Affordance("refresh", HttpMethod.Post, "/podcasts/${podcast.id}/refresh"))

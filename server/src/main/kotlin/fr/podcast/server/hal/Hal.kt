@@ -9,6 +9,7 @@ import fr.podcast.server.auth.can
 import fr.podcast.server.catalog.ShareRecord
 import fr.podcast.server.catalog.SharedEntry
 import fr.podcast.server.catalog.Page
+import fr.podcast.server.catalog.PlaylistView
 import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.search.SearchHit
 import fr.podcast.server.search.normalizedFeed
@@ -20,6 +21,8 @@ import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.Share
 import fr.podcast.shared.model.ShareType
 import fr.podcast.shared.model.OpmlImportReport
+import fr.podcast.shared.model.Playlist
+import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
 import fr.podcast.shared.model.Subscription
@@ -104,6 +107,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "queue" to "/queue",
             "users" to "/users",
             "shared" to "/shared",
+            "playlists" to "/playlists",
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
@@ -254,8 +258,11 @@ fun subscriptionCollection(items: List<SubscriptionItem>, forms: Boolean): JsonO
     templates(forms, listOf(Affordances.subscribe))
 }
 
-/** An episode; its `audio` link is signed, for players that cannot send credentials (ADR 0008). */
-fun episodeResource(item: EpisodeItem, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
+/**
+ * An episode; its `audio` link is signed, for players that cannot send credentials (ADR 0008).
+ * [extra] adds actions that depend on where it is shown (in a playlist…).
+ */
+fun episodeResource(item: EpisodeItem, forms: Boolean, audio: AudioLinks, extra: List<Affordance> = emptyList()): JsonObject = buildJsonObject {
     val episode: Episode = item.episode
     fields(Episode.serializer(), episode)
     links(
@@ -269,7 +276,46 @@ fun episodeResource(item: EpisodeItem, forms: Boolean, audio: AudioLinks): JsonO
         multiple = mapOf("transcript" to episode.transcripts.map { Link(it.url, it.type, it.language) }),
     )
     putJsonObject("_embedded") { put("podcast", podcastResource(item.podcast)) }
-    templates(forms, Affordances.forEpisode(episode))
+    templates(forms, Affordances.forEpisode(episode) + extra)
+}
+
+/**
+ * A playlist as [viewer] sees it (ADR 0010); with [episodes], its content, each episode with the
+ * viewer's own state, and in a static playlist they may modify, its `remove-from-playlist` and
+ * `move-in-playlist` templates.
+ */
+fun playlistResource(view: PlaylistView, viewer: UserAccount, forms: Boolean, audio: AudioLinks, episodes: List<EpisodeItem>? = null): JsonObject =
+    buildJsonObject {
+        val playlist: Playlist = view.playlist
+        val canModify = viewer.can(Action.MODIFY, view.ownerId, view.permission)
+        val owner = viewer.can(Action.SHARE, view.ownerId, view.permission)
+        fields(Playlist.serializer(), playlist)
+        links("self" to "/playlists/${playlist.id}")
+        episodes?.let { items ->
+            val editable = canModify && playlist.kind == PlaylistKind.STATIC
+            putJsonObject("_embedded") {
+                put(
+                    "episodes",
+                    buildJsonArray {
+                        items.forEach { item ->
+                            val extra = if (editable) Affordances.inPlaylist(playlist.id, item.episode.id) else emptyList()
+                            add(episodeResource(item, forms, audio, extra))
+                        }
+                    },
+                )
+            }
+        }
+        templates(forms, Affordances.forPlaylist(playlist, canModify, owner))
+    }
+
+/** The user's own playlists; those shared with them are in /shared. */
+fun playlistCollection(views: List<PlaylistView>, viewer: UserAccount, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
+    put("count", views.size)
+    links("self" to "/playlists")
+    putJsonObject("_embedded") {
+        put("playlists", buildJsonArray { views.forEach { add(playlistResource(it, viewer, forms, audio)) } })
+    }
+    templates(forms, listOf(Affordances.createPlaylist))
 }
 
 /** A page of episodes; [path] plus [query] (without paging) rebuild the page links. */

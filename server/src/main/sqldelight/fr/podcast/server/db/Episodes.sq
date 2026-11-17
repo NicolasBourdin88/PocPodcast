@@ -116,3 +116,45 @@ INSERT INTO playback_states(user_id, episode_id, status, rating)
 VALUES (:userId, :episodeId, 'NEW', :rating)
 ON CONFLICT (user_id, episode_id) DO UPDATE
 SET rating = excluded.rating;
+
+-- The episodes of a static playlist, in its order, as [viewerId] sees them.
+staticPlaylistEpisodes:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.chapters_url, d.chapters_type, d.file_status,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
+       q.position AS queue_position
+FROM playlist_items i
+JOIN episode_details d ON d.id = i.episode_id
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :viewerId
+LEFT JOIN queue_items q ON q.episode_id = d.id AND q.user_id = :viewerId
+WHERE i.playlist_id = :playlistId
+ORDER BY i.position, i.added_at;
+
+-- A dynamic playlist (ADR 0010): its owner's subscriptions, filtered on the owner's marks, as
+-- [viewerId] sees them. :keywordPattern is a case-insensitive regular expression ('' = any);
+-- RANDOM orders by a hash of the episode id and :seed, so the order holds until the next shuffle.
+dynamicPlaylistEpisodes:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.chapters_url, d.chapters_type, d.file_status,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
+       q.position AS queue_position
+FROM episode_details d
+JOIN subscriptions sub ON sub.podcast_id = d.podcast_id AND sub.user_id = :ownerId
+LEFT JOIN playback_states o ON o.episode_id = d.id AND o.user_id = :ownerId
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :viewerId
+LEFT JOIN queue_items q ON q.episode_id = d.id AND q.user_id = :viewerId
+WHERE (:keywordPattern = '' OR d.title ~* :keywordPattern OR d.description ~* :keywordPattern OR d.podcast_title ~* :keywordPattern)
+  AND (:favoritesOnly = FALSE OR COALESCE(o.favorite, FALSE))
+  AND COALESCE(o.rating, 0) >= :minRating
+  AND (:unplayedOnly = FALSE OR COALESCE(o.status, 'NEW') <> 'PLAYED')
+ORDER BY
+  CASE WHEN :sortOrder = 'RANDOM' THEN (d.id * :seed) % 1000003 ELSE 0 END,
+  CASE WHEN :sortOrder = 'OLDEST' THEN d.published_at END ASC,
+  d.published_at DESC, d.id DESC
+LIMIT :limit;

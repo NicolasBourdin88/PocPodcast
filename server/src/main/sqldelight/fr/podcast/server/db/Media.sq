@@ -54,8 +54,8 @@ FROM media_files
 WHERE episode_id = :episodeId AND status = 'READY' AND storage_path IS NOT NULL;
 
 -- Files that may be purged, oldest first. Never purged: kept episodes, episodes someone
--- listened to recently (still in progress) and queued episodes. Playlists (step 7) will be
--- excluded here too.
+-- listened to recently (still in progress), queued episodes and episodes of a static playlist
+-- (a dynamic one is recomputed: its episodes follow the other rules, ADR 0010).
 purgeCandidates:
 SELECT f.episode_id, f.storage_path, f.size_bytes, f.downloaded_at
 FROM media_files f
@@ -66,6 +66,7 @@ WHERE f.status = 'READY'
         AND (s.kept OR (s.status = 'IN_PROGRESS' AND s.updated_at > :activeSince))
   )
   AND NOT EXISTS (SELECT 1 FROM queue_items q WHERE q.episode_id = f.episode_id)
+  AND NOT EXISTS (SELECT 1 FROM playlist_items i WHERE i.episode_id = f.episode_id)
 ORDER BY f.downloaded_at, f.episode_id;
 
 totalReadyBytes:

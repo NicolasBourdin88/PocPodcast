@@ -24,6 +24,7 @@ tags:
   - name: file d'attente
   - name: comptes
   - name: partages
+  - name: playlists
 security:
   - bearer: []
   - session: []
@@ -950,6 +951,181 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /playlists:
+    get:
+      tags: [playlists]
+      operationId: listPlaylists
+      summary: Playlists de l'utilisateur (celles partagées avec lui sont dans `/shared`)
+      responses:
+        "200":
+          description: Playlists, par titre
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/PlaylistCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/PlaylistCollection" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [playlists]
+      operationId: createPlaylist
+      summary: Créer une playlist statique, ou dynamique avec ses règles (template `create-playlist`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistCreate" }
+      responses:
+        "201":
+          description: Playlist créée, avec ses épisodes
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /playlists/{playlistId}:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+    get:
+      tags: [playlists]
+      operationId: getPlaylist
+      summary: Une playlist et ses épisodes, avec l'état d'écoute de l'utilisateur
+      description: |
+        Une playlist dynamique est calculée sur les abonnements et les marques (favoris, notes,
+        statuts) de son propriétaire, quel que soit celui qui la lit (ADR 0010).
+      responses:
+        "200":
+          description: Playlist
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [playlists]
+      operationId: updatePlaylist
+      summary: Renommer la playlist, changer sa description ou ses règles (template `update-playlist`)
+      description: Les champs absents gardent leur valeur ; le type ne change pas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistUpdate" }
+      responses:
+        "200":
+          description: Playlist modifiée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [playlists]
+      operationId: deletePlaylist
+      summary: Supprimer la playlist, avec ses partages (template `delete-playlist`)
+      responses:
+        "204": { description: Playlist supprimée }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playlists/{playlistId}/episodes:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+    post:
+      tags: [playlists]
+      operationId: addToPlaylist
+      summary: Ajouter un épisode à une playlist statique (template `add-episode`)
+      description: À la `position` donnée (0 = en premier), sinon à la fin ; un épisode déjà présent y est déplacé.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistEpisodeAdd" }
+      responses:
+        "200":
+          description: Playlist modifiée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /playlists/{playlistId}/episodes/{episodeId}:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [playlists]
+      operationId: moveInPlaylist
+      summary: Déplacer un épisode dans une playlist statique (template `move-in-playlist`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueueMove" }
+      responses:
+        "200":
+          description: Playlist modifiée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [playlists]
+      operationId: removeFromPlaylist
+      summary: Retirer un épisode d'une playlist statique (template `remove-from-playlist`)
+      responses:
+        "204": { description: Épisode retiré }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /playlists/{playlistId}/shuffle:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+    post:
+      tags: [playlists]
+      operationId: shufflePlaylist
+      summary: Mélanger de nouveau une playlist dynamique en ordre aléatoire (template `shuffle`)
+      description: L'ordre aléatoire reste le même d'une lecture à l'autre jusqu'au prochain mélange.
+      responses:
+        "200":
+          description: Playlist mélangée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
 components:
   securitySchemes:
     bearer:
@@ -1001,6 +1177,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    playlistId:
+      name: playlistId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -1037,6 +1218,13 @@ components:
         `/problems/forbidden-feed-address` (réseau privé, protection SSRF),
         `/problems/feed-unreachable`, `/problems/not-a-feed` (pas un flux RSS),
         `/problems/feed-too-large`. Un champ `feedUrl` vide donne un 422 sans `type` particulier.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: |
+        Action impossible dans l'état de la ressource : changer un à un les épisodes d'une playlist
+        dynamique (ils sont calculés), mélanger une playlist qui n'est pas en ordre aléatoire.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1133,6 +1321,7 @@ components:
             queue: { $ref: "#/components/schemas/Link" }
             users: { $ref: "#/components/schemas/Link" }
             shared: { $ref: "#/components/schemas/Link" }
+            playlists: { $ref: "#/components/schemas/Link" }
             episodes: { $ref: "#/components/schemas/Link" }
             episode:
               description: "Gabarit `/episodes/{id}` : un épisode à partir de son identifiant."
@@ -1642,6 +1831,154 @@ components:
         autoDownload: { type: boolean }
       additionalProperties: false
 
+    PlaylistRules:
+      description: |
+        Règles d'une playlist dynamique (ADR 0010), évaluées sur les abonnements et les marques de son
+        propriétaire. Un épisode correspond si son titre, sa description ou son podcast contient l'un des
+        mots-clés (sans tenir compte de la casse) ; sans mot-clé, tout épisode correspond.
+      type: object
+      required: [keywords, favoritesOnly, minRating, unplayedOnly, order, limit]
+      properties:
+        keywords:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 50 }
+        favoritesOnly: { type: boolean }
+        minRating: { type: integer, minimum: 0, maximum: 5, description: "0 : toute note, même aucune." }
+        unplayedOnly: { type: boolean, description: Laisse de côté les épisodes écoutés. }
+        order:
+          type: string
+          enum: [NEWEST, OLDEST, RANDOM]
+          description: "`RANDOM` reste le même jusqu'au prochain `shuffle`."
+        limit: { type: integer, minimum: 1, maximum: 100 }
+      additionalProperties: false
+
+    Playlist:
+      description: Une playlist telle que la voit l'utilisateur connecté (ADR 0010).
+      type: object
+      required: [id, title, description, kind, rules, episodeCount, access, ownerName, createdAt, _links]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: [string, "null"] }
+        kind:
+          type: string
+          enum: [STATIC, DYNAMIC]
+          description: "`STATIC` : épisodes dans l'ordre choisi ; `DYNAMIC` : calculée à partir de `rules`."
+        rules:
+          description: Règles d'une playlist dynamique ; `null` pour une playlist statique.
+          oneOf:
+            - $ref: "#/components/schemas/PlaylistRules"
+            - type: "null"
+        episodeCount: { type: integer, minimum: 0 }
+        access:
+          description: "Droits de l'utilisateur : `OWNER` (la sienne, ou administrateur), `WRITE` ou `READ` (partagée avec lui)."
+          type: string
+          enum: [OWNER, WRITE, READ]
+        ownerName: { type: [string, "null"], description: "Qui l'a partagée ; null pour ses propres playlists." }
+        createdAt: { type: string, format: date-time }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          description: "Ses épisodes, dans une représentation de la playlist seule (pas dans une collection)."
+          type: object
+          required: [episodes]
+          properties:
+            episodes:
+              type: array
+              items: { $ref: "#/components/schemas/Episode" }
+          additionalProperties: false
+        _templates:
+          description: |
+            Selon les droits de l'utilisateur : `update-playlist` s'il peut la modifier, avec `add-episode`
+            pour une playlist statique et `shuffle` pour une playlist en ordre aléatoire ; `delete-playlist`
+            pour son propriétaire.
+          type: object
+          properties:
+            update-playlist: { $ref: "#/components/schemas/Template" }
+            add-episode: { $ref: "#/components/schemas/Template" }
+            shuffle: { $ref: "#/components/schemas/Template" }
+            delete-playlist: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    PlaylistCollection:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [playlists]
+          properties:
+            playlists:
+              type: array
+              items: { $ref: "#/components/schemas/Playlist" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            create-playlist: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    PlaylistCreate:
+      description: Les règles ne servent qu'à une playlist `DYNAMIC`.
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, "null"], maxLength: 500 }
+        kind: { type: string, enum: [STATIC, DYNAMIC], default: STATIC }
+        keywords:
+          description: Mots-clés séparés par des virgules, ou en tableau.
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        favoritesOnly: { type: boolean }
+        minRating: { type: integer, minimum: 0, maximum: 5 }
+        unplayedOnly: { type: boolean }
+        order: { type: string, enum: [NEWEST, OLDEST, RANDOM] }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+      additionalProperties: false
+
+    PlaylistUpdate:
+      description: Les champs absents gardent leur valeur.
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, "null"], maxLength: 500 }
+        keywords:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        favoritesOnly: { type: boolean }
+        minRating: { type: integer, minimum: 0, maximum: 5 }
+        unplayedOnly: { type: boolean }
+        order: { type: string, enum: [NEWEST, OLDEST, RANDOM] }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+      additionalProperties: false
+
+    PlaylistEpisodeAdd:
+      type: object
+      required: [episodeId]
+      properties:
+        episodeId: { type: string }
+        position: { type: [integer, "null"], minimum: 0, description: "0 : en premier ; absente : à la fin." }
+      additionalProperties: false
+
     RatingUpdate:
       type: object
       required: [rating]
@@ -1716,7 +2053,8 @@ components:
             `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`, `favorite` ou `unfavorite`
             selon `favorite`, `rate` toujours et `clear-rating` s'il est noté,
             `download` tant que le serveur n'a pas le fichier (`NONE` ou `FAILED`),
-            `enqueue` hors de la file, `dequeue` et `move` dans la file.
+            `enqueue` hors de la file, `dequeue` et `move` dans la file ; dans une playlist statique que
+            l'utilisateur peut modifier, `remove-from-playlist` et `move-in-playlist`.
           type: object
           properties:
             update-progress: { $ref: "#/components/schemas/Template" }
@@ -1733,6 +2071,8 @@ components:
             dequeue: { $ref: "#/components/schemas/Template" }
             move: { $ref: "#/components/schemas/Template" }
             recommend: { $ref: "#/components/schemas/Template" }
+            remove-from-playlist: { $ref: "#/components/schemas/Template" }
+            move-in-playlist: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 

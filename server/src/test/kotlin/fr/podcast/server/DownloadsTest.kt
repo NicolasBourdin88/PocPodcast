@@ -126,6 +126,27 @@ class DownloadsTest {
         assertTrue(mediaFile(4, 3).exists())
     }
 
+    @Test
+    fun purgeSparesTheEpisodesOfStaticPlaylists() = testApplication {
+        val services = podcastServer()
+        val token = client.token()
+        downloaded(6, 1, daysAgo = 40)
+        downloaded(7, 4, daysAgo = 40)
+        // Episode 6 in a static playlist; a dynamic playlist (every episode) protects nothing (ADR 0010).
+        suspend fun post(path: String, body: String) = client.post(path) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+        val playlist = post("/playlists", """{"title":"À garder"}""").json()["id"]!!.jsonPrimitive.content
+        post("/playlists/$playlist/episodes", """{"episodeId":"6"}""")
+        post("/playlists", """{"title":"Tout","kind":"DYNAMIC"}""")
+
+        assertEquals(1, runBlocking { services.media.purge(retention = 30.days, maxBytes = null) })
+        assertTrue(mediaFile(1, 6).exists())
+        assertFalse(mediaFile(4, 7).exists())
+    }
+
     private fun downloaded(episode: Int, podcast: Int, daysAgo: Int, size: Int = 1_000) {
         Files.createDirectories(mediaFile(podcast, episode).parent)
         mediaFile(podcast, episode).writeBytes(ByteArray(size))

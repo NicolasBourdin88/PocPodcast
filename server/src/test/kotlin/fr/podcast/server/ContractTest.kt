@@ -285,6 +285,41 @@ class ContractTest {
         check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NoContent, token = bob)
         check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NotFound)
 
+        // Playlists (ADR 0010): 1 static, 2 dynamic in random order, 3 deleted.
+        val playlist = "/playlists/{playlistId}"
+        val items = "/playlists/{playlistId}/episodes"
+        val item = "/playlists/{playlistId}/episodes/{episodeId}"
+        check(get, "/playlists", "/playlists", HttpStatusCode.OK)
+        check(post, "/playlists", "/playlists", HttpStatusCode.Created, body = """{"title":"Pour le train"}""")
+        check(post, "/playlists", "/playlists", HttpStatusCode.Created,
+            body = """{"title":"Surprise","kind":"DYNAMIC","keywords":"kotlin","order":"RANDOM"}""")
+        check(post, "/playlists", "/playlists", HttpStatusCode.UnprocessableEntity, body = """{"title":""}""")
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.OK, body = """{"episodeId":"1"}""")
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.OK, body = """{"episodeId":"2","position":0}""")
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.UnprocessableEntity, body = """{"episodeId":"999"}""")
+        check(post, "/playlists/2/episodes", items, HttpStatusCode.Conflict, body = """{"episodeId":"1"}""")
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.NotFound, token = bob, body = """{"episodeId":"1"}""")
+        check(get, "/playlists", "/playlists", HttpStatusCode.OK) // both
+        check(get, "/playlists/1", playlist, HttpStatusCode.OK) // its episodes, with `remove-from-playlist` and `move-in-playlist`
+        check(get, "/playlists/2", playlist, HttpStatusCode.OK)
+        check(get, "/playlists/1", playlist, HttpStatusCode.NotFound, token = bob)
+        check(put, "/playlists/1/episodes/1", item, HttpStatusCode.OK, body = """{"position":0}""")
+        check(put, "/playlists/1/episodes/1", item, HttpStatusCode.UnprocessableEntity, body = """{"position":-1}""")
+        check(put, "/playlists/1/episodes/9", item, HttpStatusCode.NotFound, body = """{"position":0}""")
+        check(put, "/playlists/2/episodes/1", item, HttpStatusCode.Conflict, body = """{"position":0}""")
+        check(patch, "/playlists/2", playlist, HttpStatusCode.OK, body = """{"keywords":"kotlin, ktor","minRating":0}""")
+        check(patch, "/playlists/2", playlist, HttpStatusCode.UnprocessableEntity, body = """{"limit":500}""")
+        check(patch, "/playlists/999", playlist, HttpStatusCode.NotFound, body = """{"title":"X"}""")
+        check(post, "/playlists/2/shuffle", "/playlists/{playlistId}/shuffle", HttpStatusCode.OK)
+        check(post, "/playlists/1/shuffle", "/playlists/{playlistId}/shuffle", HttpStatusCode.Conflict)
+        check(delete, "/playlists/1/episodes/2", item, HttpStatusCode.NoContent)
+        check(delete, "/playlists/1/episodes/2", item, HttpStatusCode.NotFound)
+        check(delete, "/playlists/2/episodes/1", item, HttpStatusCode.Conflict)
+        check(post, "/playlists", "/playlists", HttpStatusCode.Created, body = """{"title":"Éphémère"}""")
+        check(delete, "/playlists/3", playlist, HttpStatusCode.NotFound, token = bob)
+        check(delete, "/playlists/3", playlist, HttpStatusCode.NoContent)
+        check(delete, "/playlists/3", playlist, HttpStatusCode.NotFound)
+
         // Five wrong passwords for Bob (one above): his sign-ins and password changes wait.
         repeat(4) {
             check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Unauthorized, token = null,
