@@ -80,13 +80,13 @@ class ApiTest {
         val token = client.token()
 
         val fresh = client.getJson("/episodes/1", token)["_templates"]!!.jsonObject
-        assertEquals(setOf("update-progress", "mark-played", "keep", "download", "enqueue"), fresh.keys)
+        assertEquals(setOf("update-progress", "mark-played", "keep", "download", "recommend", "enqueue"), fresh.keys)
 
         assertEquals(HttpStatusCode.NoContent, client.post("/episodes/1/played") { bearerAuth(token) }.status)
 
         val played = client.getJson("/episodes/1", token)
         assertEquals("PLAYED", played["status"]!!.jsonPrimitive.content)
-        assertEquals(setOf("update-progress", "mark-unplayed", "keep", "download", "enqueue"), played["_templates"]!!.jsonObject.keys)
+        assertEquals(setOf("update-progress", "mark-unplayed", "keep", "download", "recommend", "enqueue"), played["_templates"]!!.jsonObject.keys)
 
         // Plain HAL has no actions.
         assertNull(client.getJson("/episodes/1", token, accept = ContentType("application", "hal+json"))["_templates"])
@@ -164,8 +164,9 @@ class ApiTest {
 
         assertEquals(HttpStatusCode.NotFound, client.get("/episodes/999") { bearerAuth(token) }.status)
         assertEquals(HttpStatusCode.NotFound, client.get("/episodes/abc") { bearerAuth(token) }.status)
-        // Bob's subscription is not visible to Alice.
-        assertEquals(HttpStatusCode.NotFound, client.get("/subscriptions/5") { bearerAuth(token) }.status)
+        // Alice's subscription is not visible to Bob (Alice, an administrator, would see Bob's).
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+        assertEquals(HttpStatusCode.NotFound, client.get("/subscriptions/1") { bearerAuth(bob) }.status)
     }
 
     @Test

@@ -138,6 +138,7 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
         val subscriptionId = id.toLongOrNull() ?: return null
         return database.transaction {
             val podcastId = catalogQueries.deleteSubscription(subscriptionId, userId).executeAsOneOrNull() ?: return@transaction null
+            sharesQueries.deleteSharesOfResource("SUBSCRIPTION", subscriptionId)
             queueQueries.removePodcastFromQueue(userId, podcastId)
             renumberQueue()
             if (catalogQueries.countSubscribers(podcastId).executeAsOne() == 0L) podcastId else 0L

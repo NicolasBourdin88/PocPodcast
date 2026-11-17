@@ -1,5 +1,6 @@
 package fr.podcast.server.hal
 
+import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
@@ -104,7 +105,7 @@ object Affordances {
     /**
      * `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new;
      * `keep` or `unkeep` (kept episodes are never purged); `download` until the server has the file;
-     * `enqueue` outside the queue, `dequeue` and `move` inside it.
+     * `recommend` to someone (ADR 0009); `enqueue` outside the queue, `dequeue` and `move` inside it.
      */
     fun forEpisode(episode: Episode): List<Affordance> = buildList {
         add(
@@ -126,6 +127,7 @@ object Affordances {
         if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
             add(Affordance("download", HttpMethod.Post, "/episodes/${episode.id}/download"))
         }
+        add(recommend(episode.id))
         if (episode.inQueue) {
             add(Affordance("dequeue", HttpMethod.Delete, "/queue/${episode.id}"))
             add(Affordance("move", HttpMethod.Put, "/queue/${episode.id}", listOf(AffordanceProperty("position", type = "number", required = true, min = 0))))
@@ -143,17 +145,60 @@ object Affordances {
         }
     }
 
-    /** `update` (note, automatic download) and `unsubscribe`. */
-    fun forSubscription(item: SubscriptionItem): List<Affordance> = listOf(
-        Affordance(
-            "update", HttpMethod.Patch, "/subscriptions/${item.subscription.id}",
-            listOf(
-                AffordanceProperty("note", type = "textarea", value = JsonPrimitive(item.subscription.note)),
-                AffordanceProperty("autoDownload", type = "checkbox", value = JsonPrimitive(item.subscription.autoDownload)),
-            ),
-        ),
-        Affordance("unsubscribe", HttpMethod.Delete, "/subscriptions/${item.subscription.id}"),
+    /**
+     * By the viewer's access (ADR 0009): `update` (note, automatic download) for the owner and a
+     * WRITE share; `unsubscribe` and `share` for the owner; `subscribe` to follow it oneself.
+     */
+    fun forSubscription(item: SubscriptionItem): List<Affordance> = buildList {
+        val subscription = item.subscription
+        if (subscription.access != Access.READ) {
+            add(
+                Affordance(
+                    "update", HttpMethod.Patch, "/subscriptions/${subscription.id}",
+                    listOf(
+                        AffordanceProperty("note", type = "textarea", value = JsonPrimitive(subscription.note)),
+                        AffordanceProperty("autoDownload", type = "checkbox", value = JsonPrimitive(subscription.autoDownload)),
+                    ),
+                ),
+            )
+        }
+        if (subscription.access == Access.OWNER) {
+            add(Affordance("unsubscribe", HttpMethod.Delete, "/subscriptions/${subscription.id}"))
+            add(
+                Affordance(
+                    "share", HttpMethod.Post, "/subscriptions/${subscription.id}/shares",
+                    listOf(
+                        AffordanceProperty("userId", required = true),
+                        AffordanceProperty("permission", value = JsonPrimitive("READ"), options = listOf("READ", "WRITE")),
+                        AffordanceProperty("message", type = "textarea"),
+                    ),
+                ),
+            )
+        }
+        if (subscription.ownerName != null) add(subscribeTo(item.podcast.feedUrl))
+    }
+
+    /** Recommends an episode to someone (a READ share, ADR 0009). */
+    fun recommend(episodeId: String) = Affordance(
+        "recommend", HttpMethod.Post, "/episodes/$episodeId/shares",
+        listOf(AffordanceProperty("userId", required = true), AffordanceProperty("message", type = "textarea")),
     )
+
+    /**
+     * `unshare` for the owner and the grantee (who may decline); `change-permission` for the owner,
+     * except on a recommendation, which stays READ.
+     */
+    fun forShare(shareId: String, canManage: Boolean, recommendation: Boolean, permission: String): List<Affordance> = buildList {
+        add(Affordance("unshare", HttpMethod.Delete, "/shares/$shareId"))
+        if (canManage && !recommendation) {
+            add(
+                Affordance(
+                    "change-permission", HttpMethod.Patch, "/shares/$shareId",
+                    listOf(AffordanceProperty("permission", required = true, value = JsonPrimitive(permission), options = listOf("READ", "WRITE"))),
+                ),
+            )
+        }
+    }
 
     fun forPodcast(podcast: Podcast): List<Affordance> =
         listOf(Affordance("refresh", HttpMethod.Post, "/podcasts/${podcast.id}/refresh"))

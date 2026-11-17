@@ -59,7 +59,7 @@ class SubscriptionsTest {
         val podcast = subscription["_embedded"]!!.jsonObject["podcast"]!!.jsonObject
         assertEquals("Le Podcast de Test", podcast["title"]!!.jsonPrimitive.content)
         assertEquals("OK", podcast["refreshStatus"]!!.jsonPrimitive.content)
-        assertEquals(setOf("update", "unsubscribe"), subscription["_templates"]!!.jsonObject.keys)
+        assertEquals(setOf("update", "unsubscribe", "share"), subscription["_templates"]!!.jsonObject.keys)
 
         // Subscribing again changes nothing; Bob gets his own subscription to the same podcast.
         assertEquals(HttpStatusCode.OK, client.subscribe(alice, "https://feeds.test/podcast20.xml").status)
@@ -110,8 +110,9 @@ class SubscriptionsTest {
         assertEquals(JsonNull, client.patchSubscription(token, "1", """{"note":null}""").json()["note"])
         assertEquals(HttpStatusCode.UnprocessableEntity, client.patchSubscription(token, "1", """{"autoDownload":"maybe"}""").status)
         assertEquals(HttpStatusCode.UnprocessableEntity, client.patchSubscription(token, "1", """{"note":"${"x".repeat(2001)}"}""").status)
-        // Bob's subscription (id 5) does not exist for Alice.
-        assertEquals(HttpStatusCode.NotFound, client.patchSubscription(token, "5", """{"note":"hack"}""").status)
+        // Alice's subscription does not exist for Bob (Alice, an administrator, would see Bob's).
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+        assertEquals(HttpStatusCode.NotFound, client.patchSubscription(bob, "1", """{"note":"hack"}""").status)
     }
 
     @Test

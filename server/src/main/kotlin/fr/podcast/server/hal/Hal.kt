@@ -3,7 +3,11 @@ package fr.podcast.server.hal
 import fr.podcast.server.auth.IssuedToken
 import fr.podcast.server.auth.Device
 import fr.podcast.server.auth.Role
+import fr.podcast.server.auth.Action
 import fr.podcast.server.auth.UserAccount
+import fr.podcast.server.auth.can
+import fr.podcast.server.catalog.ShareRecord
+import fr.podcast.server.catalog.SharedEntry
 import fr.podcast.server.catalog.Page
 import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.search.SearchHit
@@ -11,7 +15,10 @@ import fr.podcast.server.search.normalizedFeed
 import io.ktor.http.encodeURLParameter
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.home.HomeState
+import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Episode
+import fr.podcast.shared.model.Share
+import fr.podcast.shared.model.ShareType
 import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
@@ -96,6 +103,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "subscriptions" to "/subscriptions",
             "queue" to "/queue",
             "users" to "/users",
+            "shared" to "/shared",
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
@@ -175,11 +183,64 @@ fun podcastResource(podcast: Podcast, forms: Boolean = false): JsonObject = buil
     templates(forms, Affordances.forPodcast(podcast))
 }
 
+/** A subscription as the viewer sees it: its templates follow their access (ADR 0009). */
 fun subscriptionResource(item: SubscriptionItem, forms: Boolean): JsonObject = buildJsonObject {
+    val id = item.subscription.id
     fields(Subscription.serializer(), item.subscription)
-    links("self" to "/subscriptions/${item.subscription.id}", "podcast" to "/podcasts/${item.podcast.id}")
+    links(
+        buildList {
+            add("self" to "/subscriptions/$id")
+            add("podcast" to "/podcasts/${item.podcast.id}")
+            if (item.subscription.access == Access.OWNER) add("shares" to "/subscriptions/$id/shares")
+        },
+    )
     putJsonObject("_embedded") { put("podcast", podcastResource(item.podcast)) }
     templates(forms, Affordances.forSubscription(item))
+}
+
+/**
+ * A share; [resource] embeds what is shared, as the viewer sees it. The owner and the grantee may
+ * remove it (`unshare`); the owner may change its permission, except on a recommendation.
+ */
+fun shareResource(record: ShareRecord, viewer: UserAccount, forms: Boolean, resource: JsonObject? = null): JsonObject = buildJsonObject {
+    val share = record.share
+    fields(Share.serializer(), share)
+    val target = when (share.type) {
+        ShareType.SUBSCRIPTION -> "subscription" to "/subscriptions/${record.resourceId}"
+        ShareType.EPISODE -> "episode" to "/episodes/${record.resourceId}"
+        ShareType.PLAYLIST -> "playlist" to "/playlists/${record.resourceId}"
+    }
+    links("self" to "/shares/${share.id}", target)
+    resource?.let { putJsonObject("_embedded") { put(target.first, it) } }
+    val manage = viewer.can(Action.SHARE, record.ownerId, null)
+    templates(forms, Affordances.forShare(share.id, manage, share.type == ShareType.EPISODE, share.permission.name))
+}
+
+/** Whom a subscription is shared with, and the `share` template to add someone. */
+fun subscriptionShares(item: SubscriptionItem, records: List<ShareRecord>, viewer: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
+    put("count", records.size)
+    links("self" to "/subscriptions/${item.subscription.id}/shares", "subscription" to "/subscriptions/${item.subscription.id}")
+    putJsonObject("_embedded") {
+        put("shares", buildJsonArray { records.forEach { add(shareResource(it, viewer, forms)) } })
+    }
+    templates(forms, Affordances.forSubscription(item).filter { it.name == "share" })
+}
+
+/** What others share with the viewer, most recent first, each with what is shared. */
+fun sharedWithMe(entries: List<SharedEntry>, viewer: UserAccount, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
+    put("count", entries.size)
+    links("self" to "/shared")
+    putJsonObject("_embedded") {
+        put(
+            "shares",
+            buildJsonArray {
+                for (entry in entries) {
+                    val resource = entry.subscription?.let { subscriptionResource(it, forms) } ?: entry.episode?.let { episodeResource(it, forms, audio) }
+                    add(shareResource(entry.record, viewer, forms, resource))
+                }
+            },
+        )
+    }
 }
 
 fun subscriptionCollection(items: List<SubscriptionItem>, forms: Boolean): JsonObject = buildJsonObject {

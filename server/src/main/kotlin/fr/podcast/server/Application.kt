@@ -4,8 +4,10 @@ import fr.podcast.server.api.accountRoutes
 import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
 import fr.podcast.server.api.searchRoutes
+import fr.podcast.server.api.shareRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
+import fr.podcast.server.catalog.Sharing
 import fr.podcast.server.auth.LoginThrottle
 import fr.podcast.server.auth.Role
 import fr.podcast.server.auth.UserAccount
@@ -113,6 +115,7 @@ class ServerServices(
 ) {
     val accounts = Accounts(database)
     val loginThrottle = LoginThrottle()
+    val sharing = Sharing(database)
     val guard = UrlGuard(config.allowPrivateFeeds)
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
@@ -137,10 +140,13 @@ class ServerServices(
     /** A subscription changed: automatic download may have been turned on. */
     suspend fun onSubscriptionChanged(podcastId: Long) = media.scheduleAutomatic(podcastId)
 
-    /** Removes a podcast nobody follows any more, with its episodes and their files. */
+    /** Removes a podcast nobody follows any more, with its episodes, their files and recommendations. */
     suspend fun removePodcast(podcastId: Long) {
         media.deletePodcastFiles(podcastId)
-        database.query { catalogQueries.deletePodcast(podcastId) }
+        database.transaction {
+            sharesQueries.deleteEpisodeSharesOfPodcast(podcastId)
+            catalogQueries.deletePodcast(podcastId)
+        }
     }
 }
 
@@ -196,6 +202,7 @@ fun Application.module(services: ServerServices) {
         subscriptionRoutes(services)
         queueRoutes(services)
         accountRoutes(services)
+        shareRoutes(services)
         searchRoutes(services)
         webRoutes(database, services.accounts, services.audioLinks, services.loginThrottle)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")

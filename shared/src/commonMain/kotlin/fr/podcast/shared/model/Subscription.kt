@@ -3,6 +3,10 @@ package fr.podcast.shared.model
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
+/** What the viewer may do with a resource (ADR 0009): everything, modify it, or only read it. */
+@Serializable
+enum class Access { OWNER, WRITE, READ }
+
 /** A user's subscription: their own entry pointing to a shared podcast. */
 @Serializable
 data class Subscription(
@@ -12,6 +16,10 @@ data class Subscription(
     val subscribedAt: Instant,
     /** The server downloads new episodes of this podcast for this user. */
     val autoDownload: Boolean = false,
+    /** The viewer's rights: OWNER for their own subscriptions, READ or WRITE when shared with them. */
+    val access: Access = Access.OWNER,
+    /** Who shared it, when it is not the viewer's own. */
+    val ownerName: String? = null,
 )
 
 data class SubscriptionItem(val subscription: Subscription, val podcast: Podcast)

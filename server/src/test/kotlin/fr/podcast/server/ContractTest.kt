@@ -250,6 +250,33 @@ class ContractTest {
         check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NotFound)
         check(delete, "/queue", "/queue", HttpStatusCode.NoContent)
 
+        // Sharing (ADR 0009): Alice shares Les Cast Codeurs (subscription 1) with Bob; 2 stays hers.
+        check(get, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.OK)
+        check(post, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.OK,
+            body = """{"userId":"2","permission":"READ","message":"Pour toi"}""")
+        check(post, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.UnprocessableEntity, body = """{"userId":"999"}""")
+        check(post, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.Forbidden, token = bob, body = """{"userId":"1"}""")
+        check(post, "/subscriptions/2/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.NotFound, token = bob, body = """{"userId":"1"}""")
+        check(get, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.Forbidden, token = bob)
+        check(get, "/subscriptions/2/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.NotFound, token = bob)
+        check(get, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.OK, token = bob) // read-only view
+        check(get, "/shared", "/shared", HttpStatusCode.OK, token = bob)
+        val shareId = client.getJson("/shared", bob)["_embedded"]!!.jsonObject["shares"]!!.jsonArray.first().jsonObject["id"]!!.jsonPrimitive.content
+        check(get, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.OK, token = bob)
+        check(get, "/shares/999", "/shares/{shareId}", HttpStatusCode.NotFound)
+        check(patch, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.Forbidden, token = bob, body = """{"permission":"WRITE"}""")
+        check(patch, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.OK, body = """{"permission":"WRITE"}""")
+        check(patch, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.UnprocessableEntity, body = """{"permission":"OWNER"}""")
+        check(patch, "/shares/999", "/shares/{shareId}", HttpStatusCode.NotFound, body = """{"permission":"READ"}""")
+        check(patch, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.OK, token = bob, body = """{"note":"Partagé"}""")
+        check(delete, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.Forbidden, token = bob)
+        check(post, "/episodes/2/shares", "/episodes/{episodeId}/shares", HttpStatusCode.OK, body = """{"userId":"2","message":"Écoute ça"}""")
+        check(post, "/episodes/2/shares", "/episodes/{episodeId}/shares", HttpStatusCode.UnprocessableEntity, body = """{"userId":"1"}""")
+        check(post, "/episodes/999/shares", "/episodes/{episodeId}/shares", HttpStatusCode.NotFound, body = """{"userId":"2"}""")
+        check(get, "/shared", "/shared", HttpStatusCode.OK, token = bob) // with the recommended episode
+        check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NoContent, token = bob)
+        check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NotFound)
+
         // Five wrong passwords for Bob (one above): his sign-ins and password changes wait.
         repeat(4) {
             check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Unauthorized, token = null,

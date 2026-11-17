@@ -1,6 +1,8 @@
 package fr.podcast.server.api
 
 import fr.podcast.server.ServerServices
+import fr.podcast.server.auth.Action
+import fr.podcast.server.auth.can
 import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.SESSION_AUTH
 import fr.podcast.server.catalog.UserCatalog
@@ -117,17 +119,21 @@ fun Route.subscriptionRoutes(services: ServerServices) {
             call.respondText(opmlImportResource(import.report).toString(), HalJson)
         }
 
+        // Readable by its owner, administrators and whoever it is shared with (ADR 0009).
         get("/subscriptions/{id}") {
-            val item = catalog(call).subscription(call.parameters["id"]!!) ?: return@get call.respondNotFound("Subscription")
+            val view = services.sharing.subscription(call.user, call.parameters["id"]!!) ?: return@get call.respondNotFound("Subscription")
             val representation = call.representation()
-            call.respondResource(subscriptionResource(item, representation.forms), representation)
+            call.respondResource(subscriptionResource(view.item, representation.forms), representation)
         }
 
         // Partial update: absent fields keep their value, "note": null removes the note.
         patch("/subscriptions/{id}") {
-            call.mutatingUser() ?: return@patch
-            val catalog = catalog(call)
-            val current = catalog.subscription(call.parameters["id"]!!) ?: return@patch call.respondNotFound("Subscription")
+            val user = call.mutatingUser() ?: return@patch
+            val view = services.sharing.subscription(user, call.parameters["id"]!!) ?: return@patch call.respondNotFound("Subscription")
+            if (!user.can(Action.MODIFY, view.ownerId, view.permission)) {
+                return@patch call.respondProblem(HttpStatusCode.Forbidden, "This subscription is shared with you read-only")
+            }
+            val current = view.item
             val fields = call.receiveFields() ?: emptyMap()
             val note = when {
                 "note" !in fields -> current.subscription.note
@@ -142,7 +148,8 @@ fun Route.subscriptionRoutes(services: ServerServices) {
             }
             if (errors.isNotEmpty()) return@patch call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid subscription", errors)
 
-            val updated = catalog.updateSubscription(current.subscription.id, note, autoDownload!!)!!
+            services.sharing.updateSubscription(current.subscription.id, note, autoDownload!!)
+            val updated = services.sharing.subscription(user, current.subscription.id)!!.item
             services.onSubscriptionChanged(updated.podcast.id.toLong())
             if (call.isHtmx) call.response.header("HX-Trigger", "subscriptions-changed")
             val representation = call.representation()
@@ -150,8 +157,13 @@ fun Route.subscriptionRoutes(services: ServerServices) {
         }
 
         delete("/subscriptions/{id}") {
-            call.mutatingUser() ?: return@delete
-            val orphan = catalog(call).unsubscribe(call.parameters["id"]!!) ?: return@delete call.respondNotFound("Subscription")
+            val user = call.mutatingUser() ?: return@delete
+            val view = services.sharing.subscription(user, call.parameters["id"]!!) ?: return@delete call.respondNotFound("Subscription")
+            if (!user.can(Action.DELETE, view.ownerId, view.permission)) {
+                return@delete call.respondProblem(HttpStatusCode.Forbidden, "Only its owner can end a subscription")
+            }
+            val orphan = UserCatalog(services.database, view.ownerId).unsubscribe(view.item.subscription.id)
+                ?: return@delete call.respondNotFound("Subscription")
             // Nobody follows the podcast any more: it goes, with its episodes and files.
             if (orphan != 0L) services.removePodcast(orphan)
             call.respondChanged("subscriptions-changed")

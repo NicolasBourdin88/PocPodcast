@@ -23,6 +23,7 @@ tags:
   - name: épisodes
   - name: file d'attente
   - name: comptes
+  - name: partages
 security:
   - bearer: []
   - session: []
@@ -637,6 +638,140 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /episodes/{episodeId}/shares:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    post:
+      tags: [partages]
+      operationId: recommendEpisode
+      summary: Recommander un épisode à quelqu'un (template `recommend`)
+      description: Une recommandation est un partage en lecture seule (`READ`), avec un message facultatif. Recommander à nouveau remplace le message.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecommendationRequest" }
+      responses:
+        "200":
+          description: Recommandation enregistrée
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Share" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Share" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /subscriptions/{subscriptionId}/shares:
+    parameters:
+      - $ref: "#/components/parameters/subscriptionId"
+    get:
+      tags: [partages]
+      operationId: listSubscriptionShares
+      summary: Avec qui l'abonnement est partagé (propriétaire)
+      responses:
+        "200":
+          description: Partages de l'abonnement
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/SubscriptionShares" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/SubscriptionShares" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [partages]
+      operationId: shareSubscription
+      summary: Partager l'abonnement (propriétaire, template `share`)
+      description: |
+        `READ` : voir l'abonnement et sa note, écouter ses épisodes. `WRITE` : modifier aussi la note
+        et le téléchargement automatique. Partager à nouveau avec la même personne change la permission
+        et le message.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareRequest" }
+      responses:
+        "200":
+          description: Partage enregistré
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Share" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Share" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /shared:
+    get:
+      tags: [partages]
+      operationId: listSharedWithMe
+      summary: Ce que les autres partagent avec l'utilisateur, du plus récent au plus ancien
+      responses:
+        "200":
+          description: Partages reçus, chacun avec ce qui est partagé
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/SharedWithMe" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/SharedWithMe" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /shares/{shareId}:
+    parameters:
+      - $ref: "#/components/parameters/shareId"
+    get:
+      tags: [partages]
+      operationId: getShare
+      summary: Un partage, pour son propriétaire, son destinataire ou un administrateur
+      responses:
+        "200":
+          description: Partage, avec ce qui est partagé
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Share" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Share" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [partages]
+      operationId: changeSharePermission
+      summary: Changer la permission d'un partage (propriétaire, template `change-permission`)
+      description: Une recommandation d'épisode reste en lecture seule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareUpdate" }
+      responses:
+        "200":
+          description: Partage modifié
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Share" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Share" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [partages]
+      operationId: deleteShare
+      summary: Ne plus partager (propriétaire) ou refuser un partage reçu (destinataire), template `unshare`
+      responses:
+        "204": { description: Partage supprimé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /episodes/{episodeId}/audio:
     parameters:
       - $ref: "#/components/parameters/episodeId"
@@ -811,6 +946,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    shareId:
+      name: shareId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -828,8 +968,10 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     Forbidden:
       description: |
-        Requête authentifiée par session (client léger) sans l'en-tête `HX-Request` :
-        refusée pour se protéger du CSRF. Ne concerne pas les jetons Bearer.
+        Action refusée sur une ressource que l'utilisateur peut voir (ADR 0005, 0009) : abonnement
+        partagé en lecture seule, gestion des comptes sans être administrateur, etc. Aussi : requête
+        authentifiée par session (client léger) sans l'en-tête `HX-Request`, refusée pour se
+        protéger du CSRF (ne concerne pas les jetons Bearer).
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -940,6 +1082,7 @@ components:
             subscriptions: { $ref: "#/components/schemas/Link" }
             queue: { $ref: "#/components/schemas/Link" }
             users: { $ref: "#/components/schemas/Link" }
+            shared: { $ref: "#/components/schemas/Link" }
             episodes: { $ref: "#/components/schemas/Link" }
             episode:
               description: "Gabarit `/episodes/{id}` : un épisode à partir de son identifiant."
@@ -1170,7 +1313,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, note, subscribedAt, autoDownload, _links, _embedded]
+      required: [id, note, subscribedAt, autoDownload, access, ownerName, _links, _embedded]
       properties:
         id: { type: string }
         note: { type: [string, "null"], description: Annotation de l'utilisateur }
@@ -1178,12 +1321,20 @@ components:
         autoDownload:
           type: boolean
           description: Le serveur télécharge les nouveaux épisodes de ce podcast pour cet utilisateur.
+        access:
+          description: "Droits de l'utilisateur : `OWNER` (le sien, ou administrateur), `WRITE` ou `READ` (partagé avec lui)."
+          type: string
+          enum: [OWNER, WRITE, READ]
+        ownerName: { type: [string, "null"], description: "Qui l'a partagé ; null pour ses propres abonnements." }
         _links:
           type: object
           required: [self, podcast]
           properties:
             self: { $ref: "#/components/schemas/Link" }
             podcast: { $ref: "#/components/schemas/Link" }
+            shares:
+              description: Avec qui l'abonnement est partagé (propriétaire seulement).
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _embedded:
           type: object
@@ -1196,7 +1347,127 @@ components:
           properties:
             update: { $ref: "#/components/schemas/Template" }
             unsubscribe: { $ref: "#/components/schemas/Template" }
+            share: { $ref: "#/components/schemas/Template" }
+            subscribe: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
+      additionalProperties: false
+
+    Share:
+      description: Ce qu'un utilisateur partage avec un autre (ADR 0009).
+      type: object
+      required: [id, type, permission, message, createdAt, owner, grantee, _links]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [SUBSCRIPTION, EPISODE, PLAYLIST] }
+        permission: { type: string, enum: [READ, WRITE] }
+        message: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        owner: { $ref: "#/components/schemas/UserSummary" }
+        grantee: { $ref: "#/components/schemas/UserSummary" }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            subscription: { $ref: "#/components/schemas/Link" }
+            episode: { $ref: "#/components/schemas/Link" }
+            playlist: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          description: Ce qui est partagé, tel que l'utilisateur le voit.
+          type: object
+          properties:
+            subscription: { $ref: "#/components/schemas/Subscription" }
+            episode: { $ref: "#/components/schemas/Episode" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            unshare: { $ref: "#/components/schemas/Template" }
+            change-permission: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    UserSummary:
+      type: object
+      required: [id, username, displayName, role]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        role: { type: string, enum: [USER, ADMIN] }
+      additionalProperties: false
+
+    SubscriptionShares:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self, subscription]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+            subscription: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [shares]
+          properties:
+            shares:
+              type: array
+              items: { $ref: "#/components/schemas/Share" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            share: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    SharedWithMe:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [shares]
+          properties:
+            shares:
+              type: array
+              items: { $ref: "#/components/schemas/Share" }
+          additionalProperties: false
+      additionalProperties: false
+
+    ShareRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string, description: Le compte avec qui partager (voir `/users`). }
+        permission: { type: string, enum: [READ, WRITE], default: READ }
+        message: { type: [string, "null"], maxLength: 500 }
+      additionalProperties: false
+
+    RecommendationRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string }
+        message: { type: [string, "null"], maxLength: 500 }
+      additionalProperties: false
+
+    ShareUpdate:
+      type: object
+      required: [permission]
+      properties:
+        permission: { type: string, enum: [READ, WRITE] }
       additionalProperties: false
 
     SubscriptionCollection:
@@ -1387,6 +1658,7 @@ components:
             enqueue: { $ref: "#/components/schemas/Template" }
             dequeue: { $ref: "#/components/schemas/Template" }
             move: { $ref: "#/components/schemas/Template" }
+            recommend: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false
 

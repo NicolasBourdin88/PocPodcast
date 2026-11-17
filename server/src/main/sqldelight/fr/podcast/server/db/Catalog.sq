@@ -150,6 +150,23 @@ FROM subscriptions s
 JOIN podcasts p ON p.id = s.podcast_id
 WHERE s.user_id = :userId AND s.id = :id;
 
+-- A subscription whoever owns it: for its owner, an administrator, or someone it is shared with.
+subscriptionById:
+SELECT s.id, s.note, s.subscribed_at, s.auto_download,
+       p.id AS podcast_id, p.title, p.author, p.feed_url, p.artwork_url, p.description,
+       p.website_url, p.language, p.refresh_status, p.last_refreshed_at,
+       s.user_id AS owner_id, u.display_name AS owner_name
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id
+JOIN users u ON u.id = s.user_id
+WHERE s.id = :id;
+
+-- After the rights check (a WRITE share may modify someone else's subscription).
+updateSubscriptionById:
+UPDATE subscriptions
+SET note = :note, auto_download = :autoDownload
+WHERE id = :id;
+
 subscribedFeedUrls:
 SELECT p.feed_url
 FROM subscriptions s
