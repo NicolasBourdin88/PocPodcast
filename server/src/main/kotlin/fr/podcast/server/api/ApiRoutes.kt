@@ -220,6 +220,42 @@ fun Route.apiRoutes(services: ServerServices) {
             call.respondChanged()
         }
 
+        put("/episodes/{id}/favorite") {
+            call.mutatingUser() ?: return@put
+            val catalog = catalog(call)
+            val episode = catalog.episode(call.parameters["id"]!!) ?: return@put call.respondNotFound("Episode")
+            catalog.setFavorite(episode.id, favorite = true)
+            call.respondChanged()
+        }
+
+        delete("/episodes/{id}/favorite") {
+            call.mutatingUser() ?: return@delete
+            val catalog = catalog(call)
+            val episode = catalog.episode(call.parameters["id"]!!) ?: return@delete call.respondNotFound("Episode")
+            catalog.setFavorite(episode.id, favorite = false)
+            call.respondChanged()
+        }
+
+        put("/episodes/{id}/rating") {
+            call.mutatingUser() ?: return@put
+            val catalog = catalog(call)
+            val episode = catalog.episode(call.parameters["id"]!!) ?: return@put call.respondNotFound("Episode")
+            val rating = call.receiveFields()?.intField("rating")
+            if (rating == null || rating !in 1..5) {
+                return@put call.respondProblem(HttpStatusCode.UnprocessableEntity, "A rating from 1 to 5 expected", listOf(FieldError("rating", "from 1 to 5")))
+            }
+            catalog.setRating(episode.id, rating)
+            call.respondChanged()
+        }
+
+        delete("/episodes/{id}/rating") {
+            call.mutatingUser() ?: return@delete
+            val catalog = catalog(call)
+            val episode = catalog.episode(call.parameters["id"]!!) ?: return@delete call.respondNotFound("Episode")
+            catalog.setRating(episode.id, null)
+            call.respondChanged()
+        }
+
         post("/episodes/{id}/download") {
             call.mutatingUser() ?: return@post
             val episode = catalog(call).episode(call.parameters["id"]!!) ?: return@post call.respondNotFound("Episode")

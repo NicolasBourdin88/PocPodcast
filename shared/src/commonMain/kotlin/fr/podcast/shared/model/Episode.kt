@@ -20,7 +20,7 @@ data class Transcript(val url: String, val type: String, val language: String? =
 
 /**
  * An episode as seen by one user: the shared catalog data (title, duration…)
- * plus that user's listening state (position, status, kept).
+ * plus that user's listening state (position, status) and marks (kept, favorite, rating).
  */
 @Serializable
 data class Episode(
@@ -35,6 +35,10 @@ data class Episode(
     val description: String = "",
     /** Marked by the user to be kept: its server file is never purged. */
     val kept: Boolean = false,
+    /** Among the user's favorites (dynamic playlists can select them, ADR 0010). */
+    val favorite: Boolean = false,
+    /** The user's rating, from 1 to 5; null when not rated. */
+    val rating: Int? = null,
     val fileStatus: FileStatus = FileStatus.NONE,
     /** In the user's queue ("up next"). */
     val inQueue: Boolean = false,

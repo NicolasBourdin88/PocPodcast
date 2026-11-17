@@ -215,6 +215,14 @@ class ContractTest {
         check(put, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)
         check(put, "/episodes/999/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NotFound)
         check(delete, "/episodes/2/kept", "/episodes/{episodeId}/kept", HttpStatusCode.NoContent)
+        check(put, "/episodes/2/favorite", "/episodes/{episodeId}/favorite", HttpStatusCode.NoContent)
+        check(put, "/episodes/999/favorite", "/episodes/{episodeId}/favorite", HttpStatusCode.NotFound)
+        check(put, "/episodes/2/rating", "/episodes/{episodeId}/rating", HttpStatusCode.NoContent, body = """{"rating":4}""")
+        check(put, "/episodes/2/rating", "/episodes/{episodeId}/rating", HttpStatusCode.UnprocessableEntity, body = """{"rating":6}""")
+        check(put, "/episodes/999/rating", "/episodes/{episodeId}/rating", HttpStatusCode.NotFound, body = """{"rating":4}""")
+        check(get, "/episodes/2", "/episodes/{episodeId}", HttpStatusCode.OK) // favorite, rated: `unfavorite`, `clear-rating`
+        check(delete, "/episodes/2/rating", "/episodes/{episodeId}/rating", HttpStatusCode.NoContent)
+        check(delete, "/episodes/2/favorite", "/episodes/{episodeId}/favorite", HttpStatusCode.NoContent)
 
         check(post, "/subscriptions", "/subscriptions", HttpStatusCode.Created, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")
         check(post, "/subscriptions", "/subscriptions", HttpStatusCode.OK, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")

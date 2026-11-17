@@ -104,7 +104,8 @@ object Affordances {
 
     /**
      * `update-progress` always; `mark-played` unless played; `mark-unplayed` unless new;
-     * `keep` or `unkeep` (kept episodes are never purged); `download` until the server has the file;
+     * `keep` or `unkeep` (kept episodes are never purged); `favorite` or `unfavorite`; `rate`, and
+     * `clear-rating` once rated (ADR 0010); `download` until the server has the file;
      * `recommend` to someone (ADR 0009); `enqueue` outside the queue, `dequeue` and `move` inside it.
      */
     fun forEpisode(episode: Episode): List<Affordance> = buildList {
@@ -124,6 +125,18 @@ object Affordances {
         } else {
             add(Affordance("keep", HttpMethod.Put, "/episodes/${episode.id}/kept"))
         }
+        if (episode.favorite) {
+            add(Affordance("unfavorite", HttpMethod.Delete, "/episodes/${episode.id}/favorite"))
+        } else {
+            add(Affordance("favorite", HttpMethod.Put, "/episodes/${episode.id}/favorite"))
+        }
+        add(
+            Affordance(
+                "rate", HttpMethod.Put, "/episodes/${episode.id}/rating",
+                listOf(AffordanceProperty("rating", type = "number", required = true, value = episode.rating?.let(::JsonPrimitive), min = 1, max = 5)),
+            ),
+        )
+        if (episode.rating != null) add(Affordance("clear-rating", HttpMethod.Delete, "/episodes/${episode.id}/rating"))
         if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
             add(Affordance("download", HttpMethod.Post, "/episodes/${episode.id}/download"))
         }

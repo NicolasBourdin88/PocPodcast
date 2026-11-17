@@ -1,0 +1,5 @@
+-- Step 7: each user's favorites and ratings (1 to 5) of episodes; dynamic playlists select on
+-- them (ADR 0010). They live with the rest of the user's state of an episode.
+ALTER TABLE playback_states ADD COLUMN favorite BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE playback_states ADD COLUMN rating INTEGER;
+ALTER TABLE playback_states ADD CONSTRAINT playback_states_rating CHECK (rating BETWEEN 1 AND 5);

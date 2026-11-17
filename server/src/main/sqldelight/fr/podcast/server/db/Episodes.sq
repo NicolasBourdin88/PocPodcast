@@ -1,5 +1,5 @@
 -- Every query below returns the same columns (an episode, its file status, its podcast and the
--- user's state, including its place in the queue), so a single mapper builds an EpisodeItem.
+-- user's state, including its marks and its place in the queue), so a single mapper builds an EpisodeItem.
 -- Missing state means NEW at position 0, outside the queue.
 -- A nullable ":status" cannot be used: SQLDelight turns "= ?" into "IS ?" for null, which
 -- PostgreSQL rejects. Hence the explicit ":filterByStatus" flag.
@@ -10,6 +10,7 @@ SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_se
        d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
        d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
        COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
        q.position AS queue_position
 FROM episode_details d
 JOIN subscriptions sub ON sub.podcast_id = d.podcast_id AND sub.user_id = :userId
@@ -33,6 +34,7 @@ SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_se
        d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
        d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
        COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
        q.position AS queue_position
 FROM episode_details d
 JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
@@ -47,6 +49,7 @@ SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_se
        d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
        d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
        COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
        q.position AS queue_position
 FROM episode_details d
 LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
@@ -59,6 +62,7 @@ SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_se
        d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
        d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
        COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
        q.position AS queue_position
 FROM episode_details d
 LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
@@ -74,6 +78,7 @@ SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_se
        d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
        d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
        COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
        q.position AS queue_position
 FROM queue_items q
 JOIN episode_details d ON d.id = q.episode_id
@@ -98,3 +103,16 @@ INSERT INTO playback_states(user_id, episode_id, status, kept)
 VALUES (:userId, :episodeId, 'NEW', :kept)
 ON CONFLICT (user_id, episode_id) DO UPDATE
 SET kept = excluded.kept;
+
+setFavorite:
+INSERT INTO playback_states(user_id, episode_id, status, favorite)
+VALUES (:userId, :episodeId, 'NEW', :favorite)
+ON CONFLICT (user_id, episode_id) DO UPDATE
+SET favorite = excluded.favorite;
+
+-- A null rating clears it.
+setRating:
+INSERT INTO playback_states(user_id, episode_id, status, rating)
+VALUES (:userId, :episodeId, 'NEW', :rating)
+ON CONFLICT (user_id, episode_id) DO UPDATE
+SET rating = excluded.rating;

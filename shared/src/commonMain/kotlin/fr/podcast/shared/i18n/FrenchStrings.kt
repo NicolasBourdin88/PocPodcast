@@ -95,6 +95,10 @@ object FrenchStrings : Strings {
         "reset-password" -> resetPassword
         "delete-user" -> deleteUser
         "revoke" -> revokeDevice
+        "favorite" -> addFavorite
+        "unfavorite" -> removeFavorite
+        "rate" -> "Noter"
+        "clear-rating" -> clearRating
         else -> name
     }
 
@@ -137,6 +141,13 @@ object FrenchStrings : Strings {
         FileStatus.READY -> "Sur le serveur"
         FileStatus.FAILED -> "Échec du téléchargement"
     }
+
+    override val favorite = "Favori"
+    override val addFavorite = "Ajouter aux favoris"
+    override val removeFavorite = "Retirer des favoris"
+    override val rating = "Note"
+    override fun rateAs(stars: Int) = if (stars <= 1) "Noter $stars étoile" else "Noter $stars étoiles"
+    override val clearRating = "Effacer la note"
 
     override val nowPlaying = "En cours de lecture"
     override val pause = "Pause"

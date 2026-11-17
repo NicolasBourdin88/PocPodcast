@@ -622,6 +622,56 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /episodes/{episodeId}/favorite:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [épisodes]
+      operationId: favoriteEpisode
+      summary: Ajouter l'épisode aux favoris de l'utilisateur (template `favorite`)
+      responses:
+        "204": { description: Épisode parmi les favoris }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [épisodes]
+      operationId: unfavoriteEpisode
+      summary: Retirer l'épisode des favoris (template `unfavorite`)
+      responses:
+        "204": { description: Épisode retiré des favoris }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /episodes/{episodeId}/rating:
+    parameters:
+      - $ref: "#/components/parameters/episodeId"
+    put:
+      tags: [épisodes]
+      operationId: rateEpisode
+      summary: Noter l'épisode de 1 à 5 (template `rate`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RatingUpdate" }
+      responses:
+        "204": { description: Note enregistrée }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [épisodes]
+      operationId: clearEpisodeRating
+      summary: Effacer la note de l'épisode (template `clear-rating`)
+      responses:
+        "204": { description: Note effacée }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /episodes/{episodeId}/download:
     parameters:
       - $ref: "#/components/parameters/episodeId"
@@ -1592,6 +1642,13 @@ components:
         autoDownload: { type: boolean }
       additionalProperties: false
 
+    RatingUpdate:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+      additionalProperties: false
+
     EpisodeStatus:
       type: string
       enum: [NEW, IN_PROGRESS, PLAYED]
@@ -1609,7 +1666,7 @@ components:
     Episode:
       description: Un épisode tel que le voit l'utilisateur connecté (catalogue + état d'écoute).
       type: object
-      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, kept, fileStatus, inQueue, _links, _embedded]
+      required: [id, podcastId, title, description, publishedAt, durationSeconds, positionSeconds, status, kept, favorite, rating, fileStatus, inQueue, _links, _embedded]
       properties:
         id: { type: string }
         podcastId: { type: string }
@@ -1622,6 +1679,12 @@ components:
         kept:
           type: boolean
           description: Gardé par l'utilisateur ; son fichier sur le serveur n'est jamais purgé.
+        favorite: { type: boolean, description: Parmi les favoris de l'utilisateur. }
+        rating:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 5
+          description: Note de l'utilisateur, de 1 à 5 ; `null` sans note.
         fileStatus: { $ref: "#/components/schemas/FileStatus" }
         inQueue: { type: boolean, description: Dans la file d'attente de l'utilisateur. }
         _links:
@@ -1650,7 +1713,8 @@ components:
         _templates:
           description: |
             Actions possibles : `update-progress` toujours, `mark-played` si l'épisode n'est pas écouté,
-            `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`,
+            `mark-unplayed` s'il n'est pas nouveau, `keep` ou `unkeep` selon `kept`, `favorite` ou `unfavorite`
+            selon `favorite`, `rate` toujours et `clear-rating` s'il est noté,
             `download` tant que le serveur n'a pas le fichier (`NONE` ou `FAILED`),
             `enqueue` hors de la file, `dequeue` et `move` dans la file.
           type: object
@@ -1660,6 +1724,10 @@ components:
             mark-unplayed: { $ref: "#/components/schemas/Template" }
             keep: { $ref: "#/components/schemas/Template" }
             unkeep: { $ref: "#/components/schemas/Template" }
+            favorite: { $ref: "#/components/schemas/Template" }
+            unfavorite: { $ref: "#/components/schemas/Template" }
+            rate: { $ref: "#/components/schemas/Template" }
+            clear-rating: { $ref: "#/components/schemas/Template" }
             download: { $ref: "#/components/schemas/Template" }
             enqueue: { $ref: "#/components/schemas/Template" }
             dequeue: { $ref: "#/components/schemas/Template" }

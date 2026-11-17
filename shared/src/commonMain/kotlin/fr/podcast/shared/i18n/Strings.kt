@@ -111,6 +111,17 @@ interface Strings {
     val transcript: String
     fun fileStatus(status: FileStatus): String?
 
+    // Favorites and ratings (ADR 0010)
+    val favorite: String
+    val addFavorite: String
+    val removeFavorite: String
+    val rating: String
+    fun rateAs(stars: Int): String
+    val clearRating: String
+
+    /** A rating as stars, "★★★★☆" (the same in every language). */
+    fun stars(rating: Int): String = rating.coerceIn(0, 5).let { "★".repeat(it) + "☆".repeat(5 - it) }
+
     // Player (ADR 0008)
     val nowPlaying: String
     val pause: String

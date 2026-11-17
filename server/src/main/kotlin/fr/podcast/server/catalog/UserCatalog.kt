@@ -73,6 +73,17 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
     // --- Richer queries used by the API ---
 
     /** Marks the episode as kept: its server file is never purged (ADR 0007). */
+    suspend fun setFavorite(episodeId: String, favorite: Boolean) {
+        val id = episodeId.toLongOrNull() ?: return
+        database.query { episodesQueries.setFavorite(userId, id, favorite) }
+    }
+
+    /** From 1 to 5; null clears the rating. */
+    suspend fun setRating(episodeId: String, rating: Int?) {
+        val id = episodeId.toLongOrNull() ?: return
+        database.query { episodesQueries.setRating(userId, id, rating) }
+    }
+
     suspend fun setKept(episodeId: String, kept: Boolean) {
         val id = episodeId.toLongOrNull() ?: return
         database.query { episodesQueries.setKept(userId, id, kept) }
@@ -274,7 +285,7 @@ private fun episodeItem(
     chapters_url: String?, chapters_type: String?, file_status: String,
     podcast_title: String, podcast_author: String, podcast_description: String, podcast_feed_url: String, podcast_artwork_url: String?,
     podcast_website_url: String?, podcast_language: String?, podcast_refresh_status: String, podcast_refreshed_at: OffsetDateTime?,
-    position_seconds: Int, status: String, kept: Boolean, queue_position: Int?,
+    position_seconds: Int, status: String, kept: Boolean, favorite: Boolean, rating: Int?, queue_position: Int?,
 ) = EpisodeItem(
     episode = Episode(
         id = id.toString(),
@@ -286,6 +297,8 @@ private fun episodeItem(
         status = EpisodeStatus.valueOf(status),
         description = description,
         kept = kept,
+        favorite = favorite,
+        rating = rating,
         fileStatus = FileStatus.valueOf(file_status),
         inQueue = queue_position != null,
         chaptersUrl = chapters_url,
