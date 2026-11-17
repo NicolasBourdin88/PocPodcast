@@ -11,9 +11,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -113,18 +110,23 @@ fun ShareDialog(
     }
 }
 
-/** Read-only or read and modify. */
+/** Read-only or read and modify: one line each, so that the labels fit narrow dialogs. */
 @Composable
 fun PermissionChoice(permission: SharePermission, onChange: (SharePermission) -> Unit, modifier: Modifier = Modifier) {
     val strings = LocalStrings.current
-    val choices = SharePermission.entries
-    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
-        choices.forEachIndexed { index, choice ->
-            SegmentedButton(
-                selected = choice == permission,
-                onClick = { onChange(choice) },
-                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
-            ) { Text(strings.permission(choice), maxLines = 1) }
+    Column(modifier) {
+        Text(strings.sharePermission, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
+        SharePermission.entries.forEach { choice ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .selectable(selected = choice == permission, role = Role.RadioButton, onClick = { onChange(choice) })
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = choice == permission, onClick = null)
+                Spacer(Modifier.width(12.dp))
+                Text(strings.permission(choice))
+            }
         }
     }
 }
