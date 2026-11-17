@@ -14,3 +14,22 @@ revokeToken:
 UPDATE api_tokens
 SET revoked_at = now()
 WHERE token_hash = :tokenHash AND revoked_at IS NULL;
+
+-- The devices signed in to an account, most recently used first.
+devicesOfUser:
+SELECT id, device_name, created_at, last_used_at, token_hash
+FROM api_tokens
+WHERE user_id = :userId AND revoked_at IS NULL
+ORDER BY last_used_at DESC NULLS LAST, created_at DESC;
+
+revokeDevice:
+UPDATE api_tokens
+SET revoked_at = now()
+WHERE id = :id AND user_id = :userId AND revoked_at IS NULL
+RETURNING id;
+
+-- Every device but the one using :keepHash (an empty string keeps none).
+revokeOtherDevices:
+UPDATE api_tokens
+SET revoked_at = now()
+WHERE user_id = :userId AND revoked_at IS NULL AND token_hash <> :keepHash;

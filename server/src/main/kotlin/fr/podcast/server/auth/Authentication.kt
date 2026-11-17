@@ -22,9 +22,12 @@ const val SESSION_AUTH = "session"
 const val BEARER_AUTH = "bearer"
 const val SESSION_COOKIE = "podcast_session"
 
-/** Thin client session; the cookie only carries an id, the data stays in the database. */
+/**
+ * Thin client session; the cookie only carries an id, the data stays in the database.
+ * [version] is the account's credentials version: a new password ends the older sessions.
+ */
 @Serializable
-data class UserSession(val userId: Long)
+data class UserSession(val userId: Long, val version: Int = 0)
 
 /** Who made the request, and how. */
 sealed interface AuthPrincipal {
@@ -69,7 +72,9 @@ fun Application.installAuthentication(accounts: Accounts, database: ServerDataba
     }
     install(Authentication) {
         session<UserSession>(SESSION_AUTH) {
-            validate { session -> accounts.user(session.userId)?.let(::SessionPrincipal) }
+            validate { session ->
+                accounts.user(session.userId)?.takeIf { it.credentialsVersion == session.version }?.let(::SessionPrincipal)
+            }
             challenge { call.respondUnauthenticated() }
         }
         bearer(BEARER_AUTH) {

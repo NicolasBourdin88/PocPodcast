@@ -53,6 +53,7 @@ object ProblemTypes {
     const val NOT_AN_OPML = "/problems/not-an-opml"
     const val SEARCH_FAILED = "/problems/search-failed"
     const val AUDIO_LINK_EXPIRED = "/problems/audio-link-expired"
+    const val TOO_MANY_ATTEMPTS = "/problems/too-many-attempts"
 }
 
 /** Problem Details (RFC 9457). */

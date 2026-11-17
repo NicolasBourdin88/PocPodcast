@@ -3,15 +3,40 @@ INSERT INTO users(username, display_name, password_hash, role)
 VALUES (:username, :displayName, :passwordHash, :role)
 RETURNING id;
 
+-- Same columns for the three queries below, so that one mapper builds an account.
 userByUsername:
-SELECT id, username, display_name, password_hash, role
+SELECT id, username, display_name, password_hash, role, credentials_version
 FROM users
 WHERE username = :username;
 
 userById:
-SELECT id, username, display_name, password_hash, role
+SELECT id, username, display_name, password_hash, role, credentials_version
 FROM users
 WHERE id = :id;
 
+allUsers:
+SELECT id, username, display_name, password_hash, role, credentials_version
+FROM users
+ORDER BY lower(display_name), id;
+
 countUsers:
 SELECT count(*) FROM users;
+
+countAdmins:
+SELECT count(*) FROM users WHERE role = 'ADMIN';
+
+updateDisplayName:
+UPDATE users SET display_name = :displayName WHERE id = :id;
+
+updateRole:
+UPDATE users SET role = :role WHERE id = :id;
+
+-- A new password invalidates the sessions opened with the old one.
+updatePassword:
+UPDATE users
+SET password_hash = :passwordHash, credentials_version = credentials_version + 1
+WHERE id = :id
+RETURNING credentials_version;
+
+deleteUser:
+DELETE FROM users WHERE id = :id;

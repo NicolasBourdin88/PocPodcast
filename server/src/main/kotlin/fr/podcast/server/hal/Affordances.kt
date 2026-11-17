@@ -34,6 +34,8 @@ data class AffordanceProperty(
     val value: JsonPrimitive? = null,
     val min: Int? = null,
     val max: Int? = null,
+    /** The allowed values (HAL-FORMS inline options), e.g. a role or a permission. */
+    val options: List<String>? = null,
 )
 
 object Affordances {
@@ -47,6 +49,44 @@ object Affordances {
     )
 
     val logout = Affordance("logout", HttpMethod.Delete, "/auth/tokens/current")
+
+    // Accounts (ADR 0009).
+    val updateProfile = Affordance("update-profile", HttpMethod.Patch, "/me", listOf(AffordanceProperty("displayName", required = true)))
+
+    val changePassword = Affordance(
+        "change-password", HttpMethod.Put, "/me/password",
+        listOf(
+            AffordanceProperty("currentPassword", type = "password", required = true),
+            AffordanceProperty("newPassword", type = "password", required = true),
+        ),
+    )
+
+    val createUser = Affordance(
+        "create-user", HttpMethod.Post, "/users",
+        listOf(
+            AffordanceProperty("username", required = true),
+            AffordanceProperty("displayName", required = true),
+            AffordanceProperty("password", type = "password", required = true),
+            AffordanceProperty("role", value = JsonPrimitive("USER"), options = listOf("USER", "ADMIN")),
+        ),
+    )
+
+    /** What an administrator can do to an account; not delete their own. */
+    fun forUser(userId: Long, displayName: String, role: String, self: Boolean): List<Affordance> = buildList {
+        add(
+            Affordance(
+                "update-user", HttpMethod.Patch, "/users/$userId",
+                listOf(
+                    AffordanceProperty("displayName", value = JsonPrimitive(displayName)),
+                    AffordanceProperty("role", value = JsonPrimitive(role), options = listOf("USER", "ADMIN")),
+                ),
+            ),
+        )
+        add(Affordance("reset-password", HttpMethod.Put, "/users/$userId/password", listOf(AffordanceProperty("password", type = "password", required = true))))
+        if (!self) add(Affordance("delete-user", HttpMethod.Delete, "/users/$userId"))
+    }
+
+    fun revokeDevice(deviceId: Long) = Affordance("revoke", HttpMethod.Delete, "/me/devices/$deviceId")
 
     val clearQueue = Affordance("clear-queue", HttpMethod.Delete, "/queue")
 
@@ -137,6 +177,12 @@ fun List<Affordance>.toHalFormsTemplates(): JsonObject = buildJsonObject {
                             property.value?.let { put("value", it) }
                             property.min?.let { put("min", it) }
                             property.max?.let { put("max", it) }
+                            property.options?.let { options ->
+                                putJsonObject("options") {
+                                    putJsonArray("inline") { options.forEach { add(JsonPrimitive(it)) } }
+                                    put("maxItems", 1)
+                                }
+                            }
                         }
                     }
                 }

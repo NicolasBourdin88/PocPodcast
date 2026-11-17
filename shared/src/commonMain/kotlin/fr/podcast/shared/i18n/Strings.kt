@@ -46,6 +46,7 @@ interface Strings {
     val signIn: String
     val signOut: String
     val invalidCredentials: String
+    fun tooManyAttempts(minutes: Int): String
     val serverUnreachable: String
     val notAPodcastServer: String
     val accounts: String

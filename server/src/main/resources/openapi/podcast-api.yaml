@@ -22,6 +22,7 @@ tags:
   - name: podcasts
   - name: épisodes
   - name: file d'attente
+  - name: comptes
 security:
   - bearer: []
   - session: []
@@ -69,6 +70,7 @@ paths:
               schema: { $ref: "#/components/schemas/Token" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyAttempts" }
 
   /auth/tokens/current:
     delete:
@@ -82,9 +84,9 @@ paths:
 
   /me:
     get:
-      tags: [authentification]
+      tags: [comptes]
       operationId: getMe
-      summary: Utilisateur connecté
+      summary: Utilisateur connecté (templates `update-profile`, `change-password`, `logout`)
       responses:
         "200":
           description: Utilisateur
@@ -94,6 +96,183 @@ paths:
             application/prs.hal-forms+json:
               schema: { $ref: "#/components/schemas/User" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [comptes]
+      operationId: updateProfile
+      summary: Changer son nom affiché (template `update-profile`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdate" }
+      responses:
+        "200":
+          description: Profil modifié
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/User" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /me/password:
+    put:
+      tags: [comptes]
+      operationId: changePassword
+      summary: Changer son mot de passe (template `change-password`)
+      description: |
+        Le mot de passe actuel est exigé, et les essais sont limités comme à la connexion.
+        Les autres appareils et sessions doivent se reconnecter ; celui qui fait la demande reste connecté.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChange" }
+      responses:
+        "204": { description: Mot de passe changé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyAttempts" }
+
+  /me/devices:
+    get:
+      tags: [comptes]
+      operationId: listDevices
+      summary: Appareils connectés au compte (un jeton chacun)
+      responses:
+        "200":
+          description: Appareils, du plus récemment utilisé au plus ancien
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/DeviceCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/DeviceCollection" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/devices/{deviceId}:
+    parameters:
+      - $ref: "#/components/parameters/deviceId"
+    delete:
+      tags: [comptes]
+      operationId: revokeDevice
+      summary: Déconnecter un appareil (template `revoke`), par exemple un téléphone perdu
+      responses:
+        "204": { description: Jeton de l'appareil révoqué }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users:
+    get:
+      tags: [comptes]
+      operationId: listUsers
+      summary: Comptes du serveur, pour choisir avec qui partager
+      description: Un administrateur reçoit aussi le template `create-user`.
+      responses:
+        "200":
+          description: Comptes
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/UserCollection" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/UserCollection" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [comptes]
+      operationId: createUser
+      summary: Créer un compte (administrateur, template `create-user`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: Compte créé
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/User" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /users/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/userId"
+    get:
+      tags: [comptes]
+      operationId: getUser
+      summary: Un compte (un administrateur reçoit `update-user`, `reset-password` et `delete-user`)
+      responses:
+        "200":
+          description: Compte
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/User" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [comptes]
+      operationId: updateUser
+      summary: Renommer un compte ou changer son rôle (administrateur, template `update-user`)
+      description: Le serveur garde toujours au moins un administrateur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Compte modifié
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/User" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [comptes]
+      operationId: deleteUser
+      summary: Supprimer un compte (administrateur, template `delete-user`), sauf le sien
+      description: Ses abonnements, états d'écoute, partages et appareils disparaissent avec lui, ainsi que les podcasts que plus personne ne suit.
+      responses:
+        "204": { description: Compte supprimé }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/password:
+    parameters:
+      - $ref: "#/components/parameters/userId"
+    put:
+      tags: [comptes]
+      operationId: resetPassword
+      summary: Définir un nouveau mot de passe (administrateur, template `reset-password`)
+      description: Le compte est déconnecté de tous ses appareils et sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordReset" }
+      responses:
+        "204": { description: Mot de passe défini }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /subscriptions:
     get:
@@ -622,6 +801,16 @@ components:
       in: path
       required: true
       schema: { type: string }
+    userId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string }
+    deviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -661,6 +850,16 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     ValidationError:
       description: Corps de requête invalide
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyAttempts:
+      description: |
+        Trop de mots de passe erronés pour ce compte depuis cette adresse (`type` : `/problems/too-many-attempts`).
+        `Retry-After` donne le nombre de secondes à attendre.
+      headers:
+        Retry-After:
+          schema: { type: integer }
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -740,6 +939,7 @@ components:
             me: { $ref: "#/components/schemas/Link" }
             subscriptions: { $ref: "#/components/schemas/Link" }
             queue: { $ref: "#/components/schemas/Link" }
+            users: { $ref: "#/components/schemas/Link" }
             episodes: { $ref: "#/components/schemas/Link" }
             episode:
               description: "Gabarit `/episodes/{id}` : un épisode à partir de son identifiant."
@@ -798,6 +998,7 @@ components:
       additionalProperties: false
 
     User:
+      description: Un compte. `/me` ajoute les liens `devices` et `users`.
       type: object
       required: [id, username, displayName, role, _links]
       properties:
@@ -810,11 +1011,126 @@ components:
           required: [self]
           properties:
             self: { $ref: "#/components/schemas/Link" }
+            devices: { $ref: "#/components/schemas/Link" }
+            users: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
         _templates:
           type: object
           properties:
             logout: { $ref: "#/components/schemas/Template" }
+            update-profile: { $ref: "#/components/schemas/Template" }
+            change-password: { $ref: "#/components/schemas/Template" }
+            update-user: { $ref: "#/components/schemas/Template" }
+            reset-password: { $ref: "#/components/schemas/Template" }
+            delete-user: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    UserCollection:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [users]
+          properties:
+            users:
+              type: array
+              items: { $ref: "#/components/schemas/User" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            create-user: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    UserCreate:
+      type: object
+      required: [username, displayName, password]
+      properties:
+        username: { type: string, pattern: "^[a-z0-9][a-z0-9._-]{2,31}$" }
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+        password: { type: string, minLength: 8 }
+        role: { type: string, enum: [USER, ADMIN], default: USER }
+      additionalProperties: false
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+        role: { type: string, enum: [USER, ADMIN] }
+      additionalProperties: false
+
+    ProfileUpdate:
+      type: object
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+      additionalProperties: false
+
+    PasswordChange:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string, minLength: 8 }
+      additionalProperties: false
+
+    PasswordReset:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, minLength: 8 }
+      additionalProperties: false
+
+    Device:
+      type: object
+      required: [id, name, createdAt, lastUsedAt, current, _links]
+      properties:
+        id: { type: string }
+        name: { type: string, description: Nom donné par l'appareil à la connexion }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: [string, "null"], format: date-time }
+        current: { type: boolean, description: L'appareil qui fait la requête }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            revoke: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
+      additionalProperties: false
+
+    DeviceCollection:
+      type: object
+      required: [count, _links, _embedded]
+      properties:
+        count: { type: integer, minimum: 0 }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+        _embedded:
+          type: object
+          required: [devices]
+          properties:
+            devices:
+              type: array
+              items: { $ref: "#/components/schemas/Device" }
           additionalProperties: false
       additionalProperties: false
 

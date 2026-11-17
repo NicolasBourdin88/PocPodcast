@@ -128,6 +128,10 @@ RETURNING podcast_id;
 countSubscribers:
 SELECT count(*) FROM subscriptions WHERE podcast_id = :podcastId;
 
+-- Before an account is deleted: the podcasts that may lose their last subscriber.
+podcastIdsOfUser:
+SELECT podcast_id FROM subscriptions WHERE user_id = :userId;
+
 -- Same column list for both queries, so one mapper builds a subscription with its podcast.
 subscriptionsOfUser:
 SELECT s.id, s.note, s.subscribed_at, s.auto_download,

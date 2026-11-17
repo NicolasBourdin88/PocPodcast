@@ -1,6 +1,8 @@
 package fr.podcast.server.hal
 
 import fr.podcast.server.auth.IssuedToken
+import fr.podcast.server.auth.Device
+import fr.podcast.server.auth.Role
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.catalog.Page
 import fr.podcast.server.media.AudioLinks
@@ -15,6 +17,9 @@ import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
 import fr.podcast.shared.model.Subscription
 import fr.podcast.shared.model.SubscriptionItem
+import fr.podcast.shared.model.User
+import fr.podcast.shared.model.UserRole
+import fr.podcast.shared.model.Device as ModelDevice
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -90,6 +95,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "me" to "/me",
             "subscriptions" to "/subscriptions",
             "queue" to "/queue",
+            "users" to "/users",
             "episodes" to "/episodes{?status,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
@@ -111,13 +117,52 @@ fun tokenResource(token: IssuedToken): JsonObject = buildJsonObject {
     links("self" to "/auth/tokens/current", "me" to "/me")
 }
 
-fun userResource(user: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
-    put("id", user.id.toString())
-    put("username", user.username)
-    put("displayName", user.displayName)
-    put("role", user.role.name)
-    links("self" to "/me")
-    templates(forms, listOf(Affordances.logout))
+fun UserAccount.toUser() = User(id.toString(), username, displayName, UserRole.valueOf(role.name))
+
+/** The signed-in user: profile, password, devices, sign-out. */
+fun meResource(user: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
+    fields(User.serializer(), user.toUser())
+    links("self" to "/me", "devices" to "/me/devices", "users" to "/users")
+    templates(forms, listOf(Affordances.updateProfile, Affordances.changePassword, Affordances.logout))
+}
+
+/** An account as [viewer] sees it; administrators get the management templates. */
+fun userResource(user: UserAccount, viewer: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
+    fields(User.serializer(), user.toUser())
+    links("self" to "/users/${user.id}")
+    if (viewer.role == Role.ADMIN) templates(forms, Affordances.forUser(user.id, user.displayName, user.role.name, self = user.id == viewer.id))
+}
+
+/** Every account of the server: whom to share with; administrators can create accounts. */
+fun userCollection(users: List<UserAccount>, viewer: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
+    put("count", users.size)
+    links("self" to "/users")
+    putJsonObject("_embedded") {
+        put("users", buildJsonArray { users.forEach { add(userResource(it, viewer, forms)) } })
+    }
+    if (viewer.role == Role.ADMIN) templates(forms, listOf(Affordances.createUser))
+}
+
+/** The devices signed in to the account, each with its `revoke` template. */
+fun deviceCollection(devices: List<Device>, forms: Boolean): JsonObject = buildJsonObject {
+    put("count", devices.size)
+    links("self" to "/me/devices")
+    putJsonObject("_embedded") {
+        put(
+            "devices",
+            buildJsonArray {
+                for (device in devices) {
+                    add(
+                        buildJsonObject {
+                            fields(ModelDevice.serializer(), ModelDevice(device.id.toString(), device.name, device.createdAt, device.lastUsedAt, device.current))
+                            links("self" to "/me/devices/${device.id}")
+                            templates(forms, listOf(Affordances.revokeDevice(device.id)))
+                        },
+                    )
+                }
+            },
+        )
+    }
 }
 
 fun podcastResource(podcast: Podcast, forms: Boolean = false): JsonObject = buildJsonObject {

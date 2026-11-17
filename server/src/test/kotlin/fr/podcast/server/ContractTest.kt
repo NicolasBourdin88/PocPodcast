@@ -24,6 +24,7 @@ import io.ktor.server.routing.RoutingRoot
 import io.ktor.server.routing.getAllRoutes
 import io.ktor.server.testing.testApplication
 import fr.podcast.server.media.AudioLinks
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.hours
@@ -91,6 +92,7 @@ class ContractTest {
         val noRedirects = createClient { followRedirects = false }
         val alice = client.token()
         val disposable = client.token()
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
         val exercised = mutableSetOf<Operation>()
 
         suspend fun check(
@@ -143,6 +145,37 @@ class ContractTest {
 
         check(get, "/me", "/me", HttpStatusCode.OK)
         check(get, "/me", "/me", HttpStatusCode.Unauthorized, token = null)
+        check(patch, "/me", "/me", HttpStatusCode.OK, body = """{"displayName":"Alice"}""")
+        check(patch, "/me", "/me", HttpStatusCode.UnprocessableEntity, body = """{"displayName":""}""")
+        check(put, "/me/password", "/me/password", HttpStatusCode.NoContent,
+            body = """{"currentPassword":"${TestSeed.ALICE_PASSWORD}","newPassword":"${TestSeed.ALICE_PASSWORD}"}""")
+        check(put, "/me/password", "/me/password", HttpStatusCode.UnprocessableEntity, body = """{"currentPassword":"wrong","newPassword":"long-enough"}""")
+        val laptop = client.token()
+        val laptopId = client.getJson("/me/devices", laptop)["_embedded"]!!.jsonObject["devices"]!!.jsonArray
+            .map { it.jsonObject }.first { it["current"]!!.jsonPrimitive.content == "true" }["id"]!!.jsonPrimitive.content
+        check(get, "/me/devices", "/me/devices", HttpStatusCode.OK)
+        check(delete, "/me/devices/$laptopId", "/me/devices/{deviceId}", HttpStatusCode.NoContent)
+        check(delete, "/me/devices/$laptopId", "/me/devices/{deviceId}", HttpStatusCode.NotFound)
+
+        // Users 1 = Alice (administrator), 2 = Bob, 3 = Carol, created here.
+        val carol = """{"username":"carol","displayName":"Carol","password":"carol-password"}"""
+        check(get, "/users", "/users", HttpStatusCode.OK)
+        check(post, "/users", "/users", HttpStatusCode.Created, body = carol)
+        check(post, "/users", "/users", HttpStatusCode.UnprocessableEntity, body = carol)
+        check(post, "/users", "/users", HttpStatusCode.Forbidden, token = bob, body = carol)
+        check(get, "/users/3", "/users/{userId}", HttpStatusCode.OK)
+        check(get, "/users/999", "/users/{userId}", HttpStatusCode.NotFound)
+        check(patch, "/users/3", "/users/{userId}", HttpStatusCode.OK, body = """{"displayName":"Caroline"}""")
+        check(patch, "/users/1", "/users/{userId}", HttpStatusCode.UnprocessableEntity, body = """{"role":"USER"}""")
+        check(patch, "/users/3", "/users/{userId}", HttpStatusCode.Forbidden, token = bob, body = """{"role":"ADMIN"}""")
+        check(patch, "/users/999", "/users/{userId}", HttpStatusCode.NotFound, body = """{"displayName":"X"}""")
+        check(put, "/users/3/password", "/users/{userId}/password", HttpStatusCode.NoContent, body = """{"password":"carol-new-password"}""")
+        check(put, "/users/3/password", "/users/{userId}/password", HttpStatusCode.UnprocessableEntity, body = """{"password":"short"}""")
+        check(put, "/users/3/password", "/users/{userId}/password", HttpStatusCode.Forbidden, token = bob, body = """{"password":"long-enough"}""")
+        check(put, "/users/999/password", "/users/{userId}/password", HttpStatusCode.NotFound, body = """{"password":"long-enough"}""")
+        check(delete, "/users/1", "/users/{userId}", HttpStatusCode.Forbidden)
+        check(delete, "/users/3", "/users/{userId}", HttpStatusCode.NoContent)
+        check(delete, "/users/3", "/users/{userId}", HttpStatusCode.NotFound)
         check(get, "/subscriptions", "/subscriptions", HttpStatusCode.OK)
         check(get, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.OK)
         check(get, "/subscriptions/999", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
@@ -216,6 +249,16 @@ class ContractTest {
         check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NoContent)
         check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NotFound)
         check(delete, "/queue", "/queue", HttpStatusCode.NoContent)
+
+        // Five wrong passwords for Bob (one above): his sign-ins and password changes wait.
+        repeat(4) {
+            check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Unauthorized, token = null,
+                body = """{"username":"bob","password":"wrong","deviceName":"contract"}""")
+        }
+        check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.TooManyRequests, token = null,
+            body = """{"username":"${TestSeed.BOB}","password":"${TestSeed.BOB_PASSWORD}","deviceName":"contract"}""")
+        check(put, "/me/password", "/me/password", HttpStatusCode.TooManyRequests, token = bob,
+            body = """{"currentPassword":"${TestSeed.BOB_PASSWORD}","newPassword":"long-enough"}""")
 
         val missing = documented - exercised
         assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")

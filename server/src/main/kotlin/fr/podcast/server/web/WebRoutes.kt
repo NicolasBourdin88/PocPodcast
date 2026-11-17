@@ -1,6 +1,7 @@
 package fr.podcast.server.web
 
 import fr.podcast.server.auth.Accounts
+import fr.podcast.server.auth.LoginThrottle
 import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.SESSION_AUTH
 import fr.podcast.server.auth.UserSession
@@ -15,13 +16,16 @@ import fr.podcast.server.http.respondSeeOther
 import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.i18n.Language
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.html.respondHtml
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.request.acceptLanguageItems
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
+import io.ktor.server.response.header
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -34,7 +38,7 @@ import io.ktor.server.sessions.set
 fun ApplicationCall.language(): Language = Language.negotiate(request.acceptLanguageItems().map { it.value })
 
 /** Thin client pages that only exist in HTML: sign-in, sign-out, htmx fragments, the player script. */
-fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLinks) {
+fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLinks, throttle: LoginThrottle) {
     staticResources("/static", "static")
 
     get("/login") {
@@ -44,12 +48,20 @@ fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLi
     post("/login") {
         val form = call.receiveParameters()
         val username = form["username"].orEmpty()
+        val language = call.language()
+        val address = call.request.origin.remoteAddress
+        throttle.retryAfterSeconds(username, address)?.let { seconds ->
+            call.response.header(HttpHeaders.RetryAfter, seconds.toString())
+            val minutes = ((seconds + 59) / 60).toInt()
+            return@post call.respondHtml(HttpStatusCode.TooManyRequests) { loginPage(language, username, language.strings.tooManyAttempts(minutes)) }
+        }
         val user = accounts.authenticate(username, form["password"].orEmpty())
         if (user == null) {
-            val language = call.language()
+            throttle.failed(username, address)
             return@post call.respondHtml(HttpStatusCode.Unauthorized) { loginPage(language, username, language.strings.invalidCredentials) }
         }
-        call.sessions.set(UserSession(user.id))
+        throttle.succeeded(username, address)
+        call.sessions.set(UserSession(user.id, user.credentialsVersion))
         call.respondSeeOther("/")
     }
 

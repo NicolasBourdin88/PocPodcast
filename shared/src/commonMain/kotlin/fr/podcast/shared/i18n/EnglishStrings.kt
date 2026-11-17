@@ -41,6 +41,7 @@ object EnglishStrings : Strings {
     override val password = "Password"
     override val signIn = "Sign in"
     override val signOut = "Sign out"
+    override fun tooManyAttempts(minutes: Int) = "Too many attempts: try again in $minutes min."
     override val invalidCredentials = "Wrong username or password."
     override val serverUnreachable = "Cannot reach the server."
     override val notAPodcastServer = "This address is not a podcast server."

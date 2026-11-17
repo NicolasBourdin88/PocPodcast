@@ -11,7 +11,6 @@ import fr.podcast.server.hal.episodeResource
 import fr.podcast.server.hal.podcastResource
 import fr.podcast.server.hal.rootResource
 import fr.podcast.server.hal.tokenResource
-import fr.podcast.server.hal.userResource
 import fr.podcast.server.html.homePage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.HalJson
@@ -33,6 +32,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -108,8 +108,14 @@ fun Route.apiRoutes(services: ServerServices) {
         }
         if (errors.isNotEmpty()) return@post call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid token request", errors)
 
-        val user = accounts.authenticate(username!!, password!!)
-            ?: return@post call.respondProblem(HttpStatusCode.Unauthorized, "Wrong username or password")
+        val address = call.request.origin.remoteAddress
+        services.loginThrottle.retryAfterSeconds(username!!, address)?.let { return@post call.respondTooManyAttempts(it) }
+        val user = accounts.authenticate(username, password!!)
+        if (user == null) {
+            services.loginThrottle.failed(username, address)
+            return@post call.respondProblem(HttpStatusCode.Unauthorized, "Wrong username or password")
+        }
+        services.loginThrottle.succeeded(username, address)
         val token = accounts.issueToken(user, deviceName!!)
         call.respondText(tokenResource(token).toString(), HalJson, HttpStatusCode.Created)
     }
@@ -119,11 +125,6 @@ fun Route.apiRoutes(services: ServerServices) {
             val principal = call.authPrincipal as? TokenPrincipal ?: return@delete call.respondUnauthenticated()
             accounts.revokeToken(principal.token)
             call.respond(HttpStatusCode.NoContent)
-        }
-
-        get("/me") {
-            val representation = call.representation()
-            call.respondResource(userResource(call.user, representation.forms), representation)
         }
 
         get("/podcasts/{id}") {

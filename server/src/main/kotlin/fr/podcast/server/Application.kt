@@ -1,10 +1,14 @@
 package fr.podcast.server
 
+import fr.podcast.server.api.accountRoutes
 import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
 import fr.podcast.server.api.searchRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
+import fr.podcast.server.auth.LoginThrottle
+import fr.podcast.server.auth.Role
+import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.auth.installAuthentication
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.FeedFetcher
@@ -108,6 +112,7 @@ class ServerServices(
     private val scope: CoroutineScope,
 ) {
     val accounts = Accounts(database)
+    val loginThrottle = LoginThrottle()
     val guard = UrlGuard(config.allowPrivateFeeds)
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
@@ -147,7 +152,26 @@ fun main() {
         exitProcess(1)
     }
     val database = ServerDatabase.connect(url, System.getenv("DATABASE_USER") ?: "podcast", System.getenv("DATABASE_PASSWORD"))
+    val accounts = Accounts(database)
+    runBlocking {
+        val admin = bootstrapAdmin(accounts, System.getenv("ADMIN_USERNAME"), System.getenv("ADMIN_PASSWORD"))
+        when {
+            admin != null -> LoggerFactory.getLogger("fr.podcast.server").info("Administrator {} created", admin.username)
+            accounts.count() == 0L -> System.err.println("Aucun compte : définir ADMIN_USERNAME et ADMIN_PASSWORD pour créer le premier administrateur.")
+        }
+    }
     startServer(ServerConfig.fromEnvironment(defaultName = "Podcast", defaultSecureCookies = true), database)
+}
+
+/**
+ * The first administrator of a new server, from ADMIN_USERNAME and ADMIN_PASSWORD; ignored once
+ * the server has an account (the variables can then be removed). Null when nothing was created.
+ */
+suspend fun bootstrapAdmin(accounts: Accounts, username: String?, password: String?): UserAccount? {
+    if (username.isNullOrBlank() || password.isNullOrEmpty() || accounts.count() > 0) return null
+    require(Accounts.validUsername(username)) { "ADMIN_USERNAME: 3 to 32 characters (lowercase letters, digits, '.', '_', '-')" }
+    require(password.length >= Accounts.MIN_PASSWORD_LENGTH) { "ADMIN_PASSWORD: at least ${Accounts.MIN_PASSWORD_LENGTH} characters" }
+    return accounts.create(username, username, password, Role.ADMIN)
 }
 
 fun startServer(config: ServerConfig, database: ServerDatabase) {
@@ -171,8 +195,9 @@ fun Application.module(services: ServerServices) {
         apiRoutes(services)
         subscriptionRoutes(services)
         queueRoutes(services)
+        accountRoutes(services)
         searchRoutes(services)
-        webRoutes(database, services.accounts, services.audioLinks)
+        webRoutes(database, services.accounts, services.audioLinks, services.loginThrottle)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")
     }
 

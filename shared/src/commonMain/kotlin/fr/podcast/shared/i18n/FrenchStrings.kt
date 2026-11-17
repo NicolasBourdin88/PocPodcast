@@ -43,6 +43,7 @@ object FrenchStrings : Strings {
     override val password = "Mot de passe"
     override val signIn = "Se connecter"
     override val signOut = "Se déconnecter"
+    override fun tooManyAttempts(minutes: Int) = "Trop d'essais : réessayez dans $minutes min."
     override val invalidCredentials = "Identifiant ou mot de passe incorrect."
     override val serverUnreachable = "Impossible de joindre le serveur."
     override val notAPodcastServer = "Cette adresse n'est pas celle d'un serveur de podcasts."
