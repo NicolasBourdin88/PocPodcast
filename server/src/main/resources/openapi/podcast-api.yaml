@@ -1466,6 +1466,9 @@ components:
             share:
               description: "Gabarit `/shares/{id}` : un partage, vu par son propriétaire ou son destinataire."
               $ref: "#/components/schemas/Link"
+            playlist:
+              description: "Gabarit `/playlists/{id}` : une playlist, de l'utilisateur ou partagée avec lui."
+              $ref: "#/components/schemas/Link"
             search:
               description: "Gabarit `/search{?q}` : recherche dans les annuaires."
               $ref: "#/components/schemas/Link"

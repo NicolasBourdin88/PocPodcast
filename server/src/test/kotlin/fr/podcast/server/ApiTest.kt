@@ -56,6 +56,7 @@ class ApiTest {
         assertEquals("/episodes{?status,offset,limit}", link("episodes"))
         // A subscription shared with the user is not in their list: they reach it by this link.
         assertEquals("/subscriptions/{id}", link("subscription"))
+        assertEquals("/playlists/{id}", link("playlist"))
     }
 
     @Test

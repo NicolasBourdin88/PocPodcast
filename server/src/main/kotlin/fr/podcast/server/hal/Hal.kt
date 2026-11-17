@@ -113,6 +113,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "podcast" to "/podcasts/{id}",
             "subscription" to "/subscriptions/{id}",
             "share" to "/shares/{id}",
+            "playlist" to "/playlists/{id}",
             "search" to "/search{?q}",
         )
         if (home != null) {
