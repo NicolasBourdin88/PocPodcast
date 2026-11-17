@@ -192,9 +192,21 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 6 — Multi-utilisateurs
 
-- [ ] Comptes, authentification.
-- [ ] Fichiers mutualisés, statut et position par utilisateur.
-- [ ] Partage et droits (accès, modification) sur épisodes, playlists, abonnements.
+- [x] Comptes, authentification. → premier administrateur par l'environnement, comptes gérés par les administrateurs, changement de mot de passe (les autres appareils sont déconnectés), appareils, tentatives limitées (ADR 0009).
+- [x] Fichiers mutualisés, statut et position par utilisateur. → acquis aux étapes 4 et 5 (catalogue et fichiers mutualisés, `playback_states` et file d'attente par utilisateur) ; vérifié avec deux comptes.
+- [x] Partage et droits (accès, modification) sur épisodes, playlists, abonnements. → abonnements en lecture ou en modification, épisodes recommandés avec un message, une seule règle `can()` ; dans chaque client. **Les playlists se partageront à l'étape 7**, avec la même table et les mêmes routes.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| M1 | Comptes : annuaire, gestion par les administrateurs, mot de passe, appareils, tentatives limitées, premier administrateur | `./gradlew :server:test` (`AccountManagementTest`) |
+| M2 | Partages : lecture seule, modification, recommandation, 404 et 403, partages supprimés avec ce qu'ils partagent | `./gradlew :server:test` (`SharingTest`, `ContractTest`) |
+| M3 | SDK de bout en bout (comptes, partages, refus traduits) ; la démo se comporte comme un serveur | `./gradlew :server:test` (`SdkTest`), `./gradlew :shared:jvmTest` |
+| M4 | Client léger : Réglages (`/me`), partages dans la Bibliothèque, recommandation depuis l'Accueil, refus affichés | `./gradlew :server:test` (`WebTest`), puis http://localhost:8080 |
+| M5 | Apps : Réglages, « Partagés avec moi », page d'un podcast selon les droits, partage et recommandation | `./gradlew :composeApp:desktopTest` (captures `settings-*`, `shared-*`), puis chaque app |
+| M6 | CLI : `profile`, `passwd`, `devices`, `users`, `share`, `shared`, `unshare`, `recommend` | voir `README.md` |
+| M7 | Deux comptes sur un serveur : chacun sa progression et sa file, le partage visible de l'autre côté | Alice et Bob (`DevSeed.kt`) |
 
 ## Étape 7 — Playlists
 

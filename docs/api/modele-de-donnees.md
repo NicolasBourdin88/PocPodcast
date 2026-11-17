@@ -7,7 +7,7 @@ Base PostgreSQL du service, gérée par migrations Flyway et lue par SQLDelight 
 - **Catalogue mutualisé, état par utilisateur.**
   - Les podcasts, les épisodes et leurs fichiers audio existent une seule fois sur le serveur, quel que soit le nombre d'abonnés.
   - Ce qui dépend de l'utilisateur vit dans des tables séparées, clé `user_id` : abonnement, annotation, position, statut, playlists.
-- **Propriétaire + partages** (ADR 0005) : les ressources partageables (abonnements, playlists, épisodes recommandés) ont un `owner`, et `shares` donne `READ` ou `WRITE` à d'autres utilisateurs.
+- **Propriétaire + partages** (ADR 0005, 0009) : les ressources partageables (abonnements, playlists, épisodes recommandés) ont un propriétaire, et `shares` donne `READ` ou `WRITE` à d'autres utilisateurs.
 - **Secrets** : seul le hash des mots de passe (Argon2id) et des jetons (SHA-256) est stocké.
 - **Clés** : `BIGSERIAL` en base, exposées comme chaînes opaques dans l'API.
 - **Dates** : `TIMESTAMPTZ` en base, ISO 8601 UTC dans l'API.
@@ -31,6 +31,7 @@ erDiagram
     playlists ||--o{ playlist_items : "contient"
     episodes ||--o{ playlist_items : "figure dans"
     playlists ||--o| playlist_feeds : "exposée en RSS"
+    users ||--o{ shares : "donne"
     users ||--o{ shares : "reçoit"
 
     users {
@@ -39,6 +40,7 @@ erDiagram
         text display_name
         text password_hash "Argon2id"
         text role "USER | ADMIN"
+        int credentials_version "change avec le mot de passe"
         timestamptz created_at
     }
     api_tokens {
@@ -146,10 +148,14 @@ erDiagram
         text secret UK "URL à capacité"
     }
     shares {
-        text resource_type PK "SUBSCRIPTION | PLAYLIST | EPISODE"
-        bigint resource_id PK
-        bigint grantee_id PK
+        bigint id PK
+        text resource_type "SUBSCRIPTION | EPISODE | PLAYLIST"
+        bigint resource_id
+        bigint owner_id FK
+        bigint grantee_id FK
         text permission "READ | WRITE"
+        text message "facultatif"
+        timestamptz created_at
     }
 ```
 
@@ -165,7 +171,7 @@ erDiagram
 | `media_files` | Fichiers audio téléchargés et mutualisés, purge | Étape 4 (`V2`) |
 | `queue_items` | File d'attente de chaque utilisateur (« à suivre ») | Étape 5 (`V3`) |
 | `server_secrets` | Clés générées par le serveur (signature des liens audio) | Étape 5 (`V3`) |
-| `shares` | Partages et droits | Étape 6 |
+| `shares`, `users.credentials_version` | Partages et droits ; expiration des sessions à chaque nouveau mot de passe | Étape 6 (`V4`) |
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 |
 
 ## Règles
@@ -182,3 +188,8 @@ erDiagram
   - un épisode en sort quand il est marqué comme écouté, ou quand l'utilisateur se désabonne de son podcast ;
   - un épisode en file d'attente n'est jamais purgé.
 - **Position d'écoute** : elle peut dépasser la durée annoncée par le flux, jusqu'à 24 heures (ADR 0008).
+- **Partages** (ADR 0009) :
+  - un seul par ressource, propriétaire et destinataire : partager de nouveau met à jour le droit et le message ;
+  - on ne partage pas avec soi-même (`CHECK owner_id <> grantee_id`) ;
+  - ils disparaissent avec ce qu'ils partagent : avec l'abonnement quand on s'en désabonne, avec les épisodes d'un podcast supprimé, et avec le compte du propriétaire ou du destinataire (`ON DELETE CASCADE`).
+- **Mots de passe** : `credentials_version` augmente à chaque nouveau mot de passe. Une session du client léger porte la version de sa connexion et n'est plus acceptée ensuite.

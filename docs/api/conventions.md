@@ -1,6 +1,6 @@
 # Conventions de l'API hypermédia
 
-Règles communes à toutes les ressources du service. Elles appliquent les ADR 0003 (HAL + HAL-FORMS) et 0005 (authentification). Le détail de chaque ressource est dans la spécification OpenAPI : `server/src/main/resources/openapi/podcast-api.yaml`, consultable sur http://localhost:8080/docs quand le serveur tourne.
+Règles communes à toutes les ressources du service. Elles appliquent les ADR 0003 (HAL + HAL-FORMS), 0005 (authentification) et 0009 (comptes et partages). Le détail de chaque ressource est dans la spécification OpenAPI : `server/src/main/resources/openapi/podcast-api.yaml`, consultable sur http://localhost:8080/docs quand le serveur tourne.
 
 ## Une URL, plusieurs représentations
 
@@ -16,9 +16,12 @@ Les réponses portent `Vary: Accept, Accept-Language`. Le JSON est **neutre en l
 
 Sans type précis (`*/*`), la réponse est du JSON, sauf pour htmx : une requête `HX-Request` reçoit du HTML tant qu'elle ne demande pas explicitement du JSON. C'est ce qui permet la navigation boostée du client léger.
 
-Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`) et la Bibliothèque (`/subscriptions`). Les autres arrivent avec leurs fonctionnalités.
+Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque (`/subscriptions`) et les Réglages (`/me`). Les autres arrivent avec leurs fonctionnalités.
 
-**Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, toujours en `200`, car htmx n'insère que les réponses réussies. Un refus y est donc un fragment d'erreur traduit, et non un Problem Details. Quand une action change la liste des abonnements, l'en-tête `HX-Trigger: subscriptions-changed` demande à la page de la recharger ; `queue-changed` et `episodes-changed` font de même pour la file d'attente et les épisodes.
+**Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, par exemple la phrase qui dit ce qui a été fait.
+- **Refus** : il garde son statut (403, 404, 422, 429), mais son corps est la phrase que les apps afficheraient, traduite avec la même correspondance que le SDK. La page configure htmx (`responseHandling`) pour insérer ces réponses-là à côté du formulaire.
+- **Refus plus anciens** : l'abonnement à un flux et l'import OPML répondent encore `200` avec un fragment d'erreur.
+- **Rechargements** : quand une action change une liste, l'en-tête `HX-Trigger` demande à la page de la recharger : `subscriptions-changed`, `queue-changed`, `episodes-changed`, `shares-changed`, `users-changed`, `devices-changed`.
 
 **Lecteur du client léger** : un `<audio>` dans un pied de page `hx-preserve`, conservé de page en page grâce à `hx-boost` sur la navigation, et piloté par `static/player.js`. Ses requêtes de modification portent aussi `HX-Request`.
 
@@ -26,7 +29,7 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`) et la Bibliothèqu
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`) et `podcast` (`/podcasts/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
+- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, `users`, `shared`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`), `podcast` (`/podcasts/{id}`), `subscription` (`/subscriptions/{id}`) et `share` (`/shares/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
 - **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
@@ -67,6 +70,8 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`) et la Bibliothèqu
 
 - **Pas authentifié** : `401` avec `WWW-Authenticate: Bearer realm="podcast"`. Le client léger est redirigé vers `/login`.
 - **Ressource invisible** : `404`, y compris si elle existe mais n'est pas visible pour l'utilisateur.
+- **Ressource visible, action interdite** : `403`, par exemple modifier un abonnement partagé en lecture seule, ou gérer les comptes sans être administrateur.
+- **Trop d'essais** : après 5 mauvais mots de passe en 15 minutes, `429` avec `Retry-After` (ADR 0009).
 
 ## Erreurs
 
@@ -90,6 +95,7 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
 | `/problems/not-an-opml` | 422 | Fichier OPML illisible |
 | `/problems/search-failed` | 502 | Aucun annuaire n'a répondu |
 | `/problems/audio-link-expired` | 403 | Lien audio signé expiré : relire l'épisode pour en obtenir un nouveau |
+| `/problems/too-many-attempts` | 429 | Trop de mauvais mots de passe : `Retry-After` dit dans combien de secondes réessayer |
 
 ## Formats
 
@@ -100,6 +106,11 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
 - **Énumérations** : en majuscules (`NEW`, `IN_PROGRESS`, `PLAYED`).
 - **OPML** : `text/x-opml`, par le lien `opml` de la collection des abonnements. `GET` exporte et `POST` importe (corps brut, ou formulaire `multipart` depuis le client léger). L'import répond par un bilan : importés, déjà suivis, refusés avec leur cause.
 - **Audio** : le lien `audio` d'un épisode est **signé** (`?expires=…&signature=…`) et valable 24 heures, car les lecteurs (Media3, AVPlayer, JavaFX, `<audio>`) n'envoient pas de jeton. Il s'ouvre sans authentification et se donne tel quel au lecteur. Il sert le fichier téléchargé par le serveur (requêtes `Range` acceptées), sinon redirige vers l'enclosure de l'éditeur. Sans signature, une session ou un jeton donne aussi accès (ADR 0008).
+- **Comptes** (ADR 0009) : `GET /me` (profil, templates `update-profile`, `change-password`, `logout`), `/me/devices` (templates `revoke`). `GET /users` est lisible par tous ; un administrateur y trouve `create-user`, et sur chaque compte `update-user`, `reset-password` et `delete-user`.
+- **Partages** (ADR 0009) :
+  - un abonnement porte `access` (`OWNER`, `WRITE`, `READ`) et `ownerName` quand il est partagé avec l'utilisateur ; ses templates suivent ces droits (`update`, `unsubscribe`, `share`, `subscribe`) ;
+  - `share` (`userId`, `permission`, `message`) et `recommend` (`userId`, `message`) créent un partage ; le même destinataire une seconde fois remplace le droit et le message ;
+  - `GET /shared` donne ce que les autres partagent avec l'utilisateur ; `/shares/{id}` porte `unshare` (propriétaire et destinataire) et `change-permission` (propriétaire, sauf une recommandation).
 - **File d'attente** : `GET /queue` (lien `queue` de la racine) donne les épisodes dans l'ordre d'écoute. Chaque épisode indique `inQueue` et porte `enqueue` (hors de la file), ou `dequeue` et `move` (dans la file). `enqueue` envoie `episodeId` (pré-rempli, `readOnly`) et une `position` facultative : `0` pour « lire ensuite », absente pour la fin de la file.
 
 ## Évolution

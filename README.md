@@ -40,7 +40,7 @@ L'interface existe en français et en anglais. Les textes, les couleurs et la na
 ./gradlew :server:run
 ```
 
-- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer et Bibliothèque)
+- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer, Bibliothèque et Réglages)
 - http://localhost:8080/docs : documentation de l'API (Swagger UI)
 
 Au premier lancement, un PostgreSQL embarqué est créé dans `server/build/dev-postgres-8080`, avec des données de démo lues dans de **vrais flux** (Les Cast Codeurs, Talking Kotlin, Fragmented, Podnews Weekly Review, qui a des chapitres et des transcriptions). Sans réseau, les podcasts sont créés vides et lus plus tard. Les **comptes de démo** sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt) : Alice est abonnée aux quatre podcasts, Bob à deux, chacun avec sa propre progression. Les fichiers téléchargés vont dans `server/build/dev-media-8080`.
@@ -55,11 +55,12 @@ PORT=8081 SERVER_NAME="Serveur B" ./gradlew :server:run
 
 En production, le point d'entrée `fr.podcast.server.ApplicationKt` exige une vraie base (`DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`) et active les cookies `Secure`.
 
-Variables d'environnement (voir l'[ADR 0007](docs/adr/0007-flux-telechargements-et-purge.md)) :
+Variables d'environnement (voir les ADR [0007](docs/adr/0007-flux-telechargements-et-purge.md) et [0009](docs/adr/0009-comptes-et-partages.md)) :
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `PORT`, `SERVER_NAME` | `8080`, `Podcast` | Port d'écoute et nom affiché aux clients |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | aucune | Crée le premier administrateur au démarrage, seulement si la base n'a aucun compte (8 caractères au moins pour le mot de passe) |
 | `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | aucune | Ajoute Podcast Index à la recherche (clés gratuites sur api.podcastindex.org) ; sans elles, seul Apple Podcasts est interrogé |
 | `REFRESH_INTERVAL_MINUTES` | `60` | Délai avant de relire un flux |
 | `MEDIA_DIR` | `media` | Dossier des fichiers audio téléchargés |
@@ -145,6 +146,24 @@ Dans la TUI (`play` ou `tui`) :
 - `q` quitte, après avoir envoyé la position.
 
 File d'attente : `queue`, `queue add 4` (`--next` pour le lire ensuite), `queue remove 1`, `queue clear`.
+
+## Comptes et partages
+
+Un administrateur crée les comptes ; chacun change ensuite son nom et son mot de passe, et peut déconnecter un appareil perdu ([ADR 0009](docs/adr/0009-comptes-et-partages.md)). Dans les données de démo, Alice est administratrice.
+
+- **Partager un abonnement** : en lecture seule, ou en lecture et modification (note, téléchargement automatique). Seul le propriétaire se désabonne ou le partage à nouveau.
+- **Recommander un épisode** : à un autre compte, avec un message.
+- **Partagés avec moi** : ce que les autres partagent apparaît à part, dans la Bibliothèque. On peut s'abonner soi-même au podcast partagé, ou retirer le partage.
+- **Où** :
+  - apps : Réglages (profil, mot de passe, appareils, comptes du serveur pour un administrateur), Bibliothèque et page d'un podcast ;
+  - client léger : Réglages, Bibliothèque, et « Recommander » sous les nouveaux épisodes de l'Accueil ;
+  - CLI : les commandes ci-dessous.
+
+```bash
+cli/build/install/podcast/bin/podcast share 2 bob --write --message "Pour le train"
+```
+
+Ensuite : `share 2` (avec qui il est partagé), `unshare 2 bob`, `shared` puis `shared remove 1`, `recommend 3 alice`, `profile --name …`, `passwd`, `devices` puis `devices revoke 2`, et pour un administrateur `users`, `users add carol --name Carol`, `users role 3 admin`, `users passwd 3`, `users remove 3 --yes`.
 
 ## Tests
 

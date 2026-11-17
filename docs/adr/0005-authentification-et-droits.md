@@ -73,5 +73,5 @@
 
 - **Étape 3** : tables `users`, `sessions`, `tokens`, `shares`, et `owner_id` sur les ressources partageables.
 - **Étude 2** : vérifier avec un vrai AntennaPod qu'il accepte un mot de passe d'application et s'il renvoie `sessionid` ou Basic à chaque requête.
-- **Sécurité** : HTTPS obligatoire en production (cookies `Secure`, Basic en clair sinon) et limitation des tentatives de connexion, à prévoir avec les comptes (étape 6).
+- **Sécurité** : HTTPS obligatoire en production (cookies `Secure`, Basic en clair sinon) et limitation des tentatives de connexion, à prévoir avec les comptes (étape 6 : fait, ADR 0009).
 - **Plus tard** : groupes, partage public par lien et OAuth/OIDC sont hors périmètre ; le modèle `shares` pourra les accueillir (`grantee` de type groupe ou lien).
