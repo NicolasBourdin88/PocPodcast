@@ -91,5 +91,5 @@ class OpmlImportCommand : ServerCommand("import") {
 }
 
 /** The subscription shown under [number] by `podcast subscriptions`. */
-private fun ServerCommand.subscription(number: Int): SubscriptionItem =
+internal fun ServerCommand.subscription(number: Int): SubscriptionItem =
     call { client().subscriptionItems() }.getOrNull(number - 1) ?: fail(cli.strings.unknownNumber(number))

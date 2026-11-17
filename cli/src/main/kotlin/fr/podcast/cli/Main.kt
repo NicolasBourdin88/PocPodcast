@@ -259,6 +259,9 @@ fun main(args: Array<String>) = PodcastCommand()
         QueueCommand().subcommands(QueueAddCommand(), QueueRemoveCommand(), QueueClearCommand()),
         SearchCommand(), SubscribeCommand(), SubscriptionsCommand(), NoteCommand(), UnsubscribeCommand(),
         OpmlCommand().subcommands(OpmlExportCommand(), OpmlImportCommand()),
+        SharedCommand().subcommands(SharedRemoveCommand()), ShareCommand(), UnshareCommand(), RecommendCommand(),
         LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand(),
+        ProfileCommand(), PasswdCommand(), DevicesCommand().subcommands(DevicesRevokeCommand()),
+        UsersCommand().subcommands(UsersAddCommand(), UsersRemoveCommand(), UsersPasswdCommand(), UsersRoleCommand()),
     )
     .main(args)

@@ -45,4 +45,5 @@ fun renderQueueText(queue: List<EpisodeItem>, strings: Strings): String = buildS
     }
 }.trimEnd()
 
-private fun number(index: Int) = "${index + 1}.".padStart(3)
+/** " 1.", " 2."…: the numbers commands refer to. */
+internal fun number(index: Int) = "${index + 1}.".padStart(3)

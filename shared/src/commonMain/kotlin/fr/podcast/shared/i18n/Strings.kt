@@ -228,6 +228,30 @@ interface Strings {
     val cliQueueRemoveDescription: String
     val cliQueueClearDescription: String
     val nothingToPlay: String
+    val cliProfileDescription: String
+    val cliPasswdDescription: String
+    val cliDevicesDescription: String
+    val cliDevicesRevokeDescription: String
+    val cliUsersDescription: String
+    val cliUsersAddDescription: String
+    val cliUsersRemoveDescription: String
+    val cliUsersPasswdDescription: String
+    val cliUsersRoleDescription: String
+    val cliSharedDescription: String
+    val cliSharedRemoveDescription: String
+    val cliShareDescription: String
+    val cliWriteOption: String
+    val cliUnshareDescription: String
+    val cliRecommendDescription: String
+    val confirmPassword: String
+    val passwordsDiffer: String
+    val confirmWithYes: String
+    val notShared: String
+    val nothingShared: String
+    fun noLongerSharedWith(name: String): String
+    val shareRemoved: String
+    fun deviceSignedOut(name: String): String
+    fun userDeleted(name: String): String
     val tuiHelp: String
     val tuiPlayerHelp: String
 }
