@@ -1,6 +1,8 @@
 package fr.podcast.shared.i18n
 
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistOrder
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
@@ -11,6 +13,7 @@ object FrenchStrings : Strings {
         Destination.Home -> "Accueil"
         Destination.Explore -> "Explorer"
         Destination.Library -> "Bibliothèque"
+        Destination.Playlists -> "Playlists"
         Destination.Settings -> "Réglages"
     }
 
@@ -101,6 +104,15 @@ object FrenchStrings : Strings {
         "unfavorite" -> removeFavorite
         "rate" -> "Noter"
         "clear-rating" -> clearRating
+        "create-playlist" -> newPlaylist
+        "update-playlist" -> editPlaylist
+        "delete-playlist" -> deletePlaylist
+        "add-episode" -> addToPlaylist
+        "remove-from-playlist" -> removeFromPlaylist
+        "move-in-playlist" -> "Déplacer dans la playlist"
+        "shuffle" -> shuffle
+        "publish-feed" -> publishFeed
+        "unpublish-feed" -> unpublishFeed
         else -> name
     }
 
@@ -150,6 +162,51 @@ object FrenchStrings : Strings {
     override val rating = "Note"
     override fun rateAs(stars: Int) = if (stars <= 1) "Noter $stars étoile" else "Noter $stars étoiles"
     override val clearRating = "Effacer la note"
+
+    override val newPlaylist = "Nouvelle playlist"
+    override val playlistTitle = "Titre"
+    override val description = "Description"
+    override fun playlistKind(kind: PlaylistKind) = when (kind) {
+        PlaylistKind.STATIC -> "Statique"
+        PlaylistKind.DYNAMIC -> "Dynamique"
+    }
+    override fun playlistKindHint(kind: PlaylistKind) = when (kind) {
+        PlaylistKind.STATIC -> "Vous choisissez les épisodes et leur ordre."
+        PlaylistKind.DYNAMIC -> "Les épisodes suivent des règles, parmi vos abonnements."
+    }
+    override val keywords = "Mots-clés"
+    override val keywordsHint = "Séparés par des virgules : dans le titre, la description ou le podcast"
+    override val favoritesOnly = "Favoris seulement"
+    override val minRating = "Note minimale"
+    override val anyRating = "Toutes"
+    override val unplayedOnly = "Non écoutés seulement"
+    override fun playlistOrder(order: PlaylistOrder) = when (order) {
+        PlaylistOrder.NEWEST -> "Les plus récents d'abord"
+        PlaylistOrder.OLDEST -> "Les plus anciens d'abord"
+        PlaylistOrder.RANDOM -> "Aléatoire"
+    }
+    override val episodeLimit = "Nombre d'épisodes au plus"
+    override fun episodeCount(count: Int) = if (count <= 1) "$count épisode" else "$count épisodes"
+    override val playAll = "Tout lire"
+    override val shuffle = "Mélanger"
+    override val editPlaylist = "Modifier"
+    override val deletePlaylist = "Supprimer la playlist"
+    override fun deletePlaylistConfirm(title: String) = "Supprimer « $title » ? Ses partages et son flux disparaissent aussi."
+    override val addToPlaylist = "Ajouter à une playlist"
+    override fun addedTo(title: String) = "Ajouté à « $title »."
+    override val noPlaylistToAddTo = "Aucune playlist statique à compléter : créez-en une dans Playlists."
+    override val removeFromPlaylist = "Retirer de la playlist"
+    override val emptyPlaylists = "Aucune playlist pour l'instant."
+    override val emptyPlaylist = "Cette playlist est vide."
+    override val choosePlaylist = "Choisissez une playlist."
+    override val sharedPlaylists = "Partagées avec moi"
+    override fun playlistSharedBy(name: String) = "Partagée par $name"
+    override val feed = "Flux RSS"
+    override val feedHint = "Cette adresse secrète s'ouvre dans n'importe quelle appli de podcasts."
+    override val publishFeed = "Publier le flux"
+    override val newFeedAddress = "Nouvelle adresse"
+    override val unpublishFeed = "Retirer le flux"
+    override fun feedPublished(title: String) = "Flux de « $title » publié."
 
     override val nowPlaying = "En cours de lecture"
     override val pause = "Pause"

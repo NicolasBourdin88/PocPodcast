@@ -85,7 +85,9 @@ fun LibraryScreen(
 
     LaunchedEffect(client, reloads) {
         if (state !is LibraryState.Loaded) state = LibraryState.Loading
-        state = attempt { LibraryState.Loaded(client.subscriptionItems(), client.sharedWithMe()) }.fold({ it }, { LibraryState.Failed(it) })
+        // Shared playlists are in Playlists.
+        state = attempt { LibraryState.Loaded(client.subscriptionItems(), client.sharedWithMe().filter { it.playlist == null }) }
+            .fold({ it }, { LibraryState.Failed(it) })
     }
 
     fun replace(item: SubscriptionItem) {

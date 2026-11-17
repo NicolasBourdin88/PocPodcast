@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -58,6 +59,8 @@ import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.navigation.Destination
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.components.PodcastIcons
+import fr.podcast.ui.playlists.PlaylistsScreen
 import fr.podcast.ui.explore.ExploreScreen
 import fr.podcast.ui.home.HomeScreen
 import fr.podcast.ui.home.HomeUiState
@@ -79,6 +82,7 @@ private val Destination.icon: ImageVector
         Destination.Home -> Icons.Default.Home
         Destination.Explore -> Icons.Default.Search
         Destination.Library -> Icons.AutoMirrored.Filled.List
+        Destination.Playlists -> PodcastIcons.Playlist
         Destination.Settings -> Icons.Default.Settings
     }
 
@@ -93,6 +97,7 @@ fun MainScaffold(
     initialPodcastId: String? = null,
     initialQuery: String = "",
     initialPlayerOpen: Boolean = false,
+    initialPlaylistId: String? = null,
 ) {
     var reloads by remember { mutableIntStateOf(0) }
     val state by produceState<HomeUiState>(HomeUiState.Loading, client, reloads) {
@@ -118,6 +123,7 @@ fun MainScaffold(
             initialPodcastId = initialPodcastId,
             initialQuery = initialQuery,
             initialPlayerOpen = initialPlayerOpen,
+            initialPlaylistId = initialPlaylistId,
             settings = settings,
             onReload = { reloads++ },
             onSessionExpired = onSessionExpired,
@@ -135,6 +141,7 @@ private fun AdaptiveScaffold(
     initialPodcastId: String?,
     initialQuery: String,
     initialPlayerOpen: Boolean,
+    initialPlaylistId: String?,
     settings: @Composable (Modifier) -> Unit,
     onReload: () -> Unit,
     onSessionExpired: () -> Unit,
@@ -142,10 +149,12 @@ private fun AdaptiveScaffold(
     val strings = LocalStrings.current
     var selected by rememberSaveable { mutableStateOf(initialDestination) }
     var openPodcastId by rememberSaveable { mutableStateOf(initialPodcastId) }
+    var openPlaylistId by rememberSaveable { mutableStateOf(initialPlaylistId) }
 
-    // Choosing Library again goes back to the list.
+    // Choosing Library or Playlists again goes back to the list.
     fun select(destination: Destination) {
         if (destination == selected && destination == Destination.Library) openPodcastId = null
+        if (destination == selected && destination == Destination.Playlists) openPlaylistId = null
         selected = destination
     }
     val home = (state as? HomeUiState.Loaded)?.home
@@ -168,6 +177,13 @@ private fun AdaptiveScaffold(
         when {
             selected == Destination.Settings -> settings(modifier)
             selected == Destination.Explore -> ExploreScreen(client, onSubscribed = onReload, modifier, initialQuery)
+            selected == Destination.Playlists -> PlaylistsScreen(
+                client = client,
+                openPlaylistId = openPlaylistId,
+                onOpen = { openPlaylistId = it },
+                twoPanes = layout == WindowLayout.Expanded || layout == WindowLayout.Large,
+                modifier = modifier,
+            )
             selected == Destination.Library -> LibraryScreen(
                 client = client,
                 openPodcastId = openPodcastId,
@@ -196,7 +212,16 @@ private fun AdaptiveScaffold(
                                     selected = selected == destination,
                                     onClick = { select(destination) },
                                     icon = { Icon(destination.icon, contentDescription = null) },
-                                    label = { Text(strings.destination(destination)) },
+                                    // Five destinations on a phone: one line each, centered; a long one ("Bibliothèque")
+                                    // keeps its width and runs into its neighbors' margins, which have room.
+                                    label = {
+                                        Text(
+                                            strings.destination(destination),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            modifier = Modifier.wrapContentWidth(unbounded = true),
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -288,6 +313,7 @@ private fun AdaptiveScaffold(
         }
         if (playerOpen && playerItem != null) {
             PlayerScreen(
+                client = client,
                 item = playerItem,
                 nowPlaying = nowPlaying,
                 twoColumns = layout != WindowLayout.Compact && layout != WindowLayout.Medium,

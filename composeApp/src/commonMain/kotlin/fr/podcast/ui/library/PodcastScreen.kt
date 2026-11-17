@@ -59,7 +59,9 @@ import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.SubscriptionItem
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.components.FavoriteButton
 import fr.podcast.ui.components.PodcastIcons
+import fr.podcast.ui.playlists.AddToPlaylistDialog
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.player.EpisodePlayButton
 import fr.podcast.ui.player.QueueToggleButton
@@ -102,6 +104,7 @@ fun PodcastScreen(
     var confirmUnsubscribe by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
     var recommending by remember { mutableStateOf<Episode?>(null) }
+    var addingToPlaylist by remember { mutableStateOf<Episode?>(null) }
 
     LaunchedEffect(podcast.id, reloads) {
         attempt { client.podcastEpisodes(podcast.id) }
@@ -266,6 +269,13 @@ fun PodcastScreen(
                             }
                         },
                         onRecommend = { recommending = episode },
+                        onToggleFavorite = {
+                            act {
+                                client.setFavorite(episode.id, !episode.favorite)
+                                replaceEpisode(episode.id)
+                            }
+                        },
+                        onAddToPlaylist = { addingToPlaylist = episode },
                     )
                 }
             }
@@ -303,6 +313,14 @@ fun PodcastScreen(
             shareReloads++
             tell(strings.sharedWithUser(user.displayName))
         }
+    }
+    addingToPlaylist?.let { episode ->
+        AddToPlaylistDialog(
+            client = client,
+            episodeId = episode.id,
+            onDismiss = { addingToPlaylist = null },
+            onAdded = { playlist -> tell(strings.addedTo(playlist.title)) },
+        )
     }
     recommending?.let { episode ->
         ShareDialog(
@@ -374,8 +392,19 @@ private fun SharedWithList(shares: List<Share>, onPermission: (Share, SharePermi
     }
 }
 
+/**
+ * An episode: the queue, the favorite and adding to a playlist at hand, the rarer actions (keep,
+ * download, recommend) in a menu, so that narrow screens keep room.
+ */
 @Composable
-private fun EpisodeRow(episode: Episode, onToggleKept: () -> Unit, onDownload: () -> Unit, onRecommend: () -> Unit) {
+private fun EpisodeRow(
+    episode: Episode,
+    onToggleKept: () -> Unit,
+    onDownload: () -> Unit,
+    onRecommend: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+) {
     val strings = LocalStrings.current
     val details = listOfNotNull(
         strings.status(episode),
@@ -392,16 +421,41 @@ private fun EpisodeRow(episode: Episode, onToggleKept: () -> Unit, onDownload: (
                 // Secondary actions under the text, so that narrow screens keep room for the title.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     QueueToggleButton(episode.id)
-                    IconToggleButton(checked = episode.kept, onCheckedChange = { onToggleKept() }) {
-                        Icon(
-                            if (episode.kept) PodcastIcons.Bookmark else PodcastIcons.BookmarkBorder,
-                            contentDescription = strings.action(if (episode.kept) "unkeep" else "keep"),
-                        )
+                    FavoriteButton(episode.favorite) { onToggleFavorite() }
+                    IconButton(onClick = onAddToPlaylist) { Icon(PodcastIcons.PlaylistAdd, contentDescription = strings.addToPlaylist) }
+                    episode.rating?.let { Text(strings.stars(it), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = strings.moreActions) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(strings.action(if (episode.kept) "unkeep" else "keep")) },
+                                leadingIcon = { Icon(if (episode.kept) PodcastIcons.Bookmark else PodcastIcons.BookmarkBorder, contentDescription = null) },
+                                onClick = {
+                                    menu = false
+                                    onToggleKept()
+                                },
+                            )
+                            if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
+                                DropdownMenuItem(
+                                    text = { Text(strings.action("download")) },
+                                    leadingIcon = { Icon(PodcastIcons.Download, contentDescription = null) },
+                                    onClick = {
+                                        menu = false
+                                        onDownload()
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text(strings.recommend) },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                onClick = {
+                                    menu = false
+                                    onRecommend()
+                                },
+                            )
+                        }
                     }
-                    if (episode.fileStatus == FileStatus.NONE || episode.fileStatus == FileStatus.FAILED) {
-                        IconButton(onClick = onDownload) { Icon(PodcastIcons.Download, contentDescription = strings.action("download")) }
-                    }
-                    IconButton(onClick = onRecommend) { Icon(Icons.Default.Share, contentDescription = strings.recommend) }
                 }
             }
         },

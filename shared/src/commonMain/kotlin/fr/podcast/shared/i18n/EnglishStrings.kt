@@ -1,6 +1,8 @@
 package fr.podcast.shared.i18n
 
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistOrder
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
@@ -11,6 +13,7 @@ object EnglishStrings : Strings {
         Destination.Home -> "Home"
         Destination.Explore -> "Explore"
         Destination.Library -> "Library"
+        Destination.Playlists -> "Playlists"
         Destination.Settings -> "Settings"
     }
 
@@ -99,6 +102,15 @@ object EnglishStrings : Strings {
         "unfavorite" -> removeFavorite
         "rate" -> "Rate"
         "clear-rating" -> clearRating
+        "create-playlist" -> newPlaylist
+        "update-playlist" -> editPlaylist
+        "delete-playlist" -> deletePlaylist
+        "add-episode" -> addToPlaylist
+        "remove-from-playlist" -> removeFromPlaylist
+        "move-in-playlist" -> "Move in playlist"
+        "shuffle" -> shuffle
+        "publish-feed" -> publishFeed
+        "unpublish-feed" -> unpublishFeed
         else -> name
     }
 
@@ -148,6 +160,51 @@ object EnglishStrings : Strings {
     override val rating = "Rating"
     override fun rateAs(stars: Int) = if (stars <= 1) "Rate $stars star" else "Rate $stars stars"
     override val clearRating = "Clear rating"
+
+    override val newPlaylist = "New playlist"
+    override val playlistTitle = "Title"
+    override val description = "Description"
+    override fun playlistKind(kind: PlaylistKind) = when (kind) {
+        PlaylistKind.STATIC -> "Static"
+        PlaylistKind.DYNAMIC -> "Dynamic"
+    }
+    override fun playlistKindHint(kind: PlaylistKind) = when (kind) {
+        PlaylistKind.STATIC -> "You choose the episodes and their order."
+        PlaylistKind.DYNAMIC -> "The episodes follow rules, among your subscriptions."
+    }
+    override val keywords = "Keywords"
+    override val keywordsHint = "Separated by commas: in the title, the description or the podcast"
+    override val favoritesOnly = "Favorites only"
+    override val minRating = "Minimum rating"
+    override val anyRating = "Any"
+    override val unplayedOnly = "Unplayed only"
+    override fun playlistOrder(order: PlaylistOrder) = when (order) {
+        PlaylistOrder.NEWEST -> "Newest first"
+        PlaylistOrder.OLDEST -> "Oldest first"
+        PlaylistOrder.RANDOM -> "Random"
+    }
+    override val episodeLimit = "At most this many episodes"
+    override fun episodeCount(count: Int) = if (count == 1) "1 episode" else "$count episodes"
+    override val playAll = "Play all"
+    override val shuffle = "Shuffle"
+    override val editPlaylist = "Edit"
+    override val deletePlaylist = "Delete playlist"
+    override fun deletePlaylistConfirm(title: String) = "Delete \"$title\"? Its shares and its feed go too."
+    override val addToPlaylist = "Add to a playlist"
+    override fun addedTo(title: String) = "Added to \"$title\"."
+    override val noPlaylistToAddTo = "No static playlist to add to: create one in Playlists."
+    override val removeFromPlaylist = "Remove from playlist"
+    override val emptyPlaylists = "No playlist yet."
+    override val emptyPlaylist = "This playlist is empty."
+    override val choosePlaylist = "Choose a playlist."
+    override val sharedPlaylists = "Shared with me"
+    override fun playlistSharedBy(name: String) = "Shared by $name"
+    override val feed = "RSS feed"
+    override val feedHint = "This secret address opens in any podcast app."
+    override val publishFeed = "Publish the feed"
+    override val newFeedAddress = "New address"
+    override val unpublishFeed = "Withdraw the feed"
+    override fun feedPublished(title: String) = "Feed of \"$title\" published."
 
     override val nowPlaying = "Now playing"
     override val pause = "Pause"

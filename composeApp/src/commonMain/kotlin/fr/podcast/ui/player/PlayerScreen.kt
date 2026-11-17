@@ -39,6 +39,15 @@ import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.components.SystemBackHandler
 import fr.podcast.ui.theme.LocalStrings
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import fr.podcast.shared.repository.PodcastClient
+import fr.podcast.ui.components.FavoriteButton
+import fr.podcast.ui.components.StarRating
+import fr.podcast.ui.components.attempt
+import kotlinx.coroutines.launch
 
 internal const val SKIP_BACK = fr.podcast.player.PlaybackController.SKIP_BACK_SECONDS
 internal const val SKIP_FORWARD = fr.podcast.player.PlaybackController.SKIP_FORWARD_SECONDS
@@ -48,7 +57,14 @@ internal const val SKIP_FORWARD = fr.podcast.player.PlaybackController.SKIP_FORW
  * two on wide or landscape ones (controls beside the queue).
  */
 @Composable
-fun PlayerScreen(item: EpisodeItem, nowPlaying: NowPlaying?, twoColumns: Boolean, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun PlayerScreen(
+    client: PodcastClient,
+    item: EpisodeItem,
+    nowPlaying: NowPlaying?,
+    twoColumns: Boolean,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val strings = LocalStrings.current
     val playback = LocalPlayback.current
     val queue by playback.queue.collectAsState()
@@ -66,7 +82,7 @@ fun PlayerScreen(item: EpisodeItem, nowPlaying: NowPlaying?, twoColumns: Boolean
                         // A phone in landscape has no room for the artwork: the controls come first.
                         val artwork = if (maxHeight < 420.dp) null else minOf(maxHeight * 0.45f, maxWidth * 0.6f, 280.dp)
                         Column(Modifier.verticalScroll(rememberScrollState())) {
-                            NowPlayingPane(item, nowPlaying, artwork, queueEmpty = queue.isEmpty())
+                            NowPlayingPane(client, item, nowPlaying, artwork, queueEmpty = queue.isEmpty())
                         }
                     }
                     VerticalDivider()
@@ -76,7 +92,7 @@ fun PlayerScreen(item: EpisodeItem, nowPlaying: NowPlaying?, twoColumns: Boolean
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val artworkSize = minOf(maxWidth * 0.7f, 300.dp)
                     LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        item(key = "now-playing") { NowPlayingPane(item, nowPlaying, artworkSize, queueEmpty = queue.isEmpty()) }
+                        item(key = "now-playing") { NowPlayingPane(client, item, nowPlaying, artworkSize, queueEmpty = queue.isEmpty()) }
                         queueItems(queue, playback, strings)
                     }
                 }
@@ -86,9 +102,13 @@ fun PlayerScreen(item: EpisodeItem, nowPlaying: NowPlaying?, twoColumns: Boolean
 }
 
 @Composable
-private fun NowPlayingPane(item: EpisodeItem, nowPlaying: NowPlaying?, artworkSize: Dp?, queueEmpty: Boolean) {
+private fun NowPlayingPane(client: PodcastClient, item: EpisodeItem, nowPlaying: NowPlaying?, artworkSize: Dp?, queueEmpty: Boolean) {
     val playback = LocalPlayback.current
     val state = nowPlaying?.state
+    val scope = rememberCoroutineScope()
+    // The user's marks, changed at once on screen; put back if the server refuses (ADR 0010).
+    var favorite by remember(item.episode.id) { mutableStateOf(item.episode.favorite) }
+    var rating by remember(item.episode.id) { mutableStateOf(item.episode.rating) }
     Column(
         Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -106,6 +126,17 @@ private fun NowPlayingPane(item: EpisodeItem, nowPlaying: NowPlaying?, artworkSi
             overflow = TextOverflow.Ellipsis,
         )
         Text(item.podcast.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FavoriteButton(favorite) { value ->
+                favorite = value
+                scope.launch { attempt { client.setFavorite(item.episode.id, value) }.onFailure { favorite = !value } }
+            }
+            val previous = rating
+            StarRating(rating, starSize = 20.dp, onRate = { value ->
+                rating = value
+                scope.launch { attempt { client.rate(item.episode.id, value) }.onFailure { rating = previous } }
+            })
+        }
         PositionSlider(
             positionSeconds = state?.positionSeconds ?: item.episode.positionSeconds.toDouble(),
             durationSeconds = nowPlaying?.durationSeconds ?: item.episode.durationSeconds.toDouble(),

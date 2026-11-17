@@ -22,6 +22,19 @@ object PodcastIcons {
     val QueueAdd: ImageVector = icon("QueueAdd", "M14,10H2V12H14V10M14,6H2V8H14V6M18,14V10H16V14H12V16H16V20H18V16H22V14H18M2,16H10V14H2V16Z")
     val QueueAdded: ImageVector = icon("QueueAdded", "M14,10H2V12H14V10M14,6H2V8H14V6M2,16H10V14H2V16M21.5,11.5L23,13L16,20L11.5,15.5L13,14L16,17L21.5,11.5Z")
 
+    /** Playlists (ADR 0010): the destination, and adding an episode to one. */
+    val Playlist: ImageVector = icon("Playlist", "M19,9H2V11H19V9M19,5H2V7H19V5M2,15H15V13H2V15M17,13V19L22,16L17,13Z")
+    val PlaylistAdd: ImageVector = icon(
+        "PlaylistAdd",
+        "M15,6H3V8H15V6M15,10H3V12H15V10M3,16H11V14H3V16M17,6V14.18C16.69,14.07 16.35,14 16,14A3,3 0 0,0 13,17A3,3 0 0,0 16,20A3,3 0 0,0 19,17V8H22V6H17Z",
+    )
+
+    /** An empty star, next to the filled one of material-icons-core, for ratings. */
+    val StarBorder: ImageVector = icon(
+        "StarBorder",
+        "M12,15.39L8.24,17.66L9.23,13.38L5.91,10.5L10.29,10.13L12,6.09L13.71,10.13L18.09,10.5L14.77,13.38L15.76,17.66M22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.45,13.97L5.82,21L12,17.27L18.18,21L16.54,13.97L22,9.24Z",
+    )
+
     private fun icon(name: String, path: String): ImageVector =
         ImageVector.Builder(name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
             .addPath(addPathNodes(path), fill = SolidColor(Color.Black))

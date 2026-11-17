@@ -3,6 +3,8 @@ package fr.podcast.shared.i18n
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistOrder
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
@@ -123,6 +125,42 @@ interface Strings {
 
     /** A rating as stars, "★★★★☆" (the same in every language). */
     fun stars(rating: Int): String = rating.coerceIn(0, 5).let { "★".repeat(it) + "☆".repeat(5 - it) }
+
+    // Playlists (ADR 0010)
+    val newPlaylist: String
+    val playlistTitle: String
+    val description: String
+    fun playlistKind(kind: PlaylistKind): String
+    fun playlistKindHint(kind: PlaylistKind): String
+    val keywords: String
+    val keywordsHint: String
+    val favoritesOnly: String
+    val minRating: String
+    val anyRating: String
+    val unplayedOnly: String
+    fun playlistOrder(order: PlaylistOrder): String
+    val episodeLimit: String
+    fun episodeCount(count: Int): String
+    val playAll: String
+    val shuffle: String
+    val editPlaylist: String
+    val deletePlaylist: String
+    fun deletePlaylistConfirm(title: String): String
+    val addToPlaylist: String
+    fun addedTo(title: String): String
+    val noPlaylistToAddTo: String
+    val removeFromPlaylist: String
+    val emptyPlaylists: String
+    val emptyPlaylist: String
+    val choosePlaylist: String
+    val sharedPlaylists: String
+    fun playlistSharedBy(name: String): String
+    val feed: String
+    val feedHint: String
+    val publishFeed: String
+    val newFeedAddress: String
+    val unpublishFeed: String
+    fun feedPublished(title: String): String
 
     // Player (ADR 0008)
     val nowPlaying: String

@@ -96,6 +96,18 @@ class ResponsiveSnapshotTest {
     }
 
     @Test
+    fun renderPlaylists() {
+        for (language in Language.entries) {
+            val tag = language.tag
+            render("playlists-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Playlists) }
+            // Static, the demo user's: its actions and its feed (ADR 0010).
+            render("playlist-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Playlists, playlistId = "pl1") }
+            // Dynamic, next to the list.
+            render("playlists-large-$tag", sizes.getValue("large")) { Home(language, Destination.Playlists, playlistId = "pl2") }
+        }
+    }
+
+    @Test
     fun renderPlayer() {
         for (language in Language.entries) {
             val tag = language.tag
@@ -115,6 +127,7 @@ class ResponsiveSnapshotTest {
         query: String = "",
         playing: String? = null,
         playerOpen: Boolean = false,
+        playlistId: String? = null,
     ) {
         val repository = remember { FakePodcastRepository() }
         // The demo player, paused on [playing], with two episodes in the queue.
@@ -141,6 +154,7 @@ class ResponsiveSnapshotTest {
                         initialPodcastId = podcastId,
                         initialQuery = query,
                         initialPlayerOpen = playerOpen,
+                        initialPlaylistId = playlistId,
                         settings = { modifier ->
                             SettingsScreen(repository, onProfileChanged = {}, modifier) { accountsSection(accounts, demo = false, {}, {}, {}, {}) }
                         },
