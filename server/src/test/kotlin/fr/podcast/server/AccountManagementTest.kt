@@ -156,7 +156,9 @@ class AccountManagementTest {
 
         val renamed = client.send(HttpMethod.Patch, "/me", laptop, """{"displayName":"Robert"}""").json()
         assertEquals("Robert", renamed["displayName"]!!.jsonPrimitive.content)
-        assertEquals("displayName", field(client.send(HttpMethod.Patch, "/me", laptop, """{"displayName":"  "}""")))
+        val blank = client.send(HttpMethod.Patch, "/me", laptop, """{"displayName":"  "}""")
+        assertEquals("between 1 and 100 characters", blank.json()["errors"]!!.jsonArray.single().jsonObject["message"]!!.jsonPrimitive.content)
+        assertEquals("displayName", field(blank))
     }
 
     @Test

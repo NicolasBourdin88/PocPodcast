@@ -157,7 +157,7 @@ private suspend fun ApplicationCall.receiveShareRequest(services: ServerServices
         if (permissionValue != null && (!permissionAllowed || SharePermission.entries.none { it.name == permissionValue })) {
             add(FieldError("permission", if (permissionAllowed) "READ or WRITE" else "a recommendation is READ"))
         }
-        if ((message?.length ?: 0) > ShareRules.MAX_MESSAGE_LENGTH) add(FieldError("message", "at most $ShareRules.MAX_MESSAGE_LENGTH characters"))
+        if ((message?.length ?: 0) > ShareRules.MAX_MESSAGE_LENGTH) add(FieldError("message", "at most ${ShareRules.MAX_MESSAGE_LENGTH} characters"))
     }
     if (errors.isNotEmpty()) {
         respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid share", errors)

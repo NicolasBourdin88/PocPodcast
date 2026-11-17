@@ -51,7 +51,7 @@ fun Route.accountRoutes(services: ServerServices) {
             if (displayName.isNullOrEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) {
                 return@patch call.respondProblem(
                     HttpStatusCode.UnprocessableEntity, "Invalid profile",
-                    listOf(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters")),
+                    listOf(FieldError("displayName", "between 1 and ${AccountRules.MAX_DISPLAY_NAME_LENGTH} characters")),
                 )
             }
             accounts.rename(user.id, displayName)
@@ -116,7 +116,7 @@ fun Route.accountRoutes(services: ServerServices) {
             val errors = buildList {
                 if (!AccountRules.validUsername(username)) add(FieldError("username", "3 to 32 characters: lowercase letters, digits, '.', '_' or '-'"))
                 else if (accounts.userByUsername(username) != null) add(FieldError("username", "already taken"))
-                if (displayName.isEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) add(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters"))
+                if (displayName.isEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) add(FieldError("displayName", "between 1 and ${AccountRules.MAX_DISPLAY_NAME_LENGTH} characters"))
                 passwordError(password, "password")?.let(::add)
                 if (Role.entries.none { it.name == role }) add(FieldError("role", "USER or ADMIN"))
             }
@@ -135,7 +135,7 @@ fun Route.accountRoutes(services: ServerServices) {
             val role = fields.stringField("role")
             val errors = buildList {
                 if (displayName != null && (displayName.isEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH)) {
-                    add(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters"))
+                    add(FieldError("displayName", "between 1 and ${AccountRules.MAX_DISPLAY_NAME_LENGTH} characters"))
                 }
                 if (role != null && Role.entries.none { it.name == role }) add(FieldError("role", "USER or ADMIN"))
             }

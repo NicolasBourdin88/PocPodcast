@@ -126,15 +126,18 @@ class SharingTest {
         podcastServer()
         val alice = client.token()
 
-        suspend fun field(body: String): String {
+        suspend fun error(body: String): JsonObject {
             val response = client.send(HttpMethod.Post, "/subscriptions/1/shares", alice, body)
             assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-            return response.json()["errors"]!!.jsonArray.first().jsonObject["field"]!!.jsonPrimitive.content
+            return response.json()["errors"]!!.jsonArray.first().jsonObject
         }
+        suspend fun field(body: String): String = error(body)["field"]!!.jsonPrimitive.content
         assertEquals("userId", field("""{"userId":"999"}"""))
         assertEquals("userId", field("""{"userId":"1"}""")) // the owner herself
         assertEquals("permission", field("""{"userId":"2","permission":"ADMIN"}"""))
-        assertEquals("message", field("""{"userId":"2","message":"${"x".repeat(501)}"}"""))
+        val tooLong = error("""{"userId":"2","message":"${"x".repeat(501)}"}""")
+        assertEquals("message", tooLong["field"]!!.jsonPrimitive.content)
+        assertEquals("at most 500 characters", tooLong["message"]!!.jsonPrimitive.content)
     }
 
     @Test
