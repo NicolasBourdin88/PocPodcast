@@ -77,7 +77,7 @@ class PlaylistsTest {
         // Each episode shows the reader's own state, with the playlist's actions on it.
         val first = read["_embedded"]!!.jsonObject["episodes"]!!.jsonArray.first().jsonObject
         assertTrue(setOf("remove-from-playlist", "move-in-playlist").all { it in first["_templates"]!!.jsonObject })
-        assertEquals(setOf("update-playlist", "add-episode", "share", "delete-playlist"), read["_templates"]!!.jsonObject.keys)
+        assertEquals(setOf("update-playlist", "add-episode", "share", "publish-feed", "delete-playlist"), read["_templates"]!!.jsonObject.keys)
 
         // Refusals.
         assertEquals(HttpStatusCode.UnprocessableEntity, add("""{"episodeId":"999"}""").status)

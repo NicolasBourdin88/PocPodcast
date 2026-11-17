@@ -293,10 +293,12 @@ fun playlistResource(view: PlaylistView, viewer: UserAccount, forms: Boolean, au
         val owner = viewer.can(Action.SHARE, view.ownerId, view.permission)
         fields(Playlist.serializer(), playlist)
         links(
-            buildList {
+            single = buildList {
                 add("self" to "/playlists/${playlist.id}")
                 if (owner) add("shares" to "/playlists/${playlist.id}/shares")
             },
+            // Its RSS feed, which only the owner sees (ADR 0010).
+            extra = listOfNotNull(view.feedSecret?.takeIf { owner }?.let { "feed" to Link("/feeds/$it", type = "application/rss+xml") }),
         )
         episodes?.let { items ->
             val editable = canModify && playlist.kind == PlaylistKind.STATIC
@@ -312,7 +314,7 @@ fun playlistResource(view: PlaylistView, viewer: UserAccount, forms: Boolean, au
                 )
             }
         }
-        templates(forms, Affordances.forPlaylist(playlist, canModify, owner))
+        templates(forms, Affordances.forPlaylist(playlist, canModify, owner, published = view.feedSecret != null))
     }
 
 /** Whom a playlist is shared with, and the `share` template to add someone. */

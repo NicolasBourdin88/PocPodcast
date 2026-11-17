@@ -84,15 +84,7 @@ fun Route.apiRoutes(services: ServerServices) {
                     return@get call.respondProblem(HttpStatusCode.Unauthorized, "Signed link or authentication required")
                 }
             }
-            val audioUrl = services.database.query { catalogQueries.episodeAudio(episodeId.toLongOrNull() ?: -1).executeAsOneOrNull() }
-                ?: return@get call.respondNotFound("Episode")
-            val file = services.media.file(episodeId.toLong())
-            if (file != null) {
-                val (path, mimeType) = file
-                return@get call.respond(LocalPathContent(path, ContentType.parse(mimeType)))
-            }
-            call.response.header(HttpHeaders.Location, audioUrl)
-            call.respond(HttpStatusCode.Found)
+            call.respondEpisodeAudio(services, episodeId)
         }
     }
 
@@ -269,3 +261,16 @@ fun Route.apiRoutes(services: ServerServices) {
 
 /** A day: more than any episode, and a bound for the integer the clients send. */
 private const val MAX_POSITION_SECONDS = 24 * 3600
+
+/** The server's copy of the episode's audio (ranges accepted), or a redirection to the publisher's. */
+internal suspend fun ApplicationCall.respondEpisodeAudio(services: ServerServices, episodeId: String) {
+    val audioUrl = services.database.query { catalogQueries.episodeAudio(episodeId.toLongOrNull() ?: -1).executeAsOneOrNull() }
+        ?: return respondNotFound("Episode")
+    val file = services.media.file(episodeId.toLong())
+    if (file != null) {
+        val (path, mimeType) = file
+        return respond(LocalPathContent(path, ContentType.parse(mimeType)))
+    }
+    response.header(HttpHeaders.Location, audioUrl)
+    respond(HttpStatusCode.Found)
+}

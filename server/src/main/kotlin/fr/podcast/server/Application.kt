@@ -5,6 +5,7 @@ import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
 import fr.podcast.server.api.searchRoutes
 import fr.podcast.server.api.shareRoutes
+import fr.podcast.server.api.playlistFeedRoutes
 import fr.podcast.server.api.playlistRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
@@ -208,6 +209,7 @@ fun Application.module(services: ServerServices) {
         accountRoutes(services)
         shareRoutes(services)
         playlistRoutes(services)
+        playlistFeedRoutes(services)
         searchRoutes(services)
         webRoutes(database, services.accounts, services.audioLinks, services.loginThrottle)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")

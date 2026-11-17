@@ -241,9 +241,10 @@ object Affordances {
     /**
      * By the viewer's rights (ADR 0010): `update-playlist` (title, description and rules) for whoever
      * may modify it, with `add-episode` on a static playlist and `shuffle` on a RANDOM one;
-     * `share` and `delete-playlist` for its owner.
+     * `share`, `publish-feed` (a new secret address), `unpublish-feed` once published and
+     * `delete-playlist` for its owner.
      */
-    fun forPlaylist(playlist: Playlist, canModify: Boolean, owner: Boolean): List<Affordance> = buildList {
+    fun forPlaylist(playlist: Playlist, canModify: Boolean, owner: Boolean, published: Boolean = false): List<Affordance> = buildList {
         val id = playlist.id
         if (canModify) {
             val fields = listOf(
@@ -263,6 +264,8 @@ object Affordances {
         }
         if (owner) {
             add(share("/playlists/$id/shares"))
+            add(Affordance("publish-feed", HttpMethod.Put, "/playlists/$id/feed"))
+            if (published) add(Affordance("unpublish-feed", HttpMethod.Delete, "/playlists/$id/feed"))
             add(Affordance("delete-playlist", HttpMethod.Delete, "/playlists/$id"))
         }
     }

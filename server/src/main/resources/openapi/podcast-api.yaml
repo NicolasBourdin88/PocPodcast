@@ -1149,6 +1149,87 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /playlists/{playlistId}/feed:
+    parameters:
+      - $ref: "#/components/parameters/playlistId"
+    put:
+      tags: [playlists]
+      operationId: publishPlaylistFeed
+      summary: Publier le flux RSS de la playlist sous une nouvelle adresse secrète (propriétaire, template `publish-feed`)
+      description: |
+        Le lien `feed` de la playlist donne son adresse, que l'on peut donner à n'importe quelle appli de
+        podcasts. Republier change l'adresse : l'ancienne ne marche plus (ADR 0005, 0010).
+      responses:
+        "200":
+          description: Flux publié ; la playlist porte le lien `feed`
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [playlists]
+      operationId: unpublishPlaylistFeed
+      summary: Retirer le flux RSS de la playlist (propriétaire, template `unpublish-feed`)
+      responses:
+        "204": { description: Flux retiré ; son adresse ne marche plus }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /feeds/{feedSecret}:
+    parameters:
+      - $ref: "#/components/parameters/feedSecret"
+    get:
+      tags: [playlists]
+      operationId: getPlaylistFeed
+      summary: Flux RSS 2.0 d'une playlist, pour les applis de podcasts
+      description: |
+        Sans authentification : l'adresse secrète est l'accès, car les applis de podcasts ne savent pas
+        se connecter (ADR 0005, 0010). Les enclosures pointent vers le serveur ; une playlist dynamique est
+        calculée comme la voit son propriétaire.
+      security: [{}]
+      responses:
+        "200":
+          description: Flux RSS (balises iTunes pour les applis)
+          content:
+            application/rss+xml:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /feeds/{feedSecret}/episodes/{episodeId}:
+    parameters:
+      - $ref: "#/components/parameters/feedSecret"
+      - $ref: "#/components/parameters/episodeId"
+    get:
+      tags: [playlists]
+      operationId: getPlaylistFeedEnclosure
+      summary: Fichier audio d'un épisode du flux (enclosure)
+      description: |
+        Comme `/episodes/{episodeId}/audio` : le fichier du serveur (requêtes `Range` acceptées), sinon une
+        redirection vers celui de l'éditeur. Seuls les épisodes de la playlist sont servis.
+      security: [{}]
+      responses:
+        "200":
+          description: Fichier du serveur
+          content:
+            audio/*:
+              schema: { type: string, format: binary }
+        "206":
+          description: Partie du fichier demandée par `Range`
+          content:
+            audio/*:
+              schema: { type: string, format: binary }
+        "302":
+          description: Redirection vers le fichier audio de l'éditeur
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /playlists/{playlistId}/shuffle:
     parameters:
       - $ref: "#/components/parameters/playlistId"
@@ -1225,6 +1306,12 @@ components:
       name: playlistId
       in: path
       required: true
+      schema: { type: string }
+    feedSecret:
+      name: feedSecret
+      in: path
+      required: true
+      description: Adresse secrète d'un flux de playlist.
       schema: { type: string }
 
   responses:
@@ -1955,6 +2042,9 @@ components:
           properties:
             self: { $ref: "#/components/schemas/Link" }
             shares: { $ref: "#/components/schemas/Link", description: Avec qui elle est partagée (propriétaire). }
+            feed:
+              description: Son flux RSS, une fois publié (propriétaire seulement).
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _embedded:
           description: "Ses épisodes, dans une représentation de la playlist seule (pas dans une collection)."
@@ -1968,14 +2058,16 @@ components:
         _templates:
           description: |
             Selon les droits de l'utilisateur : `update-playlist` s'il peut la modifier, avec `add-episode`
-            pour une playlist statique et `shuffle` pour une playlist en ordre aléatoire ; `share` et
-            `delete-playlist` pour son propriétaire.
+            pour une playlist statique et `shuffle` pour une playlist en ordre aléatoire ; `share`,
+            `publish-feed`, `unpublish-feed` (une fois publiée) et `delete-playlist` pour son propriétaire.
           type: object
           properties:
             update-playlist: { $ref: "#/components/schemas/Template" }
             add-episode: { $ref: "#/components/schemas/Template" }
             shuffle: { $ref: "#/components/schemas/Template" }
             share: { $ref: "#/components/schemas/Template" }
+            publish-feed: { $ref: "#/components/schemas/Template" }
+            unpublish-feed: { $ref: "#/components/schemas/Template" }
             delete-playlist: { $ref: "#/components/schemas/Template" }
           additionalProperties: false
       additionalProperties: false

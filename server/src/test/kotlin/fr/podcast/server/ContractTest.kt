@@ -86,14 +86,21 @@ class ContractTest {
         assertEquals(emptySet(), specified - routes, "Documented operations without a route")
     }
 
-    @Test
-    fun responsesMatchTheSpecification() = testApplication {
-        val services = podcastServer()
-        val noRedirects = createClient { followRedirects = false }
-        val alice = client.token()
-        val disposable = client.token()
-        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+    /** One run of [responsesMatchTheSpecification]: its clients and accounts, and the operations it called. */
+    private inner class Run(
+        val services: ServerServices,
+        val client: HttpClient,
+        val noRedirects: HttpClient,
+        val alice: String,
+        val disposable: String,
+        val bob: String,
+    ) {
         val exercised = mutableSetOf<Operation>()
+        val get = HttpMethod.Get
+        val post = HttpMethod.Post
+        val put = HttpMethod.Put
+        val delete = HttpMethod.Delete
+        val patch = HttpMethod.Patch
 
         suspend fun check(
             method: HttpMethod, path: String, documentedPath: String, expected: HttpStatusCode,
@@ -120,17 +127,36 @@ class ContractTest {
             val content = responseSpec["content"]
             val schema = (content?.get(mediaType) ?: content?.get(mediaType.substringBefore('/') + "/*"))?.get("schema")
                 ?: fail("$operation: $mediaType is not documented for ${expected.value}")
-            val ref = schema["\$ref"]?.asString() ?: return // inline schemas (HTML) are not validated
+            val ref = schema["\$ref"]?.asString() ?: return // inline schemas (HTML, RSS) are not validated
             val errors = schemas.getSchema(SchemaLocation.of("classpath:$specResource$ref")).validate(json.readTree(text))
             assertTrue(errors.isEmpty(), "$operation ($path) does not match $ref:\n${errors.joinToString("\n")}\n$text")
         }
+    }
 
-        val get = HttpMethod.Get
-        val post = HttpMethod.Post
-        val put = HttpMethod.Put
-        val delete = HttpMethod.Delete
-        val patch = HttpMethod.Patch
+    // One function per area: a single one would exceed the size of a JVM method.
+    @Test
+    fun responsesMatchTheSpecification() = testApplication {
+        val run = Run(
+            services = podcastServer(),
+            client = client,
+            noRedirects = createClient { followRedirects = false },
+            alice = client.token(),
+            disposable = client.token(),
+            bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD),
+        )
+        run.rootAndAccounts()
+        run.catalog()
+        run.library()
+        run.queue()
+        run.sharing()
+        run.playlists()
+        run.tooManyAttempts()
 
+        val missing = documented - run.exercised
+        assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")
+    }
+
+    private suspend fun Run.rootAndAccounts() {
         check(get, "/", "/", HttpStatusCode.OK, token = null)
         check(get, "/", "/", HttpStatusCode.OK)
         check(get, "/", "/", HttpStatusCode.OK, accept = ContentType("application", "hal+json"))
@@ -176,6 +202,9 @@ class ContractTest {
         check(delete, "/users/1", "/users/{userId}", HttpStatusCode.Forbidden)
         check(delete, "/users/3", "/users/{userId}", HttpStatusCode.NoContent)
         check(delete, "/users/3", "/users/{userId}", HttpStatusCode.NotFound)
+    }
+
+    private suspend fun Run.catalog() {
         check(get, "/subscriptions", "/subscriptions", HttpStatusCode.OK)
         check(get, "/subscriptions/1", "/subscriptions/{subscriptionId}", HttpStatusCode.OK)
         check(get, "/subscriptions/999", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
@@ -223,7 +252,9 @@ class ContractTest {
         check(get, "/episodes/2", "/episodes/{episodeId}", HttpStatusCode.OK) // favorite, rated: `unfavorite`, `clear-rating`
         check(delete, "/episodes/2/rating", "/episodes/{episodeId}/rating", HttpStatusCode.NoContent)
         check(delete, "/episodes/2/favorite", "/episodes/{episodeId}/favorite", HttpStatusCode.NoContent)
+    }
 
+    private suspend fun Run.library() {
         check(post, "/subscriptions", "/subscriptions", HttpStatusCode.Created, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")
         check(post, "/subscriptions", "/subscriptions", HttpStatusCode.OK, body = """{"feedUrl":"https://feeds.test/podcast20.xml"}""")
         check(post, "/subscriptions", "/subscriptions", HttpStatusCode.UnprocessableEntity, body = """{"feedUrl":"https://feeds.test/not-a-feed.html"}""")
@@ -244,7 +275,9 @@ class ContractTest {
         check(post, "/subscriptions/opml", "/subscriptions/opml", HttpStatusCode.UnprocessableEntity, bodyType = opml, body = "<rss/>")
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NoContent)
         check(delete, "/subscriptions/3", "/subscriptions/{subscriptionId}", HttpStatusCode.NotFound)
+    }
 
+    private suspend fun Run.queue() {
         check(get, "/queue", "/queue", HttpStatusCode.OK)
         check(post, "/queue", "/queue", HttpStatusCode.OK, body = """{"episodeId":"1"}""")
         check(post, "/queue", "/queue", HttpStatusCode.OK, body = """{"episodeId":"2","position":0}""")
@@ -257,7 +290,9 @@ class ContractTest {
         check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NoContent)
         check(delete, "/queue/2", "/queue/{episodeId}", HttpStatusCode.NotFound)
         check(delete, "/queue", "/queue", HttpStatusCode.NoContent)
+    }
 
+    private suspend fun Run.sharing() {
         // Sharing (ADR 0009): Alice shares Les Cast Codeurs (subscription 1) with Bob; 2 stays hers.
         check(get, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.OK)
         check(post, "/subscriptions/1/shares", "/subscriptions/{subscriptionId}/shares", HttpStatusCode.OK,
@@ -284,7 +319,9 @@ class ContractTest {
         check(get, "/shared", "/shared", HttpStatusCode.OK, token = bob) // with the recommended episode
         check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NoContent, token = bob)
         check(delete, "/shares/$shareId", "/shares/{shareId}", HttpStatusCode.NotFound)
+    }
 
+    private suspend fun Run.playlists() {
         // Playlists (ADR 0010): 1 static, 2 dynamic in random order, 3 deleted.
         val playlist = "/playlists/{playlistId}"
         val items = "/playlists/{playlistId}/episodes"
@@ -327,11 +364,30 @@ class ContractTest {
         check(get, "/playlists/1", playlist, HttpStatusCode.OK, token = bob) // read-only
         check(post, "/playlists/1/episodes", items, HttpStatusCode.Forbidden, token = bob, body = """{"episodeId":"1"}""")
         check(get, "/shared", "/shared", HttpStatusCode.OK, token = bob) // with the playlist
+        // Playlist 1 as an RSS feed, read without credentials.
+        val feedOf = "/playlists/{playlistId}/feed"
+        check(put, "/playlists/1/feed", feedOf, HttpStatusCode.OK)
+        check(put, "/playlists/1/feed", feedOf, HttpStatusCode.Forbidden, token = bob)
+        check(put, "/playlists/999/feed", feedOf, HttpStatusCode.NotFound)
+        val feed = client.getJson("/playlists/1", alice)["_links"]!!.jsonObject["feed"]!!.jsonObject["href"]!!.jsonPrimitive.content
+        check(get, feed, "/feeds/{feedSecret}", HttpStatusCode.OK, token = null)
+        check(get, "/feeds/unknown", "/feeds/{feedSecret}", HttpStatusCode.NotFound, token = null)
+        check(get, "$feed/episodes/1", "/feeds/{feedSecret}/episodes/{episodeId}", HttpStatusCode.OK, token = null, accept = ContentType.Any)
+        check(get, "$feed/episodes/1", "/feeds/{feedSecret}/episodes/{episodeId}", HttpStatusCode.PartialContent, token = null,
+            accept = ContentType.Any, headers = mapOf(HttpHeaders.Range to "bytes=0-99"))
+        check(post, "/playlists/1/episodes", items, HttpStatusCode.OK, body = """{"episodeId":"6"}""") // not downloaded
+        check(get, "$feed/episodes/6", "/feeds/{feedSecret}/episodes/{episodeId}", HttpStatusCode.Found, token = null, http = noRedirects)
+        check(get, "$feed/episodes/9", "/feeds/{feedSecret}/episodes/{episodeId}", HttpStatusCode.NotFound, token = null)
+        check(delete, "/playlists/1/feed", feedOf, HttpStatusCode.Forbidden, token = bob)
+        check(delete, "/playlists/1/feed", feedOf, HttpStatusCode.NoContent)
+        check(delete, "/playlists/999/feed", feedOf, HttpStatusCode.NotFound)
         check(post, "/playlists", "/playlists", HttpStatusCode.Created, body = """{"title":"Éphémère"}""")
         check(delete, "/playlists/3", playlist, HttpStatusCode.NotFound, token = bob)
         check(delete, "/playlists/3", playlist, HttpStatusCode.NoContent)
         check(delete, "/playlists/3", playlist, HttpStatusCode.NotFound)
+    }
 
+    private suspend fun Run.tooManyAttempts() {
         // Five wrong passwords for Bob (one above): his sign-ins and password changes wait.
         repeat(4) {
             check(post, "/auth/tokens", "/auth/tokens", HttpStatusCode.Unauthorized, token = null,
@@ -341,9 +397,6 @@ class ContractTest {
             body = """{"username":"${TestSeed.BOB}","password":"${TestSeed.BOB_PASSWORD}","deviceName":"contract"}""")
         check(put, "/me/password", "/me/password", HttpStatusCode.TooManyRequests, token = bob,
             body = """{"currentPassword":"${TestSeed.BOB_PASSWORD}","newPassword":"long-enough"}""")
-
-        val missing = documented - exercised
-        assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")
     }
 
     /** Follows a `$ref` to `#/components/responses/…`. */

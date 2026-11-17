@@ -7,6 +7,8 @@ import fr.podcast.server.auth.SESSION_AUTH
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.auth.can
 import fr.podcast.server.catalog.PlaylistView
+import fr.podcast.server.feeds.Enclosure
+import fr.podcast.server.feeds.PlaylistFeed
 import fr.podcast.server.hal.playlistCollection
 import fr.podcast.server.hal.playlistResource
 import fr.podcast.server.http.FieldError
@@ -18,11 +20,15 @@ import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.PlaylistLimits
 import fr.podcast.shared.model.PlaylistOrder
 import fr.podcast.shared.model.PlaylistRules
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.withCharset
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -151,6 +157,22 @@ fun Route.playlistRoutes(services: ServerServices) {
             call.respondChanged("playlists-changed")
         }
 
+        // The secret address of its RSS feed: published or replaced, then withdrawn, by its owner (ADR 0010).
+        put("/playlists/{id}/feed") {
+            val user = call.mutatingUser() ?: return@put
+            val view = call.playlistFor(user, Action.SHARE) ?: return@put
+            playlists.publishFeed(view.id)
+            if (call.isHtmx) return@put call.respondChanged("playlists-changed")
+            call.respondPlaylist(view.id, user)
+        }
+
+        delete("/playlists/{id}/feed") {
+            val user = call.mutatingUser() ?: return@delete
+            val view = call.playlistFor(user, Action.SHARE) ?: return@delete
+            playlists.unpublishFeed(view.id)
+            call.respondChanged("playlists-changed")
+        }
+
         post("/playlists/{id}/shuffle") {
             val user = call.mutatingUser() ?: return@post
             val view = call.playlistFor(user, Action.MODIFY) ?: return@post
@@ -162,6 +184,42 @@ fun Route.playlistRoutes(services: ServerServices) {
             call.respondPlaylist(view.id, user)
         }
     }
+}
+
+/**
+ * The RSS feeds of playlists, without authentication: their secret address is the access, as podcast
+ * apps cannot sign in (ADR 0005, 0010). A dynamic playlist is computed as its owner sees it.
+ */
+fun Route.playlistFeedRoutes(services: ServerServices) {
+    val playlists = services.playlists
+
+    get("/feeds/{secret}") {
+        val secret = call.parameters["secret"]!!
+        val view = playlists.byFeedSecret(secret) ?: return@get call.respondNotFound("Feed")
+        val base = call.baseUrl()
+        val items = playlists.episodes(view, view.ownerId).mapNotNull { item ->
+            services.database.query { catalogQueries.episodeEnclosure(item.episode.id.toLong()).executeAsOneOrNull() }
+                ?.let { item to Enclosure(it.guid, it.type, it.length) }
+        }
+        val owner = services.accounts.user(view.ownerId)?.displayName.orEmpty()
+        val rss = PlaylistFeed.write(view.playlist, owner, "$base/feeds/$secret", "$base/", items) { "$base/feeds/$secret/episodes/$it" }
+        call.respondText(rss, ContentType("application", "rss+xml").withCharset(Charsets.UTF_8))
+    }
+
+    // An enclosure: only the episodes of the playlist, so the address opens nothing else.
+    get("/feeds/{secret}/episodes/{episodeId}") {
+        val view = playlists.byFeedSecret(call.parameters["secret"]!!) ?: return@get call.respondNotFound("Feed")
+        val episodeId = call.parameters["episodeId"]!!
+        if (playlists.episodes(view, view.ownerId).none { it.episode.id == episodeId }) return@get call.respondNotFound("Episode in feed")
+        call.respondEpisodeAudio(services, episodeId)
+    }
+}
+
+/** The server's address as the client reached it, e.g. http://localhost:8080. */
+private fun ApplicationCall.baseUrl(): String {
+    val origin = request.origin
+    val defaultPort = (origin.scheme == "http" && origin.serverPort == 80) || (origin.scheme == "https" && origin.serverPort == 443)
+    return "${origin.scheme}://${origin.serverHost}" + if (defaultPort) "" else ":${origin.serverPort}"
 }
 
 private data class PlaylistRequest(val title: String, val description: String?, val kind: PlaylistKind, val rules: PlaylistRules)

@@ -172,3 +172,11 @@ SELECT p.feed_url
 FROM subscriptions s
 JOIN podcasts p ON p.id = s.podcast_id
 WHERE s.user_id = :userId;
+
+-- An episode in a playlist's feed (ADR 0010): its id in the original feed, and the type and size of
+-- its audio, the server's copy when it has one.
+episodeEnclosure:
+SELECT e.guid, COALESCE(f.mime_type, e.audio_type, 'audio/mpeg') AS type, COALESCE(f.size_bytes, e.audio_length, 0) AS length
+FROM episodes e
+LEFT JOIN media_files f ON f.episode_id = e.id AND f.status = 'READY'
+WHERE e.id = :id;
