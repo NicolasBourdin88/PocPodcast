@@ -1,7 +1,6 @@
 package fr.podcast.server.api
 
 import fr.podcast.server.ServerServices
-import fr.podcast.server.auth.Accounts
 import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.Role
 import fr.podcast.server.auth.SESSION_AUTH
@@ -18,6 +17,7 @@ import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.ProblemTypes
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
+import fr.podcast.shared.model.AccountRules
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -34,7 +34,6 @@ import io.ktor.server.routing.put
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
-private const val MAX_DISPLAY_NAME = 100
 
 /** Accounts (ADR 0009): the directory of users, their management by administrators, the user's own profile and devices. */
 fun Route.accountRoutes(services: ServerServices) {
@@ -49,10 +48,10 @@ fun Route.accountRoutes(services: ServerServices) {
         patch("/me") {
             val user = call.mutatingUser() ?: return@patch
             val displayName = call.receiveFields()?.stringField("displayName")?.trim()
-            if (displayName.isNullOrEmpty() || displayName.length > MAX_DISPLAY_NAME) {
+            if (displayName.isNullOrEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) {
                 return@patch call.respondProblem(
                     HttpStatusCode.UnprocessableEntity, "Invalid profile",
-                    listOf(FieldError("displayName", "between 1 and $MAX_DISPLAY_NAME characters")),
+                    listOf(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters")),
                 )
             }
             accounts.rename(user.id, displayName)
@@ -115,9 +114,9 @@ fun Route.accountRoutes(services: ServerServices) {
             val password = fields.stringField("password").orEmpty()
             val role = fields.stringField("role")?.takeIf { it.isNotBlank() } ?: Role.USER.name
             val errors = buildList {
-                if (!Accounts.validUsername(username)) add(FieldError("username", "3 to 32 characters: lowercase letters, digits, '.', '_' or '-'"))
+                if (!AccountRules.validUsername(username)) add(FieldError("username", "3 to 32 characters: lowercase letters, digits, '.', '_' or '-'"))
                 else if (accounts.userByUsername(username) != null) add(FieldError("username", "already taken"))
-                if (displayName.isEmpty() || displayName.length > MAX_DISPLAY_NAME) add(FieldError("displayName", "between 1 and $MAX_DISPLAY_NAME characters"))
+                if (displayName.isEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) add(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters"))
                 passwordError(password, "password")?.let(::add)
                 if (Role.entries.none { it.name == role }) add(FieldError("role", "USER or ADMIN"))
             }
@@ -135,8 +134,8 @@ fun Route.accountRoutes(services: ServerServices) {
             val displayName = fields.stringField("displayName")?.trim()
             val role = fields.stringField("role")
             val errors = buildList {
-                if (displayName != null && (displayName.isEmpty() || displayName.length > MAX_DISPLAY_NAME)) {
-                    add(FieldError("displayName", "between 1 and $MAX_DISPLAY_NAME characters"))
+                if (displayName != null && (displayName.isEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH)) {
+                    add(FieldError("displayName", "between 1 and $AccountRules.MAX_DISPLAY_NAME_LENGTH characters"))
                 }
                 if (role != null && Role.entries.none { it.name == role }) add(FieldError("role", "USER or ADMIN"))
             }
@@ -188,7 +187,7 @@ private suspend fun ApplicationCall.mutatingAdmin(): UserAccount? {
 }
 
 private fun passwordError(password: String, field: String): FieldError? =
-    if (password.length < Accounts.MIN_PASSWORD_LENGTH) FieldError(field, "at least ${Accounts.MIN_PASSWORD_LENGTH} characters") else null
+    if (password.length < AccountRules.MIN_PASSWORD_LENGTH) FieldError(field, "at least ${AccountRules.MIN_PASSWORD_LENGTH} characters") else null
 
 /** 429 with Retry-After: too many wrong passwords from this address (ADR 0009). */
 internal suspend fun ApplicationCall.respondTooManyAttempts(retryAfterSeconds: Long) {

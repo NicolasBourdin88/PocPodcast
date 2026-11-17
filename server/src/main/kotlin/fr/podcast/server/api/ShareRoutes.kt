@@ -19,6 +19,7 @@ import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
 import fr.podcast.shared.model.SharePermission
+import fr.podcast.shared.model.ShareRules
 import fr.podcast.shared.model.ShareType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -31,7 +32,6 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 
-private const val MAX_MESSAGE_LENGTH = 500
 
 /**
  * Shares (ADR 0009): a subscription shared READ or WRITE, an episode recommended (READ), and what
@@ -157,7 +157,7 @@ private suspend fun ApplicationCall.receiveShareRequest(services: ServerServices
         if (permissionValue != null && (!permissionAllowed || SharePermission.entries.none { it.name == permissionValue })) {
             add(FieldError("permission", if (permissionAllowed) "READ or WRITE" else "a recommendation is READ"))
         }
-        if ((message?.length ?: 0) > MAX_MESSAGE_LENGTH) add(FieldError("message", "at most $MAX_MESSAGE_LENGTH characters"))
+        if ((message?.length ?: 0) > ShareRules.MAX_MESSAGE_LENGTH) add(FieldError("message", "at most $ShareRules.MAX_MESSAGE_LENGTH characters"))
     }
     if (errors.isNotEmpty()) {
         respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid share", errors)

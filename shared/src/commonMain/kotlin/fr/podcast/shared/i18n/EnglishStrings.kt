@@ -55,6 +55,15 @@ object EnglishStrings : Strings {
     override val retry = "Retry"
     override fun signedInAs(name: String) = "Signed in as $name"
 
+    override val notAllowed = "You are not allowed to do that."
+    override val wrongPassword = "The current password is wrong."
+    override fun passwordTooShort(minimum: Int) = "The password must have at least $minimum characters."
+    override val usernameUnavailable = "Invalid or taken username: 3 to 32 characters among a-z, 0-9, '.', '_' and '-'."
+    override fun displayNameInvalid(maximum: Int) = "The display name must have 1 to $maximum characters."
+    override val lastAdministrator = "The server must keep at least one administrator."
+    override val noSuchUser = "This account does not exist."
+    override fun messageTooLong(maximum: Int) = "The message is too long (at most $maximum characters)."
+
     override fun action(name: String) = when (name) {
         "mark-played" -> "Mark as played"
         "mark-unplayed" -> "Mark as unplayed"

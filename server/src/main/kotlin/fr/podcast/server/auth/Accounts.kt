@@ -120,13 +120,6 @@ class Accounts(private val database: ServerDatabase) {
 
     private fun hashToken(value: String): String =
         MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
-
-    companion object {
-        const val MIN_PASSWORD_LENGTH = 8
-        private val USERNAME = Regex("[a-z0-9][a-z0-9._-]{2,31}")
-
-        fun validUsername(username: String) = USERNAME.matches(username)
-    }
 }
 
 @Suppress("UNUSED_PARAMETER")

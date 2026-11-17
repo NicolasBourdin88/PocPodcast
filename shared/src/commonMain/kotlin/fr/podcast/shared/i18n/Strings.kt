@@ -59,6 +59,16 @@ interface Strings {
     val retry: String
     fun signedInAs(name: String): String
 
+    // Refusals about accounts and shares (ADR 0009)
+    val notAllowed: String
+    val wrongPassword: String
+    fun passwordTooShort(minimum: Int): String
+    val usernameUnavailable: String
+    fun displayNameInvalid(maximum: Int): String
+    val lastAdministrator: String
+    val noSuchUser: String
+    fun messageTooLong(maximum: Int): String
+
     /** Label of a server action, by its HAL-FORMS template name (ADR 0003). */
     fun action(name: String): String
 

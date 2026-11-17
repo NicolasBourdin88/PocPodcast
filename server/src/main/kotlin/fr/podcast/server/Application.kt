@@ -23,6 +23,7 @@ import fr.podcast.server.search.AppleSource
 import fr.podcast.server.search.PodcastIndexSource
 import fr.podcast.server.search.PodcastSearch
 import fr.podcast.server.web.webRoutes
+import fr.podcast.shared.model.AccountRules
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -175,8 +176,8 @@ fun main() {
  */
 suspend fun bootstrapAdmin(accounts: Accounts, username: String?, password: String?): UserAccount? {
     if (username.isNullOrBlank() || password.isNullOrEmpty() || accounts.count() > 0) return null
-    require(Accounts.validUsername(username)) { "ADMIN_USERNAME: 3 to 32 characters (lowercase letters, digits, '.', '_', '-')" }
-    require(password.length >= Accounts.MIN_PASSWORD_LENGTH) { "ADMIN_PASSWORD: at least ${Accounts.MIN_PASSWORD_LENGTH} characters" }
+    require(AccountRules.validUsername(username)) { "ADMIN_USERNAME: 3 to 32 characters (lowercase letters, digits, '.', '_', '-')" }
+    require(password.length >= AccountRules.MIN_PASSWORD_LENGTH) { "ADMIN_PASSWORD: at least ${AccountRules.MIN_PASSWORD_LENGTH} characters" }
     return accounts.create(username, username, password, Role.ADMIN)
 }
 

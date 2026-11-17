@@ -8,11 +8,18 @@ import fr.podcast.shared.model.SubscriptionItem
 
 /** What a user manages besides listening: subscriptions, search, OPML and the server's files. */
 interface LibraryRepository {
+    /** The user's own subscriptions; those shared with them come from [SharingRepository.sharedWithMe]. */
     suspend fun subscriptionItems(): List<SubscriptionItem>
+
+    /** One of the user's subscriptions, or one shared with them; null otherwise. */
+    suspend fun subscription(id: String): SubscriptionItem?
 
     /** Subscribes to a feed; the server reads it first and refuses what is not a podcast feed. */
     suspend fun subscribe(feedUrl: String): SubscriptionItem
+    /** For its owner, or someone it is shared with in [fr.podcast.shared.model.SharePermission.WRITE]. */
     suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean): SubscriptionItem
+
+    /** For its owner only. */
     suspend fun unsubscribe(subscriptionId: String)
 
     /** Asks the server to read the feed now; returns the podcast with its new refresh state. */
@@ -34,4 +41,4 @@ interface LibraryRepository {
 }
 
 /** Everything a client needs from a server, or from the demo data. */
-interface PodcastClient : PodcastRepository, LibraryRepository, PlaybackRepository
+interface PodcastClient : PodcastRepository, LibraryRepository, PlaybackRepository, AccountRepository, SharingRepository

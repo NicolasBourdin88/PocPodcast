@@ -57,6 +57,15 @@ object FrenchStrings : Strings {
     override val retry = "Réessayer"
     override fun signedInAs(name: String) = "Connecté en tant que $name"
 
+    override val notAllowed = "Vous n'avez pas le droit de faire cela."
+    override val wrongPassword = "Le mot de passe actuel est incorrect."
+    override fun passwordTooShort(minimum: Int) = "Le mot de passe doit contenir au moins $minimum caractères."
+    override val usernameUnavailable = "Identifiant invalide ou déjà pris : de 3 à 32 caractères parmi a-z, 0-9, « . », « _ » et « - »."
+    override fun displayNameInvalid(maximum: Int) = "Le nom affiché doit contenir de 1 à $maximum caractères."
+    override val lastAdministrator = "Le serveur doit garder au moins un administrateur."
+    override val noSuchUser = "Ce compte n'existe pas."
+    override fun messageTooLong(maximum: Int) = "Le message est trop long ($maximum caractères au plus)."
+
     override fun action(name: String) = when (name) {
         "mark-played" -> "Marquer comme écouté"
         "mark-unplayed" -> "Marquer comme non écouté"

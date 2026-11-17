@@ -10,15 +10,21 @@ import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+
+/** A field the server refused, and why (Problem Details `errors`, docs/api/conventions.md). */
+data class FieldError(val field: String, val message: String)
 
 /** Failures a client can explain to the user. */
 sealed class ApiException(message: String, cause: Throwable? = null) : Exception(message, cause) {
@@ -27,8 +33,15 @@ sealed class ApiException(message: String, cause: Throwable? = null) : Exception
     class Unauthorized : ApiException("Authentication refused")
     class NotFound(url: String) : ApiException("$url not found")
 
-    /** The server refused the request and said why (Problem Details, RFC 9457). */
-    class Rejected(val status: Int, val type: String?, detail: String?) : ApiException(detail ?: "Refused ($status, $type)")
+    /** The server refused the request and said why (Problem Details, RFC 9457), field by field when it can. */
+    class Rejected(val status: Int, val type: String?, detail: String?, val errors: List<FieldError> = emptyList()) :
+        ApiException(detail ?: "Refused ($status, $type)")
+
+    /** Too many wrong passwords: the server takes a new attempt in [retryAfterSeconds] (ADR 0009). */
+    class TooManyAttempts(val retryAfterSeconds: Long) : ApiException("Too many attempts: retry in $retryAfterSeconds s")
+
+    /** The resource does not offer this action (no such HAL-FORMS template): the user may not do it. */
+    class NotOffered(action: String) : ApiException("\"$action\" is not offered")
 
     class Unexpected(status: Int, url: String) : ApiException("Unexpected status $status for $url")
 }
@@ -105,9 +118,15 @@ class PodcastApi(val serverUrl: String, private val httpClient: HttpClient, priv
         when {
             response.status == HttpStatusCode.Unauthorized -> throw ApiException.Unauthorized()
             response.status == HttpStatusCode.NotFound -> throw ApiException.NotFound(url)
+            response.status == HttpStatusCode.TooManyRequests ->
+                throw ApiException.TooManyAttempts(response.headers[HttpHeaders.RetryAfter]?.toLongOrNull() ?: DEFAULT_RETRY_AFTER_SECONDS)
             !response.status.isSuccess() -> throw response.problem() ?: ApiException.Unexpected(response.status.value, url)
         }
         return response
+    }
+
+    private companion object {
+        const val DEFAULT_RETRY_AFTER_SECONDS = 60L
     }
 }
 
@@ -124,7 +143,10 @@ internal suspend fun HttpResponse.halResource(url: String): HalResource =
 private suspend fun HttpResponse.problem(): ApiException.Rejected? {
     if (contentType()?.match(ContentType("application", "problem+json")) != true) return null
     val problem = runCatching { apiJson.parseToJsonElement(bodyAsText()).jsonObject }.getOrNull() ?: return null
-    val type = (problem["type"] as? kotlinx.serialization.json.JsonPrimitive)?.content
-    val detail = (problem["detail"] as? kotlinx.serialization.json.JsonPrimitive)?.content
-    return ApiException.Rejected(status.value, type, detail)
+    fun JsonObject.text(name: String) = (get(name) as? JsonPrimitive)?.content
+    val errors = (problem["errors"] as? JsonArray).orEmpty().mapNotNull { error ->
+        val fields = error as? JsonObject ?: return@mapNotNull null
+        FieldError(fields.text("field") ?: return@mapNotNull null, fields.text("message").orEmpty())
+    }
+    return ApiException.Rejected(status.value, problem.text("type"), problem.text("detail"), errors)
 }

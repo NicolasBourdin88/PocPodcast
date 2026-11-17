@@ -10,6 +10,11 @@ enum class ShareType { SUBSCRIPTION, EPISODE, PLAYLIST }
 @Serializable
 enum class SharePermission { READ, WRITE }
 
+/** Rules on shares, checked by the server and by the clients (ADR 0009). */
+object ShareRules {
+    const val MAX_MESSAGE_LENGTH = 500
+}
+
 /** Something [owner] shares with [grantee] (ADR 0009); an episode is shared as a recommendation, READ only. */
 @Serializable
 data class Share(
