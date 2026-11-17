@@ -58,7 +58,8 @@ fun Route.apiRoutes(services: ServerServices) {
                     val catalog = UserCatalog(services.database, user.id)
                     val home = LoadHomeState(catalog)()
                     val queue = catalog.queue()
-                    call.respondHtml { homePage(home, queue, call.language(), user, services.audioLinks) }
+                    val others = accounts.users().filter { it.id != user.id }
+                    call.respondHtml { homePage(home, queue, others, call.language(), user, services.audioLinks) }
                 }
                 else -> {
                     val home = user?.let { LoadHomeState(UserCatalog(services.database, it.id))() }

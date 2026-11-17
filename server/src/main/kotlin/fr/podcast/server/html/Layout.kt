@@ -33,6 +33,14 @@ import kotlinx.html.unsafe
 private const val HTMX_URL = "https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js"
 
 /**
+ * htmx swaps the answer to a refused form too (403, 404, 422, 429): the server sends it as a
+ * sentence in the user's language (Http.kt), still marked as an error. Other errors swap nothing.
+ */
+private const val HTMX_CONFIG = """{"responseHandling":[""" +
+    """{"code":"204","swap":false},{"code":"[23]..","swap":true},""" +
+    """{"code":"40[34]|422|429","swap":true,"error":true},{"code":"[45]..","swap":false,"error":true},{"code":"...","swap":false}]}"""
+
+/**
  * Common page: navigation (when signed in), header, then [content], and the player footer,
  * opened on [player] when the page gives an episode (Home: the one to resume).
  */
@@ -50,6 +58,7 @@ fun HTML.page(
     head {
         meta(charset = "utf-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1")
+        meta(name = "htmx-config", content = HTMX_CONFIG)
         title("${strings.appName} — $title")
         script(src = HTMX_URL) {}
         if (user != null) script(src = "/static/player.js") { attributes["defer"] = "" }
@@ -177,6 +186,25 @@ private val STYLES = """
     img.artwork { object-fit: cover; }
     .results .episode { align-items: center; }
     .empty { color: var(--muted); }
+
+    .settings { max-width: 640px; }
+    .rows .row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--card); }
+    form.fields { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 4px 0; }
+    form.fields label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+    form.fields label.toggle { flex-direction: row; align-items: center; }
+    .fields input:not([type=checkbox]), .fields select, .fields textarea, .shared-with select {
+      font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--card); background: var(--surface); color: var(--text);
+    }
+    .hint { font-size: .75rem; }
+    details > summary { cursor: pointer; list-style: none; width: fit-content; }
+    details > summary::-webkit-details-marker { display: none; }
+    summary.action { font-size: .8rem; padding: 4px 12px; border-radius: 999px; background: var(--card); }
+    details[open] > summary { margin-bottom: 8px; }
+    details.share, details.add { margin-top: 8px; }
+    .shared-with { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+    .shared-with li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    q.message { font-style: italic; color: var(--muted); }
+    .result { margin: 4px 0; }
 
     .login { max-width: 360px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: 12px; }
     .login label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }

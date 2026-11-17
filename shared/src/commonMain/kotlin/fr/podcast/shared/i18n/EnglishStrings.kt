@@ -165,6 +165,7 @@ object EnglishStrings : Strings {
     override val passwordChanged = "Password changed: your other devices will have to sign in again."
     override val devices = "Signed-in devices"
     override val thisDevice = "This device"
+    override val noDevices = "No app or terminal is signed in to this account."
     override fun lastUsed(date: LocalDate) = "Last used ${shortDate(date)}"
     override val neverUsed = "Never used"
     override val revokeDevice = "Sign out"
@@ -178,6 +179,7 @@ object EnglishStrings : Strings {
     override val resetPassword = "Reset password"
     override fun resetPasswordOf(name: String) = "New password for $name"
     override val resetPasswordNotice = "All their devices will be signed out."
+    override fun passwordReset(name: String) = "$name's password was reset: their devices are signed out."
     override val deleteUser = "Delete account"
     override fun deleteUserConfirm(name: String) =
         "Delete $name's account? Their subscriptions, listening positions and shares will be erased."
@@ -192,6 +194,7 @@ object EnglishStrings : Strings {
         SharePermission.READ -> "Read-only"
         SharePermission.WRITE -> "Read and modify"
     }
+    override val sharePermission = "Access"
     override val decline = "Remove"
     override val share = "Share"
     override fun shareTitle(title: String) = "Share \"$title\""

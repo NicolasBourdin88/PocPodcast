@@ -2,12 +2,15 @@ package fr.podcast.server
 
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -203,5 +206,89 @@ class WebTest {
             formData { append("opml", javaClass.getResourceAsStream("/feeds/import.opml")!!.readBytes(), Headers.build { append(HttpHeaders.ContentDisposition, "filename=\"a.opml\"") }) },
         ) { frenchHtmx() }
         assertContains(report.bodyAsText(), "importé(s)")
+    }
+
+    /** What htmx sends: form fields and HX-Request, from a French browser. */
+    private suspend fun io.ktor.client.HttpClient.htmx(method: HttpMethod, path: String, vararg fields: Pair<String, String>) = request(path) {
+        this.method = method
+        header("HX-Request", "true")
+        header(HttpHeaders.AcceptLanguage, "fr")
+        if (fields.isNotEmpty()) setBody(FormDataContent(parameters { fields.forEach { (name, value) -> append(name, value) } }))
+    }
+
+    private suspend fun io.ktor.client.HttpClient.page(path: String) = get(path) {
+        header(HttpHeaders.Accept, "text/html")
+        header(HttpHeaders.AcceptLanguage, "fr")
+    }.bodyAsText()
+
+    @Test
+    fun settingsAreTheHtmlOfMe() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+
+        val settings = alice.page("/me")
+        assertContains(settings, "href=\"/me\" aria-current=\"page\"")
+        assertContains(settings, "hx-patch=\"/me\"")
+        assertContains(settings, "hx-put=\"/me/password\"")
+        assertContains(settings, "Appareils connectés")
+        // Alice administers the server: the accounts, each with its actions, hers without.
+        assertContains(settings, "hx-delete=\"/users/2\"")
+        assertContains(settings, "Alice (vous)")
+        assertTrue("hx-delete=\"/users/1\"" !in settings)
+
+        val saved = alice.htmx(HttpMethod.Patch, "/me", "displayName" to "Alicia")
+        assertEquals(HttpStatusCode.OK, saved.status)
+        assertContains(saved.bodyAsText(), "Profil enregistré.")
+
+        // A refusal keeps its status; htmx shows the sentence the apps would show.
+        val wrong = alice.htmx(HttpMethod.Put, "/me/password", "currentPassword" to "wrong-password", "newPassword" to "alice-new-password")
+        assertEquals(HttpStatusCode.UnprocessableEntity, wrong.status)
+        assertContains(wrong.bodyAsText(), "Le mot de passe actuel est incorrect.")
+
+        val created = alice.htmx(HttpMethod.Post, "/users", "username" to "carol", "displayName" to "Carol", "password" to "carol-password")
+        assertEquals(HttpStatusCode.OK, created.status)
+        assertContains(created.bodyAsText(), "Compte de Carol créé.")
+        assertEquals("users-changed", created.headers["HX-Trigger"])
+        val taken = alice.htmx(HttpMethod.Post, "/users", "username" to "carol", "displayName" to "Carol", "password" to "carol-password")
+        assertContains(taken.bodyAsText(), "Identifiant invalide ou déjà pris")
+        val lastAdmin = alice.htmx(HttpMethod.Patch, "/users/1", "role" to "USER")
+        assertContains(lastAdmin.bodyAsText(), "Le serveur doit garder au moins un administrateur.")
+
+        // Bob only sees his own account.
+        val bob = browser()
+        bob.submitForm("/login", parameters { append("username", TestSeed.BOB); append("password", TestSeed.BOB_PASSWORD) })
+        val bobSettings = bob.page("/me")
+        assertContains(bobSettings, "hx-put=\"/me/password\"")
+        assertTrue("hx-post=\"/users\"" !in bobSettings)
+        assertEquals(HttpStatusCode.Forbidden, bob.htmx(HttpMethod.Delete, "/users/1").status)
+    }
+
+    @Test
+    fun theLibraryShowsSharesBothWays() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+        val bob = browser()
+        bob.submitForm("/login", parameters { append("username", TestSeed.BOB); append("password", TestSeed.BOB_PASSWORD) })
+
+        // Alice shares Les Cast Codeurs (subscription 1) with Bob, who may modify it.
+        val shared = alice.htmx(HttpMethod.Post, "/subscriptions/1/shares", "userId" to "2", "permission" to "WRITE", "message" to "Pour toi")
+        assertEquals(HttpStatusCode.OK, shared.status)
+        assertContains(shared.bodyAsText(), "Partagé avec Bob.")
+        assertEquals("shares-changed", shared.headers["HX-Trigger"])
+        assertContains(alice.page("/subscriptions"), "Partagé avec")
+
+        val bobsLibrary = bob.page("/subscriptions")
+        assertContains(bobsLibrary, "Partagés avec moi")
+        assertContains(bobsLibrary, "Partagé par Alice · Lecture et modification")
+        assertContains(bobsLibrary, "Pour toi")
+        assertContains(bobsLibrary, "hx-patch=\"/subscriptions/1\"") // the note, which he may change
+
+        // Bob recommends an episode back from his Home.
+        assertContains(bob.page("/"), "hx-post=\"/episodes/")
+        val recommended = bob.htmx(HttpMethod.Post, "/episodes/2/shares", "userId" to "1", "message" to "À partir de 12 min")
+        assertContains(recommended.bodyAsText(), "Recommandé à Alice.")
+        assertContains(alice.page("/subscriptions"), "Recommandé par Bob")
     }
 }

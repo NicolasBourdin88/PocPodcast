@@ -55,6 +55,10 @@ class Sharing(private val database: ServerDatabase) {
     suspend fun sharesOf(type: ShareType, resourceId: Long): List<ShareRecord> =
         database.query { sharesQueries.sharesOfResource(type.name, resourceId, ::shareRecord).executeAsList() }
 
+    /** What [ownerId] shares of one [type], by resource id. */
+    suspend fun sharesGiven(ownerId: Long, type: ShareType): Map<Long, List<ShareRecord>> =
+        database.query { sharesQueries.sharesGiven(ownerId, type.name, ::shareRecord).executeAsList() }.groupBy { it.resourceId }
+
     suspend fun setPermission(shareId: Long, permission: SharePermission) {
         database.query { sharesQueries.updatePermission(permission.name, shareId) }
     }

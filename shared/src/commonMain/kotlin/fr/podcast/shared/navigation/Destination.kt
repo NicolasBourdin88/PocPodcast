@@ -8,5 +8,6 @@ enum class Destination(val path: String) {
     Home("/"),
     Explore("/search"),
     Library("/subscriptions"),
-    Settings("/settings"),
+    /** The signed-in user's resource: in HTML, the thin client's Settings page. */
+    Settings("/me"),
 }

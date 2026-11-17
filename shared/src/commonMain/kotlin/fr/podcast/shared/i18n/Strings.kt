@@ -150,6 +150,7 @@ interface Strings {
     val passwordChanged: String
     val devices: String
     val thisDevice: String
+    val noDevices: String
     fun lastUsed(date: LocalDate): String
     val neverUsed: String
     val revokeDevice: String
@@ -163,6 +164,7 @@ interface Strings {
     val resetPassword: String
     fun resetPasswordOf(name: String): String
     val resetPasswordNotice: String
+    fun passwordReset(name: String): String
     val deleteUser: String
     fun deleteUserConfirm(name: String): String
     val create: String
@@ -174,6 +176,9 @@ interface Strings {
     fun sharedBy(name: String): String
     fun recommendedBy(name: String): String
     fun permission(permission: SharePermission): String
+
+    /** Label of the choice between [permission]s. */
+    val sharePermission: String
     val decline: String
     val share: String
     fun shareTitle(title: String): String

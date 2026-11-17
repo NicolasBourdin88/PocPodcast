@@ -1,5 +1,8 @@
 package fr.podcast.server.http
 
+import fr.podcast.server.web.language
+import fr.podcast.shared.api.ApiException
+import fr.podcast.shared.api.userMessage
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -9,6 +12,8 @@ import io.ktor.server.request.header
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import kotlinx.html.p
+import kotlinx.html.stream.createHTML
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -56,13 +61,28 @@ object ProblemTypes {
     const val TOO_MANY_ATTEMPTS = "/problems/too-many-attempts"
 }
 
-/** Problem Details (RFC 9457). */
+/**
+ * Problem Details (RFC 9457). htmx gets the same status with a sentence in the user's language,
+ * the one the apps show for this refusal, which the page puts next to the form (Layout.kt).
+ */
 suspend fun ApplicationCall.respondProblem(
     status: HttpStatusCode,
     detail: String? = null,
     errors: List<FieldError> = emptyList(),
     type: String = "about:blank",
 ) {
+    if (isHtmx) {
+        val strings = language().strings
+        val refusal = when (type) {
+            ProblemTypes.TOO_MANY_ATTEMPTS -> ApiException.TooManyAttempts(response.headers[HttpHeaders.RetryAfter]?.toLongOrNull() ?: 60)
+            else -> ApiException.Rejected(status.value, type, detail, errors.map { fr.podcast.shared.api.FieldError(it.field, it.message) })
+        }
+        val html = createHTML(prettyPrint = false).p("error") {
+            attributes["role"] = "alert"
+            +refusal.userMessage(strings)
+        }
+        return respondText(html, ContentType.Text.Html, status)
+    }
     val problem = buildJsonObject {
         put("type", type)
         put("title", status.description)

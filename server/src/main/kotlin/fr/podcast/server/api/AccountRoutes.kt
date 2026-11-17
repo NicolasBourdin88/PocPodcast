@@ -13,15 +13,20 @@ import fr.podcast.server.hal.deviceCollection
 import fr.podcast.server.hal.meResource
 import fr.podcast.server.hal.userCollection
 import fr.podcast.server.hal.userResource
+import fr.podcast.server.html.settingsPage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.ProblemTypes
+import fr.podcast.server.http.Representation
+import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
+import fr.podcast.server.web.language
 import fr.podcast.shared.model.AccountRules
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
@@ -35,14 +40,23 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 
-/** Accounts (ADR 0009): the directory of users, their management by administrators, the user's own profile and devices. */
+/**
+ * Accounts (ADR 0009): the directory of users, their management by administrators, the user's own
+ * profile and devices. In HTML, /me is the thin client's Settings page.
+ */
 fun Route.accountRoutes(services: ServerServices) {
     val accounts = services.accounts
 
     authenticate(SESSION_AUTH, BEARER_AUTH) {
         get("/me") {
+            val user = call.user
             val representation = call.representation()
-            call.respondResource(meResource(call.user, representation.forms), representation)
+            if (representation == Representation.Html) {
+                val devices = accounts.devices(user.id, (call.authPrincipal as? TokenPrincipal)?.token)
+                val users = if (user.role == Role.ADMIN) accounts.users() else null
+                return@get call.respondHtml { settingsPage(user, devices, users, call.language()) }
+            }
+            call.respondResource(meResource(user, representation.forms), representation)
         }
 
         patch("/me") {
@@ -55,6 +69,7 @@ fun Route.accountRoutes(services: ServerServices) {
                 )
             }
             accounts.rename(user.id, displayName)
+            if (call.isHtmx) return@patch call.respondNotice(call.language().strings.profileSaved)
             val representation = call.representation()
             call.respondResource(meResource(accounts.user(user.id)!!, representation.forms), representation)
         }
@@ -79,6 +94,7 @@ fun Route.accountRoutes(services: ServerServices) {
             val principal = call.authPrincipal
             val version = accounts.setPassword(user.id, new, keepToken = (principal as? TokenPrincipal)?.token)
             if (principal is SessionPrincipal) call.sessions.set(UserSession(user.id, version))
+            if (call.isHtmx) return@put call.respondNotice(call.language().strings.passwordChanged, "devices-changed")
             call.respond(HttpStatusCode.NoContent)
         }
 
@@ -122,6 +138,7 @@ fun Route.accountRoutes(services: ServerServices) {
             }
             if (errors.isNotEmpty()) return@post call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid account", errors)
             val created = accounts.create(username, displayName, password, Role.valueOf(role))
+            if (call.isHtmx) return@post call.respondNotice(call.language().strings.userCreated(created.displayName), "users-changed")
             call.response.header(HttpHeaders.Location, "/users/${created.id}")
             val representation = call.representation()
             call.respondResource(userResource(created, admin, representation.forms), representation, HttpStatusCode.Created)
@@ -147,6 +164,7 @@ fun Route.accountRoutes(services: ServerServices) {
                 )
             }
             displayName?.let { accounts.rename(user.id, it) }
+            if (call.isHtmx) return@patch call.respondChanged("users-changed")
             val representation = call.representation()
             call.respondResource(userResource(accounts.user(user.id)!!, admin, representation.forms), representation)
         }
@@ -158,6 +176,7 @@ fun Route.accountRoutes(services: ServerServices) {
             passwordError(password, "password")?.let { return@put call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid password", listOf(it)) }
             // A reset by an administrator signs the account out everywhere.
             accounts.setPassword(user.id, password, keepToken = null)
+            if (call.isHtmx) return@put call.respondNotice(call.language().strings.passwordReset(user.displayName))
             call.respond(HttpStatusCode.NoContent)
         }
 

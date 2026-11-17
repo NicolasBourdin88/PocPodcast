@@ -18,6 +18,7 @@ import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
 import fr.podcast.server.http.respondProblem
+import fr.podcast.server.web.language
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.ShareRules
 import fr.podcast.shared.model.ShareType
@@ -51,9 +52,10 @@ fun Route.shareRoutes(services: ServerServices) {
         return record
     }
 
-    /** The share answered: htmx reloads what shows shares, other clients get the share. */
-    suspend fun ApplicationCall.respondShare(record: ShareRecord, user: UserAccount) {
+    /** The share answered: htmx reloads what shows shares, and is told [done]; other clients get the share. */
+    suspend fun ApplicationCall.respondShare(record: ShareRecord, user: UserAccount, done: String? = null) {
         if (isHtmx) {
+            if (done != null) return respondNotice(done, "shares-changed")
             response.header("HX-Trigger", "shares-changed")
             return respond(HttpStatusCode.NoContent)
         }
@@ -88,7 +90,7 @@ fun Route.shareRoutes(services: ServerServices) {
             val record = sharing.share(
                 ShareType.SUBSCRIPTION, view.item.subscription.id.toLong(), view.ownerId, request.granteeId, request.permission, request.message,
             )
-            call.respondShare(record, user)
+            call.respondShare(record, user, done = call.language().strings.sharedWithUser(record.share.grantee.displayName))
         }
 
         // A recommendation: any episode of the catalog, to anyone, READ only.
@@ -97,7 +99,7 @@ fun Route.shareRoutes(services: ServerServices) {
             val episode = UserCatalog(services.database, user.id).episode(call.parameters["id"]!!) ?: return@post call.respondNotFound("Episode")
             val request = call.receiveShareRequest(services, user.id, permissionAllowed = false) ?: return@post
             val record = sharing.share(ShareType.EPISODE, episode.id.toLong(), user.id, request.granteeId, SharePermission.READ, request.message)
-            call.respondShare(record, user)
+            call.respondShare(record, user, done = call.language().strings.recommendedTo(record.share.grantee.displayName))
         }
 
         get("/shares/{id}") {

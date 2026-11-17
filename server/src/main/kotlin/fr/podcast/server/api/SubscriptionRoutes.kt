@@ -13,7 +13,9 @@ import fr.podcast.server.opml.Opml
 import fr.podcast.server.opml.OpmlException
 import fr.podcast.server.web.language
 import fr.podcast.shared.i18n.Strings
+import fr.podcast.shared.model.ShareType
 import fr.podcast.server.hal.opmlImportResource
+import fr.podcast.server.html.LibraryView
 import fr.podcast.server.html.libraryPage
 import fr.podcast.server.html.opmlReportFragment
 import fr.podcast.server.html.refusedFragment
@@ -60,7 +62,16 @@ fun Route.subscriptionRoutes(services: ServerServices) {
         get("/subscriptions") {
             val items = catalog(call).subscriptionList()
             when (val representation = call.representation()) {
-                Representation.Html -> call.respondHtml { libraryPage(items, call.language(), call.user) }
+                Representation.Html -> {
+                    val user = call.user
+                    val library = LibraryView(
+                        items = items,
+                        given = services.sharing.sharesGiven(user.id, ShareType.SUBSCRIPTION),
+                        received = services.sharing.received(user),
+                        others = services.accounts.users().filter { it.id != user.id },
+                    )
+                    call.respondHtml { libraryPage(library, call.language(), user, services.audioLinks) }
+                }
                 else -> call.respondResource(subscriptionCollection(items, representation.forms), representation)
             }
         }

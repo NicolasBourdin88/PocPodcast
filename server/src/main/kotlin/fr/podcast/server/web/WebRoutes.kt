@@ -72,9 +72,11 @@ fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLi
 
     authenticate(SESSION_AUTH, BEARER_AUTH) {
         get("/fragments/home") {
-            val catalog = UserCatalog(database, call.authPrincipal!!.user.id)
+            val user = call.authPrincipal!!.user
+            val catalog = UserCatalog(database, user.id)
             val home = LoadHomeState(catalog)()
-            call.respondText(homeFragmentHtml(home, catalog.queue(), call.language().strings, audio), ContentType.Text.Html)
+            val others = accounts.users().filter { it.id != user.id }
+            call.respondText(homeFragmentHtml(home, catalog.queue(), others, call.language().strings, audio), ContentType.Text.Html)
         }
 
         get("/fragments/queue") {

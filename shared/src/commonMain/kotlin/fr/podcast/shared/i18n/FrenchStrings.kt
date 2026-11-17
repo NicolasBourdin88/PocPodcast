@@ -167,6 +167,7 @@ object FrenchStrings : Strings {
     override val passwordChanged = "Mot de passe changé : vos autres appareils devront se reconnecter."
     override val devices = "Appareils connectés"
     override val thisDevice = "Cet appareil"
+    override val noDevices = "Aucune application ni aucun terminal n'est connecté à ce compte."
     override fun lastUsed(date: LocalDate) = "Utilisé le ${shortDate(date)}"
     override val neverUsed = "Jamais utilisé"
     override val revokeDevice = "Déconnecter"
@@ -180,6 +181,7 @@ object FrenchStrings : Strings {
     override val resetPassword = "Réinitialiser le mot de passe"
     override fun resetPasswordOf(name: String) = "Nouveau mot de passe pour $name"
     override val resetPasswordNotice = "Tous ses appareils seront déconnectés."
+    override fun passwordReset(name: String) = "Mot de passe de $name réinitialisé : ses appareils sont déconnectés."
     override val deleteUser = "Supprimer le compte"
     override fun deleteUserConfirm(name: String) =
         "Supprimer le compte de $name ? Ses abonnements, ses positions d'écoute et ses partages seront effacés."
@@ -194,6 +196,7 @@ object FrenchStrings : Strings {
         SharePermission.READ -> "Lecture seule"
         SharePermission.WRITE -> "Lecture et modification"
     }
+    override val sharePermission = "Droits"
     override val decline = "Retirer"
     override val share = "Partager"
     override fun shareTitle(title: String) = "Partager « $title »"

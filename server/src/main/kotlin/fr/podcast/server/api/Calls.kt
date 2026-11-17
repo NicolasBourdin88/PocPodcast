@@ -3,6 +3,7 @@ package fr.podcast.server.api
 import fr.podcast.server.auth.SessionPrincipal
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.auth.authPrincipal
+import fr.podcast.server.html.noticeFragment
 import fr.podcast.server.http.HalJson
 import fr.podcast.server.http.Representation
 import fr.podcast.server.http.isHtmx
@@ -41,6 +42,12 @@ internal suspend fun ApplicationCall.respondResource(resource: JsonObject, repre
 
 internal suspend fun ApplicationCall.respondNotFound(what: String) =
     respondProblem(HttpStatusCode.NotFound, "$what ${parameters["id"]} not found")
+
+/** For htmx: a sentence telling what was done, and [trigger] so the page reloads what changed. */
+internal suspend fun ApplicationCall.respondNotice(message: String, trigger: String? = null) {
+    trigger?.let { response.header("HX-Trigger", it) }
+    respondFragment(noticeFragment(message))
+}
 
 /** 204; htmx also gets [trigger] so the page reloads what changed. */
 internal suspend fun ApplicationCall.respondChanged(trigger: String = "episodes-changed") {
