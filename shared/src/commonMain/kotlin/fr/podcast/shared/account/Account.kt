@@ -53,6 +53,11 @@ class AccountStore(private val storage: KeyValueStore) {
         AccountsState(state.accounts.filterNot { it.id == account.id } + account, account.id)
     }
 
+    /** Replaces the saved [account] in place (a new display name…); the active account stays. */
+    fun update(account: Account) = change { state ->
+        state.copy(accounts = state.accounts.map { if (it.id == account.id) account else it })
+    }
+
     fun select(id: String) = change { state -> if (state.accounts.any { it.id == id }) state.copy(activeId = id) else state }
 
     /** Removes the account; another one becomes active if there is any. */

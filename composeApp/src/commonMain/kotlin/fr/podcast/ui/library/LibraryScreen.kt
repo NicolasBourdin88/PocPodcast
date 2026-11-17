@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -33,28 +37,35 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.userMessage
+import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.RefreshStatus
+import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.SubscriptionItem
 import fr.podcast.shared.repository.PodcastClient
+import fr.podcast.shared.repository.SharedItem
 import fr.podcast.ui.components.Artwork
+import fr.podcast.ui.components.SectionTitle
 import fr.podcast.ui.components.SystemBackHandler
 import fr.podcast.ui.components.attempt
+import fr.podcast.ui.player.EpisodePlayButton
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
 
 private sealed interface LibraryState {
     data object Loading : LibraryState
-    data class Loaded(val items: List<SubscriptionItem>) : LibraryState
+    data class Loaded(val items: List<SubscriptionItem>, val shared: List<SharedItem>) : LibraryState
     data class Failed(val error: Throwable) : LibraryState
 }
 
 /**
- * Library: the subscriptions, then a podcast's page. With [twoPanes] (wide windows) the list
- * stays visible next to the open podcast; otherwise the podcast replaces the list.
+ * Library: the subscriptions and what others share with the user (ADR 0009), then a podcast's
+ * page. With [twoPanes] (wide windows) the list stays visible next to the open podcast; otherwise
+ * the podcast replaces the list.
  */
 @Composable
 fun LibraryScreen(
@@ -74,20 +85,43 @@ fun LibraryScreen(
 
     LaunchedEffect(client, reloads) {
         if (state !is LibraryState.Loaded) state = LibraryState.Loading
-        state = attempt { client.subscriptionItems() }.fold({ LibraryState.Loaded(it) }, { LibraryState.Failed(it) })
+        state = attempt { LibraryState.Loaded(client.subscriptionItems(), client.sharedWithMe()) }.fold({ it }, { LibraryState.Failed(it) })
     }
 
     fun replace(item: SubscriptionItem) {
         val loaded = state as? LibraryState.Loaded ?: return
-        state = LibraryState.Loaded(loaded.items.map { if (it.subscription.id == item.subscription.id) item else it })
+        state = loaded.copy(
+            items = loaded.items.map { if (it.subscription.id == item.subscription.id) item else it },
+            shared = loaded.shared.map { if (it.subscription?.subscription?.id == item.subscription.id) it.copy(subscription = item) else it },
+        )
     }
 
     fun removed(item: SubscriptionItem) {
         val loaded = state as? LibraryState.Loaded ?: return
-        state = LibraryState.Loaded(loaded.items.filterNot { it.subscription.id == item.subscription.id })
+        state = loaded.copy(items = loaded.items.filterNot { it.subscription.id == item.subscription.id })
         onOpenPodcast(null)
         onChanged()
         scope.launch { snackbar.showSnackbar(strings.unsubscribedFrom(item.podcast.title)) }
+    }
+
+    /** The user follows a podcast shared with them: their own subscription replaces the share on screen. */
+    fun subscribed(item: SubscriptionItem) {
+        reloads++
+        onChanged()
+        scope.launch { snackbar.showSnackbar(strings.subscribedTo(item.podcast.title)) }
+    }
+
+    fun decline(shared: SharedItem) {
+        scope.launch {
+            attempt { client.unshare(shared.share.id) }.fold(
+                onSuccess = {
+                    val loaded = state as? LibraryState.Loaded ?: return@fold
+                    state = loaded.copy(shared = loaded.shared.filterNot { it.share.id == shared.share.id })
+                    if (shared.subscription?.podcast?.id == openPodcastId) onOpenPodcast(null)
+                },
+                onFailure = { snackbar.showSnackbar(it.userMessage(strings)) },
+            )
+        }
     }
 
     fun exportOpml(files: OpmlFiles) {
@@ -115,7 +149,10 @@ fun LibraryScreen(
     }
 
     val items = (state as? LibraryState.Loaded)?.items
+    val shared = (state as? LibraryState.Loaded)?.shared.orEmpty()
+    // One's own subscription first: a podcast can also be shared by someone else.
     val open = items?.find { it.podcast.id == openPodcastId }
+        ?: shared.firstNotNullOfOrNull { it.subscription?.takeIf { item -> item.podcast.id == openPodcastId } }
     SystemBackHandler(enabled = openPodcastId != null && !twoPanes) { onOpenPodcast(null) }
 
     val list: @Composable (Modifier) -> Unit = { listModifier ->
@@ -124,8 +161,10 @@ fun LibraryScreen(
             is LibraryState.Failed -> Centered(current.error.userMessage(strings), listModifier, strings.retry) { reloads++ }
             is LibraryState.Loaded -> SubscriptionList(
                 items = current.items,
+                shared = current.shared,
                 selectedPodcastId = openPodcastId.takeIf { twoPanes },
                 onOpen = { onOpenPodcast(it.podcast.id) },
+                onDecline = ::decline,
                 onExport = opml?.let { { exportOpml(it) } },
                 onImport = opml?.let { { importOpml(it) } },
                 modifier = listModifier,
@@ -141,6 +180,8 @@ fun LibraryScreen(
             onUnsubscribed = { removed(item) },
             snackbar = snackbar,
             modifier = detailModifier,
+            onSubscribed = ::subscribed,
+            onDecline = shared.find { it.subscription?.subscription?.id == item.subscription.id }?.let { { decline(it) } },
         )
     }
 
@@ -165,8 +206,10 @@ fun LibraryScreen(
 @Composable
 private fun SubscriptionList(
     items: List<SubscriptionItem>,
+    shared: List<SharedItem>,
     selectedPodcastId: String?,
     onOpen: (SubscriptionItem) -> Unit,
+    onDecline: (SharedItem) -> Unit,
     onExport: (() -> Unit)?,
     onImport: (() -> Unit)?,
     modifier: Modifier,
@@ -195,14 +238,9 @@ private fun SubscriptionList(
         }
         items(items, key = { it.subscription.id }) { item ->
             val podcast = item.podcast
-            val selected = podcast.id == selectedPodcastId
             ListItem(
                 modifier = Modifier.clickable { onOpen(item) },
-                colors = if (selected) {
-                    ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                } else {
-                    ListItemDefaults.colors()
-                },
+                colors = selectedColors(podcast.id == selectedPodcastId),
                 leadingContent = { Artwork(podcast, size = 48.dp) },
                 headlineContent = { Text(podcast.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 supportingContent = {
@@ -211,8 +249,54 @@ private fun SubscriptionList(
                 trailingContent = { RefreshBadge(podcast.refreshStatus) },
             )
         }
+        if (shared.isNotEmpty()) {
+            item(key = "shared") { SectionTitle(strings.sharedWithMe) }
+            items(shared, key = { "share-${it.share.id}" }) { entry ->
+                entry.subscription?.let { SharedSubscriptionItem(entry, it, selected = it.podcast.id == selectedPodcastId, onOpen = onOpen) }
+                entry.episode?.let { episode ->
+                    ListItem(
+                        leadingContent = { Artwork(episode.podcast, size = 48.dp) },
+                        overlineContent = { Text(strings.recommendedBy(entry.share.owner.displayName)) },
+                        headlineContent = { Text(episode.episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = entry.share.message?.let { message ->
+                            { Text(message, fontStyle = FontStyle.Italic, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+                        },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                EpisodePlayButton(episode.episode.id)
+                                IconButton(onClick = { onDecline(entry) }) { Icon(Icons.Default.Close, contentDescription = strings.decline) }
+                            }
+                        },
+                    )
+                }
+            }
+        }
     }
 }
+
+/** A subscription someone shares with the user: whose, what they may do with it, and the owner's message. */
+@Composable
+private fun SharedSubscriptionItem(entry: SharedItem, item: SubscriptionItem, selected: Boolean, onOpen: (SubscriptionItem) -> Unit) {
+    val strings = LocalStrings.current
+    val permission = if (item.subscription.access == Access.WRITE) SharePermission.WRITE else SharePermission.READ
+    ListItem(
+        modifier = Modifier.clickable { onOpen(item) },
+        colors = selectedColors(selected),
+        leadingContent = { Artwork(item.podcast, size = 48.dp) },
+        overlineContent = { Text(strings.sharedBy(entry.share.owner.displayName)) },
+        headlineContent = { Text(item.podcast.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            Column {
+                Text(strings.permission(permission))
+                entry.share.message?.let { Text(it, fontStyle = FontStyle.Italic, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun selectedColors(selected: Boolean) =
+    if (selected) ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else ListItemDefaults.colors()
 
 /** Shown while a feed has never been read, or when its last reading failed. */
 @Composable

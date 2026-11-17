@@ -16,8 +16,9 @@ import androidx.compose.ui.Modifier
 import fr.podcast.shared.account.AccountService
 import fr.podcast.shared.account.AccountStore
 import fr.podcast.shared.i18n.Language
-import fr.podcast.ui.account.AccountsScreen
+import fr.podcast.ui.account.SettingsScreen
 import fr.podcast.ui.account.SignInScreen
+import fr.podcast.ui.account.accountsSection
 import fr.podcast.ui.player.LocalPlayback
 import fr.podcast.ui.theme.LocalStrings
 import fr.podcast.ui.theme.PodcastTheme
@@ -78,23 +79,29 @@ private fun AppRoot(environment: AppEnvironment) {
             accountLabel = active?.let { "${it.displayName} · ${it.serverName}" } ?: strings.demoAccount,
             onSessionExpired = { active?.let { store.remove(it.id) } },
             settings = { modifier ->
-                AccountsScreen(
-                    state = accounts,
-                    demo = usingDemo,
-                    onSelect = { account ->
-                        demo = false
-                        store.select(account.id)
-                    },
-                    onAdd = { addingAccount = true },
-                    onSignOut = { account ->
-                        scope.launch {
-                            service.signOut(account)
-                            store.remove(account.id)
-                        }
-                    },
-                    onLeaveDemo = { demo = false },
+                SettingsScreen(
+                    client = repository,
+                    // The device keeps the name shown for the account up to date.
+                    onProfileChanged = { user -> active?.let { store.update(it.copy(displayName = user.displayName)) } },
                     modifier = modifier,
-                )
+                ) {
+                    accountsSection(
+                        state = accounts,
+                        demo = usingDemo,
+                        onSelect = { account ->
+                            demo = false
+                            store.select(account.id)
+                        },
+                        onAdd = { addingAccount = true },
+                        onSignOut = { account ->
+                            scope.launch {
+                                service.signOut(account)
+                                store.remove(account.id)
+                            }
+                        },
+                        onLeaveDemo = { demo = false },
+                    )
+                }
             },
         )
     }

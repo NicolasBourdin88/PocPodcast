@@ -17,8 +17,9 @@ import fr.podcast.shared.repository.FakePodcastRepository
 import fr.podcast.ui.player.LocalPlayback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import fr.podcast.ui.account.AccountsScreen
+import fr.podcast.ui.account.SettingsScreen
 import fr.podcast.ui.account.SignInScreen
+import fr.podcast.ui.account.accountsSection
 import fr.podcast.ui.theme.PodcastTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -72,6 +73,9 @@ class ResponsiveSnapshotTest {
                 }
             }
             render("settings-large-${language.tag}", sizes.getValue("large")) { Home(language, Destination.Settings) }
+            render("settings-compact-${language.tag}", sizes.getValue("compact")) { Home(language, Destination.Settings) }
+            // Tall enough for every section: devices and, for an administrator, the users (ADR 0009).
+            render("settings-full-${language.tag}", 1000 to 1700) { Home(language, Destination.Settings) }
         }
     }
 
@@ -85,6 +89,9 @@ class ResponsiveSnapshotTest {
             render("podcast-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library, podcastId = "p2") }
             render("library-expanded-$tag", sizes.getValue("expanded")) { Home(language, Destination.Library, podcastId = "p2") }
             render("library-large-$tag", sizes.getValue("large")) { Home(language, Destination.Library, podcastId = "p1") }
+            // Shared by Alice, read-only (ADR 0009).
+            render("shared-podcast-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library, podcastId = "p5") }
+            render("shared-library-expanded-$tag", sizes.getValue("expanded")) { Home(language, Destination.Library, podcastId = "p5") }
         }
     }
 
@@ -134,7 +141,9 @@ class ResponsiveSnapshotTest {
                         initialPodcastId = podcastId,
                         initialQuery = query,
                         initialPlayerOpen = playerOpen,
-                        settings = { modifier -> AccountsScreen(accounts, demo = false, {}, {}, {}, {}, modifier) },
+                        settings = { modifier ->
+                            SettingsScreen(repository, onProfileChanged = {}, modifier) { accountsSection(accounts, demo = false, {}, {}, {}, {}) }
+                        },
                     )
                 }
             }

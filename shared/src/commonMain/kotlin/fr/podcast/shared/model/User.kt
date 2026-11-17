@@ -1,5 +1,8 @@
 package fr.podcast.shared.model
 
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -34,4 +37,6 @@ data class Device(
     val lastUsedAt: Instant? = null,
     /** The device making the request. */
     val current: Boolean = false,
-)
+) {
+    fun lastUsedOn(timeZone: TimeZone = TimeZone.currentSystemDefault()): LocalDate? = lastUsedAt?.toLocalDateTime(timeZone)?.date
+}

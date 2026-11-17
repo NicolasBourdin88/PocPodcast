@@ -1,6 +1,8 @@
 package fr.podcast.shared.i18n
 
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.SharePermission
+import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
 
@@ -80,6 +82,17 @@ object EnglishStrings : Strings {
         "dequeue" -> removeFromQueue
         "move" -> "Move in the queue"
         "clear-queue" -> clearQueue
+        "share" -> share
+        "unshare" -> stopSharing
+        "recommend" -> recommend
+        "change-permission" -> "Change permission"
+        "update-profile" -> "Save profile"
+        "change-password" -> changePassword
+        "create-user" -> addUser
+        "update-user" -> "Edit account"
+        "reset-password" -> resetPassword
+        "delete-user" -> deleteUser
+        "revoke" -> revokeDevice
         else -> name
     }
 
@@ -137,6 +150,61 @@ object EnglishStrings : Strings {
     override val moveUp = "Move up"
     override val clearQueue = "Clear queue"
     override val playbackFailed = "This episode cannot be played."
+
+    override val profile = "Profile"
+    override val displayName = "Display name"
+    override fun role(role: UserRole) = when (role) {
+        UserRole.ADMIN -> "Administrator"
+        UserRole.USER -> "User"
+    }
+    override val profileSaved = "Profile saved."
+    override val changePassword = "Change password"
+    override val currentPassword = "Current password"
+    override val newPassword = "New password"
+    override fun passwordHint(minimum: Int) = "At least $minimum characters"
+    override val passwordChanged = "Password changed: your other devices will have to sign in again."
+    override val devices = "Signed-in devices"
+    override val thisDevice = "This device"
+    override fun lastUsed(date: LocalDate) = "Last used ${shortDate(date)}"
+    override val neverUsed = "Never used"
+    override val revokeDevice = "Sign out"
+    override fun revokeDeviceConfirm(name: String) = "Sign \"$name\" out? It will have to sign in again."
+    override val users = "Users"
+    override val you = "you"
+    override val addUser = "Add a user"
+    override fun userCreated(name: String) = "$name's account created."
+    override val makeAdmin = "Make administrator"
+    override val removeAdmin = "Remove administrator role"
+    override val resetPassword = "Reset password"
+    override fun resetPasswordOf(name: String) = "New password for $name"
+    override val resetPasswordNotice = "All their devices will be signed out."
+    override val deleteUser = "Delete account"
+    override fun deleteUserConfirm(name: String) =
+        "Delete $name's account? Their subscriptions, listening positions and shares will be erased."
+    override val create = "Create"
+    override val delete = "Delete"
+    override val moreActions = "More actions"
+
+    override val sharedWithMe = "Shared with me"
+    override fun sharedBy(name: String) = "Shared by $name"
+    override fun recommendedBy(name: String) = "Recommended by $name"
+    override fun permission(permission: SharePermission) = when (permission) {
+        SharePermission.READ -> "Read-only"
+        SharePermission.WRITE -> "Read and modify"
+    }
+    override val decline = "Remove"
+    override val share = "Share"
+    override fun shareTitle(title: String) = "Share \"$title\""
+    override val recommend = "Recommend"
+    override fun recommendTitle(title: String) = "Recommend \"$title\""
+    override val shareWith = "With whom?"
+    override val shareMessage = "Message (optional)"
+    override val sharedWith = "Shared with"
+    override val stopSharing = "Stop sharing"
+    override fun sharedWithUser(name: String) = "Shared with $name."
+    override fun recommendedTo(name: String) = "Recommended to $name."
+    override val noOtherUsers = "No other account on this server."
+    override fun ownerNote(name: String) = "$name's note"
 
     override val feedUnreachable = "This feed cannot be read."
     override val notAFeed = "This address is not a podcast feed."

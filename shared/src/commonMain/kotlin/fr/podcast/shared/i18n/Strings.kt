@@ -3,6 +3,8 @@ package fr.podcast.shared.i18n
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.SharePermission
+import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
 
@@ -135,6 +137,56 @@ interface Strings {
         val rest = (total % 60).toString().padStart(2, '0')
         return if (hours > 0) "$hours:${minutes.toString().padStart(2, '0')}:$rest" else "$minutes:$rest"
     }
+
+    // Settings: profile, password, devices, users (ADR 0009)
+    val profile: String
+    val displayName: String
+    fun role(role: UserRole): String
+    val profileSaved: String
+    val changePassword: String
+    val currentPassword: String
+    val newPassword: String
+    fun passwordHint(minimum: Int): String
+    val passwordChanged: String
+    val devices: String
+    val thisDevice: String
+    fun lastUsed(date: LocalDate): String
+    val neverUsed: String
+    val revokeDevice: String
+    fun revokeDeviceConfirm(name: String): String
+    val users: String
+    val you: String
+    val addUser: String
+    fun userCreated(name: String): String
+    val makeAdmin: String
+    val removeAdmin: String
+    val resetPassword: String
+    fun resetPasswordOf(name: String): String
+    val resetPasswordNotice: String
+    val deleteUser: String
+    fun deleteUserConfirm(name: String): String
+    val create: String
+    val delete: String
+    val moreActions: String
+
+    // Sharing (ADR 0009)
+    val sharedWithMe: String
+    fun sharedBy(name: String): String
+    fun recommendedBy(name: String): String
+    fun permission(permission: SharePermission): String
+    val decline: String
+    val share: String
+    fun shareTitle(title: String): String
+    val recommend: String
+    fun recommendTitle(title: String): String
+    val shareWith: String
+    val shareMessage: String
+    val sharedWith: String
+    val stopSharing: String
+    fun sharedWithUser(name: String): String
+    fun recommendedTo(name: String): String
+    val noOtherUsers: String
+    fun ownerNote(name: String): String
 
     // Server refusals (Problem Details types)
     val feedUnreachable: String

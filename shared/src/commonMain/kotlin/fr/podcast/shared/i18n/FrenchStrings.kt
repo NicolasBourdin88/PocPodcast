@@ -1,6 +1,8 @@
 package fr.podcast.shared.i18n
 
 import fr.podcast.shared.model.FileStatus
+import fr.podcast.shared.model.SharePermission
+import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
 
@@ -82,6 +84,17 @@ object FrenchStrings : Strings {
         "dequeue" -> removeFromQueue
         "move" -> "Déplacer dans la file"
         "clear-queue" -> clearQueue
+        "share" -> share
+        "unshare" -> stopSharing
+        "recommend" -> recommend
+        "change-permission" -> "Changer les droits"
+        "update-profile" -> "Enregistrer le profil"
+        "change-password" -> changePassword
+        "create-user" -> addUser
+        "update-user" -> "Modifier le compte"
+        "reset-password" -> resetPassword
+        "delete-user" -> deleteUser
+        "revoke" -> revokeDevice
         else -> name
     }
 
@@ -139,6 +152,61 @@ object FrenchStrings : Strings {
     override val moveUp = "Monter dans la file"
     override val clearQueue = "Vider la file d'attente"
     override val playbackFailed = "Impossible de lire cet épisode."
+
+    override val profile = "Profil"
+    override val displayName = "Nom affiché"
+    override fun role(role: UserRole) = when (role) {
+        UserRole.ADMIN -> "Administrateur"
+        UserRole.USER -> "Utilisateur"
+    }
+    override val profileSaved = "Profil enregistré."
+    override val changePassword = "Changer le mot de passe"
+    override val currentPassword = "Mot de passe actuel"
+    override val newPassword = "Nouveau mot de passe"
+    override fun passwordHint(minimum: Int) = "Au moins $minimum caractères"
+    override val passwordChanged = "Mot de passe changé : vos autres appareils devront se reconnecter."
+    override val devices = "Appareils connectés"
+    override val thisDevice = "Cet appareil"
+    override fun lastUsed(date: LocalDate) = "Utilisé le ${shortDate(date)}"
+    override val neverUsed = "Jamais utilisé"
+    override val revokeDevice = "Déconnecter"
+    override fun revokeDeviceConfirm(name: String) = "Déconnecter « $name » ? Il devra se reconnecter."
+    override val users = "Utilisateurs"
+    override val you = "vous"
+    override val addUser = "Ajouter un utilisateur"
+    override fun userCreated(name: String) = "Compte de $name créé."
+    override val makeAdmin = "Rendre administrateur"
+    override val removeAdmin = "Retirer le rôle d'administrateur"
+    override val resetPassword = "Réinitialiser le mot de passe"
+    override fun resetPasswordOf(name: String) = "Nouveau mot de passe pour $name"
+    override val resetPasswordNotice = "Tous ses appareils seront déconnectés."
+    override val deleteUser = "Supprimer le compte"
+    override fun deleteUserConfirm(name: String) =
+        "Supprimer le compte de $name ? Ses abonnements, ses positions d'écoute et ses partages seront effacés."
+    override val create = "Créer"
+    override val delete = "Supprimer"
+    override val moreActions = "Plus d'actions"
+
+    override val sharedWithMe = "Partagés avec moi"
+    override fun sharedBy(name: String) = "Partagé par $name"
+    override fun recommendedBy(name: String) = "Recommandé par $name"
+    override fun permission(permission: SharePermission) = when (permission) {
+        SharePermission.READ -> "Lecture seule"
+        SharePermission.WRITE -> "Lecture et modification"
+    }
+    override val decline = "Retirer"
+    override val share = "Partager"
+    override fun shareTitle(title: String) = "Partager « $title »"
+    override val recommend = "Recommander"
+    override fun recommendTitle(title: String) = "Recommander « $title »"
+    override val shareWith = "Avec qui ?"
+    override val shareMessage = "Message (facultatif)"
+    override val sharedWith = "Partagé avec"
+    override val stopSharing = "Ne plus partager"
+    override fun sharedWithUser(name: String) = "Partagé avec $name."
+    override fun recommendedTo(name: String) = "Recommandé à $name."
+    override val noOtherUsers = "Aucun autre compte sur ce serveur."
+    override fun ownerNote(name: String) = "Note de $name"
 
     override val feedUnreachable = "Impossible de lire ce flux."
     override val notAFeed = "Cette adresse n'est pas un flux de podcast."
