@@ -48,12 +48,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.userMessage
 import fr.podcast.shared.home.EpisodeItem
-import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Playlist
 import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.PlaylistOrder
-import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.repository.PlaylistDetails
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
@@ -139,7 +137,7 @@ fun PlaylistScreen(
                     }
                 }
                 playlist.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                playlist.rules?.let { Text(rulesSummary(it, strings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                playlist.rules?.let { Text(strings.playlistRules(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 playlist.ownerName?.let { ownerName ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
@@ -260,16 +258,6 @@ private fun PlaylistEpisode(item: EpisodeItem, onMoveUp: (() -> Unit)?, onRemove
         trailingContent = { EpisodePlayButton(item.episode.id) },
     )
 }
-
-/** "kotlin, ktor · Favorites only · ★★★★☆ · Newest first · ≤ 50" in the user's language. */
-internal fun rulesSummary(rules: PlaylistRules, strings: Strings): String = listOfNotNull(
-    rules.keywords.joinToString(", ").ifEmpty { null },
-    strings.favoritesOnly.takeIf { rules.favoritesOnly },
-    strings.stars(rules.minRating).takeIf { rules.minRating > 0 },
-    strings.unplayedOnly.takeIf { rules.unplayedOnly },
-    strings.playlistOrder(rules.order),
-    "≤ ${rules.limit}",
-).joinToString(" · ")
 
 private fun Access.toPermission() =
     if (this == Access.WRITE) fr.podcast.shared.model.SharePermission.WRITE else fr.podcast.shared.model.SharePermission.READ

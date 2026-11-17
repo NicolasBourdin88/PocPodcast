@@ -5,6 +5,7 @@ import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.PlaylistOrder
+import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
@@ -161,6 +162,16 @@ interface Strings {
     val newFeedAddress: String
     val unpublishFeed: String
     fun feedPublished(title: String): String
+
+    /** A dynamic playlist's rules in a line: "kotlin, ktor · Favorites only · ★★★★☆ · Newest first · ≤ 50". */
+    fun playlistRules(rules: PlaylistRules): String = listOfNotNull(
+        rules.keywords.joinToString(", ").ifEmpty { null },
+        favoritesOnly.takeIf { rules.favoritesOnly },
+        stars(rules.minRating).takeIf { rules.minRating > 0 },
+        unplayedOnly.takeIf { rules.unplayedOnly },
+        playlistOrder(rules.order),
+        "≤ ${rules.limit}",
+    ).joinToString(" · ")
 
     // Player (ADR 0008)
     val nowPlaying: String
