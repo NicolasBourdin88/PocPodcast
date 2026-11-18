@@ -60,6 +60,8 @@ fun FlowContent.homeContent(state: HomeState, queue: List<EpisodeItem>, extras: 
         attributes["hx-get"] = "/fragments/home"
         attributes["hx-trigger"] = "episodes-changed from:body"
         attributes["hx-swap"] = "outerHTML"
+        // Its forms keep their own targets (see reloadOn).
+        attributes["hx-disinherit"] = "*"
 
         if (state.resume.isNotEmpty()) {
             section {

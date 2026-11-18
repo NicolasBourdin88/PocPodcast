@@ -216,6 +216,9 @@ internal fun kotlinx.html.HTMLTag.reloadOn(page: String, vararg events: String) 
     attributes["hx-select"] = "#$elementId"
     attributes["hx-trigger"] = events.joinToString(", ") { "$it from:body" }
     attributes["hx-swap"] = "outerHTML"
+    // htmx would pass hx-select and hx-swap on to every form, button and boosted link inside: their
+    // answer, a sentence or another page, has no such element and would be swapped for nothing.
+    attributes["hx-disinherit"] = "*"
 }
 
 private fun Role.toUserRole() = UserRole.valueOf(name)

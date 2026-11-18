@@ -21,7 +21,7 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque 
 **Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, par exemple la phrase qui dit ce qui a été fait.
 - **Refus** : il garde son statut (403, 404, 422, 429), mais son corps est la phrase que les apps afficheraient, traduite avec la même correspondance que le SDK. La page configure htmx (`responseHandling`) pour insérer ces réponses-là à côté du formulaire.
 - **Refus plus anciens** : l'abonnement à un flux et l'import OPML répondent encore `200` avec un fragment d'erreur.
-- **Rechargements** : quand une action change une liste, l'en-tête `HX-Trigger` demande à la page de la recharger : `subscriptions-changed`, `queue-changed`, `episodes-changed`, `shares-changed`, `users-changed`, `devices-changed`, `playlists-changed`.
+- **Rechargements** : quand une action change une liste, l'en-tête `HX-Trigger` demande à la page de la recharger : `subscriptions-changed`, `queue-changed`, `episodes-changed`, `shares-changed`, `users-changed`, `devices-changed`, `playlists-changed`. L'élément qui se recharge porte `hx-disinherit="*"` : ses formulaires et ses liens gardent ainsi leur propre cible au lieu d'hériter de la sienne.
 - **Changement de page** : quand l'action crée, renomme ou supprime ce que montre la page (une playlist), la réponse porte `HX-Location` vers la page à afficher. htmx la charge comme un lien boosté, sans arrêter le lecteur.
 
 **Lecteur du client léger** : un `<audio>` dans un pied de page `hx-preserve`, conservé de page en page grâce à `hx-boost` sur la navigation, et piloté par `static/player.js`. Ses requêtes de modification portent aussi `HX-Request`.

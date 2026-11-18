@@ -58,8 +58,6 @@ fun HTML.playlistsPage(own: List<PlaylistView>, shared: List<SharedEntry>, langu
         div {
             id = "playlists"
             reloadOn("/playlists", "playlists-changed", "shares-changed")
-            // Boosted: opening a playlist keeps the player going.
-            attributes["hx-boost"] = "true"
             if (own.isEmpty()) p("empty") { +strings.emptyPlaylists }
             ul("rows") { own.forEach { playlistRow(it.playlist, strings) } }
             if (shared.isNotEmpty()) {
@@ -174,6 +172,8 @@ fun HTML.playlistPage(data: PlaylistPage, language: Language, user: UserAccount,
 private fun UL.playlistRow(playlist: Playlist, strings: Strings, message: String? = null) {
     li("row") {
         a(href = "/playlists/${playlist.id}", classes = "card-body") {
+            // Boosted: opening a playlist keeps the player going.
+            attributes["hx-boost"] = "true"
             playlist.ownerName?.let { span("overline") { +strings.playlistSharedBy(it) } }
             span("title") { +playlist.title }
             span("meta") { +"${strings.playlistKind(playlist.kind)} · ${strings.episodeCount(playlist.episodeCount)}" }

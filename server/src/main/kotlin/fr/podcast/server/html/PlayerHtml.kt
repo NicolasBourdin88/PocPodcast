@@ -147,6 +147,8 @@ fun FlowContent.queueSection(queue: List<EpisodeItem>, strings: Strings, audio: 
         attributes["hx-get"] = "/fragments/queue"
         attributes["hx-trigger"] = "queue-changed from:body"
         attributes["hx-swap"] = "outerHTML"
+        // Its buttons keep their own targets (see reloadOn).
+        attributes["hx-disinherit"] = "*"
         div("section-header") {
             h2 { +strings.queue }
             if (queue.isNotEmpty()) {

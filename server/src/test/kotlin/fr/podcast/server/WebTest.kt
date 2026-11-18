@@ -322,4 +322,22 @@ class WebTest {
         assertContains(alice.page("/playlists/2"), "kotlin · Non écoutés seulement")
         assertEquals("/playlists", alice.htmx(HttpMethod.Delete, "/playlists/2").headers["HX-Location"])
     }
+
+    @Test
+    fun selfReloadingElementsPassNothingOn() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+        val rules = arrayOf("keywords" to "", "favoritesOnly" to "false", "unplayedOnly" to "false", "minRating" to "0", "order" to "NEWEST", "limit" to "50")
+        alice.htmx(HttpMethod.Post, "/playlists", "title" to "Pour le train", "kind" to "STATIC", *rules)
+
+        // An element that reloads itself on an event: htmx would otherwise pass its hx-swap and
+        // hx-select on to the forms and links inside, whose answers would then replace or empty it.
+        val reloading = Regex("""<[a-z]+ [^>]*hx-trigger="[^"]*from:body[^"]*"[^>]*>""")
+        for (path in listOf("/", "/subscriptions", "/playlists", "/playlists/1", "/me")) {
+            val elements = reloading.findAll(alice.page(path)).map { it.value }.toList()
+            assertTrue(elements.isNotEmpty(), path)
+            elements.forEach { assertContains(it, "hx-disinherit=\"*\"", message = "$path: $it") }
+        }
+    }
 }
