@@ -112,9 +112,10 @@ abstract class ServerCommand(name: String) : CliktCommand(name = name) {
 
     /**
      * The interactive screen, playing on JavaFX Media (ADR 0008), or silently with --demo; starts
-     * [autoplay] at once. The position reaches the server before the command ends.
+     * [autoplay] at once, the following episodes before the queue. The position reaches the server
+     * before the command ends.
      */
-    protected fun runTui(home: HomeState, autoplay: String?) {
+    protected fun runTui(home: HomeState, autoplay: List<String> = emptyList()) {
         val client = client()
         // One thread: playback commands run in the order they are given.
         val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "playback").apply { isDaemon = true } }.asCoroutineDispatcher()
@@ -122,7 +123,11 @@ abstract class ServerCommand(name: String) : CliktCommand(name = name) {
         val player = if (cli.demo) SimulatedAudioPlayer(scope) else JavaFxAudioPlayer()
         val playback = PlaybackController(player, scope)
         playback.attach(client)
-        autoplay?.let(playback::play)
+        when (autoplay.size) {
+            0 -> Unit
+            1 -> playback.play(autoplay.single())
+            else -> playback.playAll(autoplay)
+        }
         try {
             runMosaicBlocking { PodcastTui(home, playback, cli.strings) }
         } finally {
@@ -141,7 +146,7 @@ class ListCommand : ServerCommand("list") {
 
 class TuiCommand : ServerCommand("tui") {
     override fun help(context: Context) = systemLanguage.strings.cliTuiDescription
-    override fun run() = runTui(loadHome(), autoplay = null)
+    override fun run() = runTui(loadHome())
 }
 
 class PlayCommand : ServerCommand("play") {
@@ -154,7 +159,7 @@ class PlayCommand : ServerCommand("play") {
             ?: home.resume.firstOrNull()?.episode?.id
             ?: call { client().queue() }.firstOrNull()?.episode?.id
             ?: fail(cli.strings.nothingToPlay)
-        runTui(home, autoplay = episodeId)
+        runTui(home, autoplay = listOf(episodeId))
     }
 }
 
@@ -260,6 +265,12 @@ fun main(args: Array<String>) = PodcastCommand()
         SearchCommand(), SubscribeCommand(), SubscriptionsCommand(), NoteCommand(), UnsubscribeCommand(),
         OpmlCommand().subcommands(OpmlExportCommand(), OpmlImportCommand()),
         SharedCommand().subcommands(SharedRemoveCommand()), ShareCommand(), UnshareCommand(), RecommendCommand(),
+        FavoriteCommand(), RateCommand(),
+        PlaylistsCommand().subcommands(
+            PlaylistShowCommand(), PlaylistCreateCommand(), PlaylistEditCommand(), PlaylistAddCommand(), PlaylistRemoveCommand(),
+            PlaylistMoveCommand(), PlaylistDeleteCommand(), PlaylistPlayCommand(), PlaylistShuffleCommand(),
+            PlaylistShareCommand(), PlaylistUnshareCommand(), PlaylistFeedCommand(),
+        ),
         LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand(),
         ProfileCommand(), PasswdCommand(), DevicesCommand().subcommands(DevicesRevokeCommand()),
         UsersCommand().subcommands(UsersAddCommand(), UsersRemoveCommand(), UsersPasswdCommand(), UsersRoleCommand()),

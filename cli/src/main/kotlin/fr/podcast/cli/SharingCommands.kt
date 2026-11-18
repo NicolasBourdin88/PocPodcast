@@ -80,7 +80,7 @@ class RecommendCommand : ServerCommand("recommend") {
 }
 
 /** An account of the server, by its username or its display name, in any case. */
-private fun ServerCommand.account(name: String): User {
+internal fun ServerCommand.account(name: String): User {
     val users = call { client().users() }
     return users.firstOrNull { it.username.equals(name, ignoreCase = true) }
         ?: users.firstOrNull { it.displayName.equals(name, ignoreCase = true) }

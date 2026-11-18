@@ -306,6 +306,32 @@ interface Strings {
     val cliWriteOption: String
     val cliUnshareDescription: String
     val cliRecommendDescription: String
+    val cliPlaylistsDescription: String
+    val cliPlaylistShowDescription: String
+    val cliPlaylistCreateDescription: String
+    val cliPlaylistEditDescription: String
+    val cliDynamicOption: String
+    val cliPlaylistAddDescription: String
+    val cliPlaylistRemoveDescription: String
+    val cliPlaylistMoveDescription: String
+    val cliPlaylistDeleteDescription: String
+    val cliPlaylistPlayDescription: String
+    val cliPlaylistShuffleDescription: String
+    val cliPlaylistShareDescription: String
+    val cliPlaylistWriteOption: String
+    val cliPlaylistUnshareDescription: String
+    val cliPlaylistFeedDescription: String
+    val cliFavoriteDescription: String
+    val cliRateDescription: String
+    val rulesOnlyForDynamic: String
+    val onlyRandomShuffles: String
+    val playlistNotShared: String
+    fun playlistNoLongerSharedWith(name: String): String
+    fun playlistDeleted(title: String): String
+    val feedUnpublished: String
+    fun favoriteAdded(title: String): String
+    fun favoriteRemoved(title: String): String
+    fun ratingCleared(title: String): String
     val confirmPassword: String
     val passwordsDiffer: String
     val confirmWithYes: String

@@ -44,10 +44,13 @@ class AccountTextTest {
                 "    ✉ Pour tes trajets",
                 " 2. KMP in production — Fragmented · Recommandé par Bob",
                 "    ✉ À écouter à partir de 12 min",
+                " 3. Android — Partagée par Bob · Lecture seule · Statique",
+                "    ✉ Pour découvrir",
             ).joinToString("\n"),
             renderSharedText(repository.sharedWithMe(), strings),
         )
         assertEquals("  ⇄ Bob — Lecture et modification", renderSharesText(repository.sharesOf("s2"), strings))
         assertEquals(strings.notShared, renderSharesText(repository.sharesOf("s1"), strings))
+        assertEquals(strings.playlistNotShared, renderSharesText(repository.sharesOfPlaylist("pl2"), strings, strings.playlistNotShared))
     }
 }

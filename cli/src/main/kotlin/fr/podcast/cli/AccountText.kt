@@ -39,13 +39,17 @@ fun renderSharedText(items: List<SharedItem>, strings: Strings): String = buildS
             appendLine("${number(index)} ${it.podcast.title} — ${strings.sharedBy(owner)} · ${strings.permission(permission)}")
         }
         item.episode?.let { appendLine("${number(index)} ${it.episode.title} — ${it.podcast.title} · ${strings.recommendedBy(owner)}") }
+        item.playlist?.let {
+            val permission = if (it.access == Access.WRITE) SharePermission.WRITE else SharePermission.READ
+            appendLine("${number(index)} ${it.title} — ${strings.playlistSharedBy(owner)} · ${strings.permission(permission)} · ${strings.playlistKind(it.kind)}")
+        }
         item.share.message?.let { appendLine("    ✉ $it") }
     }
 }.trimEnd()
 
-/** Whom a subscription is shared with, for `podcast share <n>`. */
-fun renderSharesText(shares: List<Share>, strings: Strings): String = buildString {
-    if (shares.isEmpty()) return strings.notShared
+/** Whom a subscription or a playlist is shared with, for `podcast share <n>` and `podcast playlists share <n>`. */
+fun renderSharesText(shares: List<Share>, strings: Strings, none: String = strings.notShared): String = buildString {
+    if (shares.isEmpty()) return none
     shares.forEach { share ->
         appendLine("  ⇄ ${share.grantee.displayName} — ${strings.permission(share.permission)}")
         share.message?.let { appendLine("    ✉ $it") }
