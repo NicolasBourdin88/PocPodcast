@@ -2,6 +2,7 @@ package fr.podcast.server.sync
 
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.opml.OpmlEntry
+import fr.podcast.server.catalog.Playlists
 import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.UrlGuard
@@ -53,6 +54,8 @@ data class EpisodeActions(val actions: List<EpisodeAction>, val timestamp: Long)
 class GpodderSync(
     private val database: ServerDatabase,
     private val guard: UrlGuard,
+    /** To recognise the enclosures of our playlist feeds (ADR 0010). */
+    private val playlists: Playlists,
     /** Reads new feeds in the background, as after an OPML import. */
     private val refreshSoon: (List<Long>) -> Unit,
     /** Removes a podcast nobody follows any more, with its files. */
@@ -164,7 +167,8 @@ class GpodderSync(
             val key = normalizedFeed(action.podcast)
             val podcastId = database.query { catalogQueries.podcastIdByFeedUrl(action.podcast).executeAsOneOrNull() }
                 ?: podcasts().firstOrNull { normalizedFeed(it.feed_url) == key }?.podcast_id
-            val episode = podcastId?.let { findEpisode(it, action.guid, action.episode) }
+            // Listened to through one of our playlist feeds: its enclosure names the episode.
+            val episode = playlistEnclosure(action.episode) ?: podcastId?.let { findEpisode(it, action.guid, action.episode) }
             if (episode != null) {
                 apply(user.id, episode, kind, action.position, action.total, happened)
             } else {
@@ -192,6 +196,14 @@ class GpodderSync(
     }
 
     private class Episode(val id: Long, val durationSeconds: Int)
+
+    /** `…/feeds/{secret}/episodes/{id}`, the enclosure of a published playlist: that episode. */
+    private suspend fun playlistEnclosure(audioUrl: String): Episode? {
+        val (secret, id) = PLAYLIST_ENCLOSURE.find(audioUrl)?.destructured ?: return null
+        playlists.byFeedSecret(secret) ?: return null
+        val episodeId = id.toLongOrNull() ?: return null
+        return database.query { catalogQueries.episodeDuration(episodeId).executeAsOneOrNull() }?.let { Episode(episodeId, it) }
+    }
 
     /** By the feed's guid first, then by the address of the audio file. */
     private suspend fun findEpisode(podcastId: Long, guid: String?, audioUrl: String): Episode? = database.query {
@@ -228,6 +240,8 @@ class GpodderSync(
 
         /** As for our own clients (ADR 0008). */
         const val MAX_POSITION_SECONDS = 24 * 3600
+
+        val PLAYLIST_ENCLOSURE = Regex("""/feeds/([A-Za-z0-9_-]+)/episodes/(\d+)$""")
 
         /** gPodder dates: UTC, to the second, without zone ("2026-11-18T08:19:12"). */
         val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")

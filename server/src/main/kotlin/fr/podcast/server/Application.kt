@@ -142,7 +142,7 @@ class ServerServices(
     )
 
     /** gPodder API and Open Podcast API (ADR 0011). */
-    val gpodder = GpodderSync(database, guard, ::refreshSoon, ::removePodcast)
+    val gpodder = GpodderSync(database, guard, playlists, ::refreshSoon, ::removePodcast)
     val openPodcastApi = OpenPodcastApi(database, guard, ::refreshSoon, ::removePodcast)
 
     /** Reads new feeds (e.g. after an OPML import) without making the request wait. */

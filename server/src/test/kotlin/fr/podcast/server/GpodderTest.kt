@@ -2,6 +2,8 @@ package fr.podcast.server
 
 import fr.podcast.server.catalog.UserCatalog
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.PlaylistRules
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.get
@@ -197,5 +199,24 @@ class GpodderTest {
         // Now told as the state, once.
         val actions = client.get("/api/2/episodes/alice.json?since=0").json()["actions"]!!.jsonArray
         assertEquals(1, actions.count { it.jsonObject["guid"]?.jsonPrimitive?.content == "test-ep-3" })
+    }
+
+    @Test
+    fun listeningThroughAPlaylistFeedMovesTheEpisode() = testApplication {
+        val services = podcastServer()
+        val alice = services.accounts.userByUsername(TestSeed.ALICE)!!
+        val playlist = services.playlists.create(alice.id, "Pour le train", null, PlaylistKind.STATIC, PlaylistRules())
+        services.playlists.add(playlist, "6", null)
+        val secret = services.playlists.publishFeed(playlist)
+        val client = signedIn(TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
+
+        // As AntennaPod sends it for an episode of the playlist's feed (ADR 0010).
+        client.post("/api/2/episodes/alice.json") {
+            setBody(
+                """[{"podcast":"http://10.0.2.2:8080/feeds/$secret","episode":"http://10.0.2.2:8080/feeds/$secret/episodes/6","guid":"seed-6",""" +
+                    """"action":"play","timestamp":"${soon()}","started":0,"position":300,"total":5280}]""",
+            )
+        }
+        assertEquals(300, UserCatalog(services.database, alice.id).episode("6")!!.positionSeconds)
     }
 }
