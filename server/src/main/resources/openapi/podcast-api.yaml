@@ -1411,6 +1411,132 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
 
+
+  /v1/subscriptions:
+    get:
+      tags: [Open Podcast API]
+      operationId: opaListSubscriptions
+      summary: Abonnements, page par page
+      description: Sans `since`, toutes les entrées non supprimées ; avec, celles changées ou supprimées depuis.
+      security: [{ bearer: [] }, { basic: [] }]
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Une page d'abonnements
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Open Podcast API]
+      operationId: opaAddSubscriptions
+      summary: Ajouter des abonnements
+      description: Comme un import OPML ; un flux déjà suivi est un succès. Un `guid` envoyé fait foi.
+      security: [{ bearer: [] }, { basic: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpaNewSubscriptions" }
+      responses:
+        "200":
+          description: Succès et échecs, flux par flux
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaAdded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/subscriptions/{guid}:
+    parameters:
+      - name: guid
+        in: path
+        required: true
+        schema: { type: string }
+        description: Celui envoyé par le client, sinon le `podcast:guid` de l'URL du flux.
+    get:
+      tags: [Open Podcast API]
+      operationId: opaGetSubscription
+      summary: Un abonnement
+      security: [{ bearer: [] }, { basic: [] }]
+      responses:
+        "200":
+          description: L'abonnement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaSubscription" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/OpaGone" }
+    patch:
+      tags: [Open Podcast API]
+      operationId: opaUpdateSubscription
+      summary: Changer l'adresse du flux, le GUID ou l'abonnement
+      security: [{ bearer: [] }, { basic: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpaUpdate" }
+      responses:
+        "200":
+          description: Ce qui a changé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaUpdated" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/OpaGone" }
+    delete:
+      tags: [Open Podcast API]
+      operationId: opaDeleteSubscription
+      summary: Supprimer un abonnement
+      description: Désabonne et marque l'entrée supprimée, tout de suite ; elle répond ensuite 410.
+      security: [{ bearer: [] }, { basic: [] }]
+      responses:
+        "202":
+          description: Suppression faite ; son état est à `/v1/deletions/{deletionId}`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaDeletion" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/OpaGone" }
+
+  /v1/deletions/{deletionId}:
+    parameters:
+      - name: deletionId
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Open Podcast API]
+      operationId: opaDeletionStatus
+      summary: État d'une suppression
+      security: [{ bearer: [] }, { basic: [] }]
+      responses:
+        "200":
+          description: Toujours `SUCCESS` ici, la suppression étant immédiate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpaDeletionStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -1502,6 +1628,11 @@ components:
       schema: { type: string }
 
   responses:
+    OpaGone:
+      description: Abonnement supprimé (Open Podcast API)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/OpaGone" }
     BadRequest:
       description: Paramètre invalide
       content:
@@ -2587,4 +2718,105 @@ components:
           type: array
           items: { $ref: "#/components/schemas/EpisodeAction" }
         timestamp: { type: integer, description: Le prochain `since`. }
+      additionalProperties: false
+
+    OpaSubscription:
+      type: object
+      required: [feed_url, guid, is_subscribed]
+      properties:
+        feed_url: { type: string }
+        guid: { type: string }
+        is_subscribed: { type: boolean }
+        subscription_changed: { type: string, format: date-time }
+        guid_changed: { type: string, format: date-time }
+        new_guid: { type: string }
+        deleted: { type: string, format: date-time }
+      additionalProperties: false
+
+    OpaPage:
+      type: object
+      required: [total, page, per_page, subscriptions]
+      properties:
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        per_page: { type: integer, minimum: 1 }
+        next: { type: string }
+        previous: { type: string }
+        subscriptions:
+          type: array
+          items: { $ref: "#/components/schemas/OpaSubscription" }
+      additionalProperties: false
+
+    OpaNewSubscriptions:
+      type: object
+      required: [subscriptions]
+      properties:
+        subscriptions:
+          type: array
+          items:
+            type: object
+            required: [feed_url]
+            properties:
+              feed_url: { type: string, description: Avec son protocole (http ou https). }
+              guid: { type: string }
+
+    OpaAdded:
+      type: object
+      required: [success, failure]
+      properties:
+        success:
+          type: array
+          items: { $ref: "#/components/schemas/OpaSubscription" }
+        failure:
+          type: array
+          items:
+            type: object
+            required: [feed_url, message]
+            properties:
+              feed_url: { type: string }
+              message: { type: string }
+            additionalProperties: false
+      additionalProperties: false
+
+    OpaUpdate:
+      type: object
+      description: Au moins un champ.
+      properties:
+        new_feed_url: { type: string }
+        new_guid: { type: string }
+        is_subscribed: { type: boolean }
+
+    OpaUpdated:
+      type: object
+      properties:
+        new_feed_url: { type: string }
+        is_subscribed: { type: boolean }
+        subscription_changed: { type: string, format: date-time }
+        guid_changed: { type: string, format: date-time }
+        new_guid: { type: string }
+      additionalProperties: false
+
+    OpaDeletion:
+      type: object
+      required: [deletion_id, message]
+      properties:
+        deletion_id: { type: integer }
+        message: { type: string }
+      additionalProperties: false
+
+    OpaDeletionStatus:
+      type: object
+      required: [deletion_id, status]
+      properties:
+        deletion_id: { type: integer }
+        status: { type: string, enum: [SUCCESS, FAILURE, PENDING] }
+        message: { type: string }
+      additionalProperties: false
+
+    OpaGone:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer, const: 410 }
+        message: { type: string }
       additionalProperties: false

@@ -151,6 +151,7 @@ class ContractTest {
         run.sharing()
         run.playlists()
         run.gpodder()
+        run.openPodcastApi()
         run.tooManyAttempts()
 
         val missing = documented - run.exercised
@@ -197,6 +198,42 @@ class ContractTest {
         check(get, "/api/2/episodes/alice.json", episodes, HttpStatusCode.Unauthorized, token = null, accept = json)
 
         check(post, "/api/2/auth/alice/logout.json", "/api/2/auth/{username}/logout.json", HttpStatusCode.OK, token = null, accept = json)
+    }
+
+    /** The subscriptions of the Open Podcast API (ADR 0011). */
+    private suspend fun Run.openPodcastApi() {
+        val json = ContentType.Application.Json
+        val list = "/v1/subscriptions"
+        check(get, "/v1/subscriptions?per_page=2", list, HttpStatusCode.OK, accept = json)
+        check(get, "/v1/subscriptions?since=2000-01-01T00:00:00Z", list, HttpStatusCode.OK, accept = json)
+        check(get, "/v1/subscriptions?since=yesterday", list, HttpStatusCode.BadRequest, accept = json)
+        check(get, list, list, HttpStatusCode.Unauthorized, token = null, accept = json)
+        check(post, list, list, HttpStatusCode.OK, accept = json,
+            body = """{"subscriptions":[{"feed_url":"https://feeds.test/podcast20.xml"},{"feed_url":"example.com/rss"}]}""")
+        check(post, list, list, HttpStatusCode.BadRequest, accept = json, body = """{"feeds":[]}""")
+        check(post, list, list, HttpStatusCode.Unauthorized, token = null, accept = json, body = """{"subscriptions":[]}""")
+
+        val one = "/v1/subscriptions/{guid}"
+        val guid = fr.podcast.server.sync.podcastGuid("https://feeds.test/podcast20.xml")
+        val unknown = "/v1/subscriptions/00000000-0000-0000-0000-000000000000"
+        check(get, "/v1/subscriptions/$guid", one, HttpStatusCode.OK, accept = json)
+        check(get, unknown, one, HttpStatusCode.NotFound, accept = json)
+        check(get, "/v1/subscriptions/$guid", one, HttpStatusCode.Unauthorized, token = null, accept = json)
+        check(patch, "/v1/subscriptions/$guid", one, HttpStatusCode.OK, accept = json, body = """{"is_subscribed":false}""")
+        check(patch, "/v1/subscriptions/$guid", one, HttpStatusCode.BadRequest, accept = json, body = """{}""")
+        check(patch, unknown, one, HttpStatusCode.NotFound, accept = json, body = """{"is_subscribed":true}""")
+        check(patch, "/v1/subscriptions/$guid", one, HttpStatusCode.Unauthorized, token = null, accept = json, body = """{"is_subscribed":true}""")
+        check(delete, "/v1/subscriptions/$guid", one, HttpStatusCode.Accepted, accept = json)
+        check(delete, "/v1/subscriptions/$guid", one, HttpStatusCode.Gone, accept = json)
+        check(get, "/v1/subscriptions/$guid", one, HttpStatusCode.Gone, accept = json)
+        check(patch, "/v1/subscriptions/$guid", one, HttpStatusCode.Gone, accept = json, body = """{"is_subscribed":true}""")
+        check(delete, unknown, one, HttpStatusCode.NotFound, accept = json)
+        check(delete, unknown, one, HttpStatusCode.Unauthorized, token = null, accept = json)
+
+        val deletion = "/v1/deletions/{deletionId}"
+        check(get, "/v1/deletions/1", deletion, HttpStatusCode.OK, accept = json)
+        check(get, "/v1/deletions/999", deletion, HttpStatusCode.NotFound, accept = json)
+        check(get, "/v1/deletions/1", deletion, HttpStatusCode.Unauthorized, token = null, accept = json)
     }
 
     private suspend fun Run.rootAndAccounts() {

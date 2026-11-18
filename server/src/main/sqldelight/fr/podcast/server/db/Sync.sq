@@ -126,3 +126,13 @@ WHERE id = :id;
 prunePendingActions:
 DELETE FROM episode_actions
 WHERE received_at < :before;
+
+insertDeletion:
+INSERT INTO subscription_deletions(user_id, feed_url)
+VALUES (:userId, :feedUrl)
+RETURNING id;
+
+deletionOfUser:
+SELECT id, feed_url, deleted_at
+FROM subscription_deletions
+WHERE id = :id AND user_id = :userId;

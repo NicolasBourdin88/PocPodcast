@@ -1,6 +1,7 @@
 package fr.podcast.server
 
 import fr.podcast.server.api.gpodderRoutes
+import fr.podcast.server.api.openPodcastRoutes
 import fr.podcast.server.api.accountRoutes
 import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
@@ -24,6 +25,7 @@ import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.media.MediaService
 import fr.podcast.server.media.MediaStore
 import fr.podcast.server.sync.GpodderSync
+import fr.podcast.server.sync.OpenPodcastApi
 import fr.podcast.server.search.AppleSource
 import fr.podcast.server.search.PodcastIndexSource
 import fr.podcast.server.search.PodcastSearch
@@ -139,8 +141,9 @@ class ServerServices(
         ),
     )
 
-    /** gPodder API (ADR 0011). */
+    /** gPodder API and Open Podcast API (ADR 0011). */
     val gpodder = GpodderSync(database, guard, ::refreshSoon, ::removePodcast)
+    val openPodcastApi = OpenPodcastApi(database, guard, ::refreshSoon, ::removePodcast)
 
     /** Reads new feeds (e.g. after an OPML import) without making the request wait. */
     fun refreshSoon(podcastIds: List<Long>) {
@@ -225,6 +228,7 @@ fun Application.module(services: ServerServices) {
         playlistFeedRoutes(services)
         searchRoutes(services)
         gpodderRoutes(services)
+        openPodcastRoutes(services)
         webRoutes(services)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")
     }

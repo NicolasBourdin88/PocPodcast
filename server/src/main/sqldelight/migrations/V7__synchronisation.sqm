@@ -54,3 +54,11 @@ CREATE TABLE episode_actions (
 
 CREATE INDEX episode_actions_by_user ON episode_actions(user_id, received_at);
 CREATE INDEX episode_actions_by_feed ON episode_actions(podcast_key);
+
+-- Deletions requested through the Open Podcast API: done at once, their status kept for the client.
+CREATE TABLE subscription_deletions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    feed_url TEXT NOT NULL,
+    deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

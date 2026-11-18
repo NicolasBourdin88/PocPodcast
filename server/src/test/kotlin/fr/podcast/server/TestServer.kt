@@ -60,7 +60,7 @@ object TestDatabase {
             it.createStatement().execute(
                 "TRUNCATE users, api_tokens, http_sessions, podcasts, episodes, episode_transcripts, subscriptions, " +
                     "playback_states, media_files, queue_items, shares, playlists, playlist_items, playlist_feeds, " +
-                    "gpodder_devices, subscription_changes, episode_actions RESTART IDENTITY CASCADE",
+                    "gpodder_devices, subscription_changes, episode_actions, subscription_deletions RESTART IDENTITY CASCADE",
             )
         }
         mediaDirectory.toFile().listFiles()?.forEach { it.deleteRecursively() }
