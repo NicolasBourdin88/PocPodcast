@@ -1,5 +1,7 @@
 package fr.podcast.server.api
 
+import fr.podcast.server.html.episodeSearchPage
+import fr.podcast.server.html.EpisodeSearch
 import fr.podcast.server.ServerServices
 import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.SESSION_AUTH
@@ -148,17 +150,18 @@ fun Route.apiRoutes(services: ServerServices) {
             call.respondResource(episodeCollection(page, "/podcasts/$podcastId/episodes", emptyMap(), representation.forms, services.audioLinks), representation)
         }
 
+        // The episodes of the user's subscriptions, filtered (ADR 0012); in HTML, the search page.
         get("/episodes") {
             val paging = call.paging() ?: return@get
-            val statusParameter = call.request.queryParameters["status"]
-            val status = statusParameter?.let { value -> EpisodeStatus.entries.firstOrNull { it.name == value } }
-            if (statusParameter != null && status == null) {
-                return@get call.respondProblem(HttpStatusCode.BadRequest, "status must be one of ${EpisodeStatus.entries.joinToString()}")
-            }
-            val page = catalog(call).latest(status, paging.limit, paging.offset)
-            val query = status?.let { mapOf("status" to it.name) } ?: emptyMap()
+            val (query, given) = call.episodeQuery() ?: return@get
+            val catalog = catalog(call)
+            val page = catalog.search(query, paging.limit, paging.offset)
             val representation = call.representation()
-            call.respondResource(episodeCollection(page, "/episodes", query, representation.forms, services.audioLinks), representation)
+            if (representation == Representation.Html) {
+                val search = EpisodeSearch(query, given, page, catalog.subscriptionList(), catalog.tags())
+                return@get call.respondHtml { episodeSearchPage(search, call.language(), call.user, services.audioLinks) }
+            }
+            call.respondResource(episodeCollection(page, "/episodes", given, representation.forms, services.audioLinks), representation)
         }
 
         get("/episodes/{id}") {

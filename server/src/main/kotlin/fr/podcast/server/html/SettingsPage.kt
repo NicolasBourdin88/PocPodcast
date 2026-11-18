@@ -1,5 +1,8 @@
 package fr.podcast.server.html
 
+import kotlinx.html.UL
+import kotlinx.html.ol
+import fr.podcast.shared.model.ListeningStats
 import fr.podcast.server.auth.Device
 import fr.podcast.server.auth.Role
 import fr.podcast.server.auth.UserAccount
@@ -43,9 +46,10 @@ internal const val RESET_WHEN_ACCEPTED = "if (event.detail.successful) this.rese
  * administrator, the server's accounts ([users]) (ADR 0009). The forms send what the HAL-FORMS
  * templates describe; the answer, or the refusal, appears next to them.
  */
-fun HTML.settingsPage(user: UserAccount, devices: List<Device>, users: List<UserAccount>?, language: Language) {
+fun HTML.settingsPage(user: UserAccount, devices: List<Device>, users: List<UserAccount>?, stats: ListeningStats, language: Language) {
     val strings = language.strings
     page(language, strings.destination(Destination.Settings), user, Destination.Settings, content = {
+        listeningSection(stats, strings)
         section("settings") {
             h2 { +strings.profile }
             p("meta") { +"${user.username} · ${strings.role(user.role.toUserRole())}" }
@@ -250,3 +254,59 @@ fun appPasswordFragment(name: String, password: String, strings: Strings): Strin
     +" "
     +strings.appPasswordShownOnce
 }
+
+/** How much the user listened (ADR 0012): totals, the last twelve months as bars, the most listened podcasts. */
+private fun FlowContent.listeningSection(stats: ListeningStats, strings: Strings) {
+    section("settings stats") {
+        h2 { +strings.myListening }
+        if (stats.totalSeconds == 0L && stats.episodesFinished == 0) {
+            p("empty") { +strings.noListeningYet }
+            return@section
+        }
+        ul("figures") {
+            figure(strings.listeningTime, strings.duration(stats.totalSeconds.toInt()))
+            figure(strings.last7Days, strings.duration(stats.last7DaysSeconds.toInt()))
+            figure(strings.last30Days, strings.duration(stats.last30DaysSeconds.toInt()))
+        }
+        p("meta") {
+            +listOfNotNull(strings.episodesFinished(stats.episodesFinished), stats.since?.let(strings::listeningSince)).joinToString(" · ")
+        }
+        h2 { +strings.byMonth }
+        val longest = stats.byMonth.maxOfOrNull { it.seconds }?.takeIf { it > 0 } ?: 1
+        div("bars") {
+            attributes["role"] = "img"
+            attributes["aria-label"] = stats.byMonth.joinToString(", ") { "${monthLabel(it.month, strings)} ${strings.duration(it.seconds.toInt())}" }
+            stats.byMonth.forEach { month ->
+                div("bar") {
+                    div("fill") { attributes["style"] = "height: ${(month.seconds * 100 / longest).coerceAtLeast(if (month.seconds > 0) 2 else 0)}%" }
+                    span("label") { +monthLabel(month.month, strings) }
+                }
+            }
+        }
+        if (stats.byPodcast.isNotEmpty()) {
+            h2 { +strings.mostListened }
+            ol("rows") {
+                stats.byPodcast.forEach { podcast ->
+                    li("row") {
+                        div("card-body") {
+                            span("title") { +podcast.podcastTitle }
+                            span("meta") {
+                                +listOf(strings.duration(podcast.seconds.toInt()), strings.episodesFinished(podcast.episodesFinished)).joinToString(" · ")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun UL.figure(label: String, value: String) {
+    li {
+        span("value") { +value }
+        span("meta") { +label }
+    }
+}
+
+/** "2026-11" → "nov.". */
+private fun monthLabel(month: String, strings: Strings): String = strings.shortMonth(month.substringAfter('-').toIntOrNull() ?: 1)

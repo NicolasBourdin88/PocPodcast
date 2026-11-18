@@ -181,6 +181,8 @@ object Affordances {
                     listOf(
                         AffordanceProperty("note", type = "textarea", value = JsonPrimitive(subscription.note)),
                         AffordanceProperty("autoDownload", type = "checkbox", value = JsonPrimitive(subscription.autoDownload)),
+                        // Separated by commas; a list is accepted too (ADR 0012).
+                        AffordanceProperty("tags", value = JsonPrimitive(subscription.tags.joinToString(", "))),
                     ),
                 ),
             )

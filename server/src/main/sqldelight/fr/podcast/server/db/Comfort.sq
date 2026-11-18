@@ -1,0 +1,59 @@
+-- Tags, search and listening statistics (ADR 0012).
+
+tagsOfSubscriptions:
+SELECT subscription_id, tag
+FROM subscription_tags
+WHERE subscription_id IN ?
+ORDER BY lower(tag);
+
+deleteTags:
+DELETE FROM subscription_tags
+WHERE subscription_id = :subscriptionId;
+
+insertTag:
+INSERT INTO subscription_tags(subscription_id, tag)
+VALUES (:subscriptionId, :tag);
+
+-- The tags of a user's own subscriptions, for the filters.
+tagsOfUser:
+SELECT DISTINCT t.tag
+FROM subscription_tags t
+JOIN subscriptions s ON s.id = t.subscription_id
+WHERE s.user_id = :userId
+ORDER BY t.tag;
+
+-- The user's state of an episode before a change: what the new position is compared with.
+stateBefore:
+SELECT position_seconds, status, updated_at
+FROM playback_states
+WHERE user_id = :userId AND episode_id = :episodeId;
+
+episodePodcast:
+SELECT p.feed_url, p.title
+FROM episodes e
+JOIN podcasts p ON p.id = e.podcast_id
+WHERE e.id = :episodeId;
+
+-- Adds to the day's total for that podcast.
+recordListening:
+INSERT INTO listening_days(user_id, day, feed_url, podcast_title, seconds, finished)
+VALUES (:userId, :day, :feedUrl, :podcastTitle, :seconds, :finished)
+ON CONFLICT (user_id, day, feed_url) DO UPDATE
+SET seconds = listening_days.seconds + excluded.seconds,
+    finished = listening_days.finished + excluded.finished,
+    podcast_title = excluded.podcast_title;
+
+listeningPerDay:
+SELECT day, SUM(seconds) AS seconds, SUM(finished) AS finished
+FROM listening_days
+WHERE user_id = :userId
+GROUP BY day
+ORDER BY day;
+
+listeningPerPodcast:
+SELECT feed_url, MAX(podcast_title) AS podcast_title, SUM(seconds) AS seconds, SUM(finished) AS finished
+FROM listening_days
+WHERE user_id = :userId
+GROUP BY feed_url
+ORDER BY SUM(seconds) DESC, feed_url
+LIMIT :limit;

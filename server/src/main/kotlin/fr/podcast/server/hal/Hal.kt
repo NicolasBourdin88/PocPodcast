@@ -1,5 +1,6 @@
 package fr.podcast.server.hal
 
+import fr.podcast.shared.model.ListeningStats
 import fr.podcast.server.auth.IssuedToken
 import fr.podcast.server.auth.Device
 import fr.podcast.server.auth.Role
@@ -108,7 +109,7 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
             "users" to "/users",
             "shared" to "/shared",
             "playlists" to "/playlists",
-            "episodes" to "/episodes{?status,offset,limit}",
+            "episodes" to "/episodes{?q,status,favorite,minRating,from,to,podcast,tag,offset,limit}",
             "episode" to "/episodes/{id}",
             "podcast" to "/podcasts/{id}",
             "subscription" to "/subscriptions/{id}",
@@ -142,10 +143,16 @@ fun tokenResource(token: IssuedToken): JsonObject = buildJsonObject {
 
 fun UserAccount.toUser() = User(id.toString(), username, displayName, UserRole.valueOf(role.name))
 
+/** How much the user listened (ADR 0012). */
+fun statsResource(stats: ListeningStats): JsonObject = buildJsonObject {
+    fields(ListeningStats.serializer(), stats)
+    links("self" to "/me/stats")
+}
+
 /** The signed-in user: profile, password, devices, sign-out. */
 fun meResource(user: UserAccount, forms: Boolean): JsonObject = buildJsonObject {
     fields(User.serializer(), user.toUser())
-    links("self" to "/me", "devices" to "/me/devices", "users" to "/users")
+    links("self" to "/me", "devices" to "/me/devices", "users" to "/users", "stats" to "/me/stats")
     templates(forms, listOf(Affordances.updateProfile, Affordances.changePassword, Affordances.logout))
 }
 
@@ -351,7 +358,7 @@ fun playlistCollection(views: List<PlaylistView>, viewer: UserAccount, forms: Bo
 /** A page of episodes; [path] plus [query] (without paging) rebuild the page links. */
 fun episodeCollection(page: Page<EpisodeItem>, path: String, query: Map<String, String>, forms: Boolean, audio: AudioLinks): JsonObject = buildJsonObject {
     fun pageHref(offset: Int) = path + "?" + (query + mapOf("offset" to "$offset", "limit" to "${page.limit}"))
-        .entries.joinToString("&") { (key, value) -> "$key=$value" }
+        .entries.joinToString("&") { (key, value) -> "$key=${value.encodeURLParameter()}" }
 
     put("count", page.items.size)
     put("total", page.total)

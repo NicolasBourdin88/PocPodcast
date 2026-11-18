@@ -113,7 +113,7 @@ WHERE user_id = :userId AND received_at >= :since AND (:podcastUrl = '' OR podca
 ORDER BY received_at;
 
 pendingActionsForFeed:
-SELECT id, user_id, episode_url, guid, action, position, total, happened_at
+SELECT id, user_id, episode_url, guid, action, started, position, total, happened_at
 FROM episode_actions
 WHERE podcast_key = :podcastKey
 ORDER BY happened_at;

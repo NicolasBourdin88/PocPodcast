@@ -1,5 +1,9 @@
 package fr.podcast.server.api
 
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
+import fr.podcast.shared.model.TagRules
+import fr.podcast.server.html.LibraryFilter
 import fr.podcast.server.ServerServices
 import fr.podcast.server.auth.Action
 import fr.podcast.server.auth.can
@@ -60,12 +64,16 @@ fun Route.subscriptionRoutes(services: ServerServices) {
 
     authenticate(SESSION_AUTH, BEARER_AUTH) {
         get("/subscriptions") {
-            val items = catalog(call).subscriptionList()
+            val text = call.request.queryParameters["q"]?.trim().orEmpty()
+            val tag = call.request.queryParameters["tag"]?.trim().orEmpty()
+            val catalog = catalog(call)
+            val items = catalog.subscriptionList().filter { it.matches(text, tag) }
             when (val representation = call.representation()) {
                 Representation.Html -> {
                     val user = call.user
                     val library = LibraryView(
                         items = items,
+                        filter = LibraryFilter(text, tag, catalog.tags()),
                         given = services.sharing.sharesGiven(user.id, ShareType.SUBSCRIPTION),
                         // Shared playlists are on the Playlists page.
                         received = services.sharing.received(user).filter { it.playlist == null },
@@ -153,14 +161,23 @@ fun Route.subscriptionRoutes(services: ServerServices) {
                 else -> fields.stringField("note")?.trim()?.ifEmpty { null }
             }
             val autoDownload = if ("autoDownload" in fields) fields.booleanField("autoDownload") else current.subscription.autoDownload
+            // A list, or text separated by commas (forms); absent keeps them (ADR 0012).
+            val tags = when (val raw = fields["tags"]) {
+                null -> current.subscription.tags
+                is JsonNull -> emptyList()
+                is JsonArray -> raw.map { (it as? JsonPrimitive)?.takeIf { value -> value.isString }?.content ?: "," }
+                is JsonPrimitive -> if (raw.isString) TagRules.parse(raw.content) else listOf(",")
+                else -> listOf(",")
+            }.let(TagRules::normalize)
             val errors = buildList {
                 if ("note" in fields && fields["note"] !is JsonNull && fields.stringField("note") == null) add(FieldError("note", "string or null expected"))
                 if ((note?.length ?: 0) > MAX_NOTE_LENGTH) add(FieldError("note", "at most $MAX_NOTE_LENGTH characters"))
                 if (autoDownload == null) add(FieldError("autoDownload", "boolean expected"))
+                if (!TagRules.valid(tags)) add(FieldError("tags", "at most ${TagRules.MAX_TAGS} tags of 1 to ${TagRules.MAX_LENGTH} characters, without commas"))
             }
             if (errors.isNotEmpty()) return@patch call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid subscription", errors)
 
-            services.sharing.updateSubscription(current.subscription.id, note, autoDownload!!)
+            services.sharing.updateSubscription(current.subscription.id, note, autoDownload!!, tags)
             val updated = services.sharing.subscription(user, current.subscription.id)!!.item
             services.onSubscriptionChanged(updated.podcast.id.toLong())
             if (call.isHtmx) call.response.header("HX-Trigger", "subscriptions-changed")

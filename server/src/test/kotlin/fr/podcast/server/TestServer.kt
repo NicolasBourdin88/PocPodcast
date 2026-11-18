@@ -59,7 +59,7 @@ object TestDatabase {
         dataSource.connection.use {
             it.createStatement().execute(
                 "TRUNCATE users, api_tokens, http_sessions, podcasts, episodes, episode_transcripts, subscriptions, " +
-                    "playback_states, media_files, queue_items, shares, playlists, playlist_items, playlist_feeds, " +
+                    "playback_states, media_files, queue_items, shares, playlists, playlist_items, playlist_feeds, subscription_tags, listening_days, " +
                     "gpodder_devices, subscription_changes, episode_actions, subscription_deletions RESTART IDENTITY CASCADE",
             )
         }

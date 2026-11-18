@@ -84,6 +84,24 @@ paths:
         "204": { description: Jeton révoqué }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /me/stats:
+    get:
+      tags: [comptes]
+      operationId: getListeningStats
+      summary: Statistiques d'écoute de l'utilisateur (ADR 0012)
+      description: |
+        Temps écouté en durée d'épisode, nombre d'épisodes terminés, podcasts les plus écoutés et
+        12 derniers mois (jours UTC).
+      responses:
+        "200":
+          description: Statistiques
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/ListeningStats" }
+            application/prs.hal-forms+json:
+              schema: { $ref: "#/components/schemas/ListeningStats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /me:
     get:
       tags: [comptes]
@@ -305,6 +323,15 @@ paths:
       tags: [abonnements]
       operationId: listSubscriptions
       summary: Abonnements de l'utilisateur
+      parameters:
+        - name: q
+          in: query
+          description: Chaque mot dans le titre, l'auteur, la description ou la note (ADR 0012).
+          schema: { type: string }
+        - name: tag
+          in: query
+          description: Les abonnements portant cette étiquette.
+          schema: { type: string }
       responses:
         "200":
           description: Abonnements, par titre de podcast
@@ -547,12 +574,43 @@ paths:
     get:
       tags: [épisodes]
       operationId: listEpisodes
-      summary: Épisodes des abonnements de l'utilisateur, du plus récent au plus ancien
+      summary: Épisodes des abonnements de l'utilisateur, du plus récent au plus ancien, filtrés (ADR 0012)
+      description: |
+        Les filtres s'ajoutent ; un filtre vide compte comme absent. En HTML, la page de recherche
+        d'épisodes du client léger.
       parameters:
+        - name: q
+          in: query
+          description: Chaque mot doit figurer, sans tenir compte de la casse, dans le titre, la description ou le titre du podcast.
+          schema: { type: string, maxLength: 200 }
         - name: status
           in: query
           description: Ne garder que les épisodes dans cet état (pour l'utilisateur).
           schema: { $ref: "#/components/schemas/EpisodeStatus" }
+        - name: favorite
+          in: query
+          description: "`true` : les favoris de l'utilisateur."
+          schema: { type: boolean }
+        - name: minRating
+          in: query
+          description: Note minimale de l'utilisateur ; 0 pour toutes.
+          schema: { type: integer, minimum: 0, maximum: 5 }
+        - name: from
+          in: query
+          description: Publiés à partir de ce jour (UTC).
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Publiés jusqu'à ce jour compris (UTC).
+          schema: { type: string, format: date }
+        - name: podcast
+          in: query
+          description: Un podcast, par son identifiant.
+          schema: { type: string }
+        - name: tag
+          in: query
+          description: Les podcasts que l'utilisateur a étiquetés ainsi.
+          schema: { type: string, maxLength: 30 }
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
       responses:
@@ -563,6 +621,8 @@ paths:
               schema: { $ref: "#/components/schemas/EpisodeCollection" }
             application/prs.hal-forms+json:
               schema: { $ref: "#/components/schemas/EpisodeCollection" }
+            text/html:
+              schema: { type: string }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
@@ -1862,7 +1922,7 @@ components:
       additionalProperties: false
 
     User:
-      description: Un compte. `/me` ajoute les liens `devices` et `users`.
+      description: Un compte. `/me` ajoute les liens `devices`, `users` et `stats`.
       type: object
       required: [id, username, displayName, role, _links]
       properties:
@@ -1877,6 +1937,7 @@ components:
             self: { $ref: "#/components/schemas/Link" }
             devices: { $ref: "#/components/schemas/Link" }
             users: { $ref: "#/components/schemas/Link" }
+            stats: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
         _templates:
           type: object
@@ -2039,7 +2100,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, note, subscribedAt, autoDownload, access, ownerName, _links, _embedded]
+      required: [id, note, subscribedAt, autoDownload, access, ownerName, tags, _links, _embedded]
       properties:
         id: { type: string }
         note: { type: [string, "null"], description: Annotation de l'utilisateur }
@@ -2052,6 +2113,11 @@ components:
           type: string
           enum: [OWNER, WRITE, READ]
         ownerName: { type: [string, "null"], description: "Qui l'a partagé ; null pour ses propres abonnements." }
+        tags:
+          type: array
+          description: "Étiquettes du propriétaire (ADR 0012) : 10 au plus, de 1 à 30 caractères, sans virgule."
+          items: { type: string, minLength: 1, maxLength: 30 }
+          maxItems: 10
         _links:
           type: object
           required: [self, podcast]
@@ -2857,6 +2923,45 @@ components:
         name: { type: string }
         password: { type: string, description: "À saisir comme mot de passe dans le client gPodder ; montré une seule fois." }
         createdAt: { type: string, format: date-time }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
+      additionalProperties: false
+
+    ListeningStats:
+      type: object
+      required: [totalSeconds, last7DaysSeconds, last30DaysSeconds, episodesFinished, byPodcast, byMonth, _links]
+      properties:
+        totalSeconds: { type: integer, minimum: 0, description: En durée d'épisode. }
+        last7DaysSeconds: { type: integer, minimum: 0 }
+        last30DaysSeconds: { type: integer, minimum: 0 }
+        episodesFinished: { type: integer, minimum: 0 }
+        since: { type: [string, "null"], format: date, description: Premier jour enregistré. }
+        byPodcast:
+          type: array
+          description: Les plus écoutés d'abord (10 au plus).
+          items:
+            type: object
+            required: [podcastTitle, feedUrl, seconds, episodesFinished]
+            properties:
+              podcastTitle: { type: string }
+              feedUrl: { type: string }
+              seconds: { type: integer, minimum: 0 }
+              episodesFinished: { type: integer, minimum: 0 }
+            additionalProperties: false
+        byMonth:
+          type: array
+          description: Les 12 derniers mois, du plus ancien au plus récent.
+          items:
+            type: object
+            required: [month, seconds]
+            properties:
+              month: { type: string, pattern: "^[0-9]{4}-[0-9]{2}$" }
+              seconds: { type: integer, minimum: 0 }
+            additionalProperties: false
         _links:
           type: object
           required: [self]

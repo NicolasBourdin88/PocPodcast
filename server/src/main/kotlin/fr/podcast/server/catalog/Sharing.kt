@@ -41,8 +41,12 @@ class Sharing(private val database: ServerDatabase, private val playlists: Playl
         return database.query { subscriptionView(viewer, subscriptionId) }
     }
 
-    suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean) {
-        database.query { catalogQueries.updateSubscriptionById(note, autoDownload, subscriptionId.toLong()) }
+    /** [tags] null keeps them (ADR 0012). */
+    suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean, tags: List<String>? = null) {
+        database.transaction {
+            catalogQueries.updateSubscriptionById(note, autoDownload, subscriptionId.toLong())
+            tags?.let { replaceTags(subscriptionId.toLong(), it) }
+        }
     }
 
     /** Creates or updates the share; returns it. */
@@ -106,7 +110,8 @@ class Sharing(private val database: ServerDatabase, private val playlists: Playl
             row.podcast_id, row.title, row.author, row.feed_url, row.artwork_url, row.description,
             row.website_url, row.language, row.refresh_status, row.last_refreshed_at,
         )
-        return SubscriptionView(SubscriptionItem(subscription, podcast), row.owner_id, permission)
+        val tags = tagsOf(listOf(row.id))[row.id].orEmpty()
+        return SubscriptionView(SubscriptionItem(subscription.copy(tags = tags), podcast), row.owner_id, permission)
     }
 }
 

@@ -12,6 +12,7 @@ import fr.podcast.server.auth.authPrincipal
 import fr.podcast.server.hal.appPasswordResource
 import fr.podcast.server.hal.deviceCollection
 import fr.podcast.server.hal.meResource
+import fr.podcast.server.hal.statsResource
 import fr.podcast.server.hal.userCollection
 import fr.podcast.server.hal.userResource
 import fr.podcast.server.html.appPasswordFragment
@@ -58,7 +59,8 @@ fun Route.accountRoutes(services: ServerServices) {
             if (representation == Representation.Html) {
                 val devices = accounts.devices(user.id, (call.authPrincipal as? TokenPrincipal)?.token)
                 val users = if (user.role == Role.ADMIN) accounts.users() else null
-                return@get call.respondHtml { settingsPage(user, devices, users, call.language()) }
+                val stats = services.statistics.of(user.id)
+                return@get call.respondHtml { settingsPage(user, devices, users, stats, call.language()) }
             }
             call.respondResource(meResource(user, representation.forms), representation)
         }
@@ -100,6 +102,12 @@ fun Route.accountRoutes(services: ServerServices) {
             if (principal is SessionPrincipal) call.sessions.set(UserSession(user.id, version))
             if (call.isHtmx) return@put call.respondNotice(call.language().strings.passwordChanged, "devices-changed")
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        // Listening statistics (ADR 0012).
+        get("/me/stats") {
+            val representation = call.representation()
+            call.respondResource(statsResource(services.statistics.of(call.user.id)), representation)
         }
 
         get("/me/devices") {

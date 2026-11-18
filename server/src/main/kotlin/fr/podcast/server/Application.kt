@@ -11,6 +11,7 @@ import fr.podcast.server.api.playlistFeedRoutes
 import fr.podcast.server.api.playlistRoutes
 import fr.podcast.server.api.subscriptionRoutes
 import fr.podcast.server.auth.Accounts
+import fr.podcast.server.catalog.ListeningStatistics
 import fr.podcast.server.catalog.Playlists
 import fr.podcast.server.catalog.Sharing
 import fr.podcast.server.auth.LoginThrottle
@@ -140,6 +141,9 @@ class ServerServices(
             config.podcastIndexKey?.let { key -> config.podcastIndexSecret?.let { PodcastIndexSource(outgoing, key, it) } },
         ),
     )
+
+    /** Listening statistics (ADR 0012). */
+    val statistics = ListeningStatistics(database)
 
     /** gPodder API and Open Podcast API (ADR 0011). */
     val gpodder = GpodderSync(database, guard, playlists, ::refreshSoon, ::removePodcast)

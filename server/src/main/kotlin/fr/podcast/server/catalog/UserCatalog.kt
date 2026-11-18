@@ -1,5 +1,7 @@
 package fr.podcast.server.catalog
 
+import java.time.ZoneOffset
+import fr.podcast.shared.model.EpisodeQuery
 import fr.podcast.server.db.PodcastDb
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.db.toKotlinInstant
@@ -52,16 +54,37 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
 
     override suspend fun updateProgress(episodeId: String, positionSeconds: Int) {
         val id = episodeId.toLongOrNull() ?: return
-        database.query { episodesQueries.saveProgress(userId, id, positionSeconds, EpisodeStatus.IN_PROGRESS.name) }
+        saveProgress(id, positionSeconds, listened = null)
+    }
+
+    /**
+     * Saves the position, and the listening time it adds (ADR 0012): [listened] when the client
+     * tells it (gPodder), otherwise the plausible gap with the previous position.
+     */
+    suspend fun saveProgress(episodeId: Long, positionSeconds: Int, listened: Long?, day: java.time.LocalDate = today()) {
+        database.transaction {
+            val before = comfortQueries.stateBefore(userId, episodeId).executeAsOneOrNull()
+            episodesQueries.saveProgress(userId, episodeId, positionSeconds, EpisodeStatus.IN_PROGRESS.name)
+            val seconds = listened ?: listenedBetween(before, positionSeconds, OffsetDateTime.now(ZoneOffset.UTC))
+            recordListening(userId, episodeId, seconds, finished = 0, day = day)
+        }
     }
 
     /** A played episode also leaves the queue. */
     override suspend fun markPlayed(episodeId: String) {
         val id = episodeId.toLongOrNull() ?: return
+        markPlayed(id, listened = null)
+    }
+
+    /** Played, and finished in the statistics if it was not already (ADR 0012). */
+    suspend fun markPlayed(episodeId: Long, listened: Long?, day: java.time.LocalDate = today()) {
         database.transaction {
-            val duration = catalogQueries.episodeDuration(id).executeAsOneOrNull() ?: return@transaction
-            episodesQueries.saveProgress(userId, id, duration, EpisodeStatus.PLAYED.name)
-            removeFromQueue(id)
+            val duration = catalogQueries.episodeDuration(episodeId).executeAsOneOrNull() ?: return@transaction
+            val before = comfortQueries.stateBefore(userId, episodeId).executeAsOneOrNull()
+            episodesQueries.saveProgress(userId, episodeId, duration, EpisodeStatus.PLAYED.name)
+            removeFromQueue(episodeId)
+            val seconds = listened ?: listenedBetween(before, duration, OffsetDateTime.now(ZoneOffset.UTC))
+            recordListening(userId, episodeId, seconds, finished = if (before?.status == EpisodeStatus.PLAYED.name) 0 else 1, day = day)
         }
     }
 
@@ -118,11 +141,35 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
     }
 
     suspend fun subscriptionList(): List<SubscriptionItem> =
-        database.query { catalogQueries.subscriptionsOfUser(userId, ::subscriptionItem).executeAsList() }
+        database.query { withTags(catalogQueries.subscriptionsOfUser(userId, ::subscriptionItem).executeAsList()) }
 
     suspend fun subscription(id: String): SubscriptionItem? {
         val subscriptionId = id.toLongOrNull() ?: return null
-        return database.query { catalogQueries.subscriptionOfUser(userId, subscriptionId, ::subscriptionItem).executeAsOneOrNull() }
+        return database.query { catalogQueries.subscriptionOfUser(userId, subscriptionId, ::subscriptionItem).executeAsOneOrNull()?.let { withTags(listOf(it)).single() } }
+    }
+
+    /** The tags of the user's own subscriptions, for the filters (ADR 0012). */
+    suspend fun tags(): List<String> = database.query { comfortQueries.tagsOfUser(userId).executeAsList() }
+
+    /** The episodes of the user's subscriptions matching [query], newest first (ADR 0012). */
+    suspend fun search(query: EpisodeQuery, limit: Int, offset: Int): Page<EpisodeItem> = database.query {
+        val pattern = searchPattern(query.text)
+        val status = query.status?.name.orEmpty()
+        val from = query.from?.let { java.time.LocalDate.of(it.year, it.month.ordinal + 1, it.day).atStartOfDay().atOffset(ZoneOffset.UTC) }
+        // "To" includes its day: before the next one.
+        val to = query.to?.let { java.time.LocalDate.of(it.year, it.month.ordinal + 1, it.day).plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC) }
+        val epoch = OffsetDateTime.ofInstant(java.time.Instant.EPOCH, ZoneOffset.UTC)
+        val podcastId = query.podcastId?.toLongOrNull() ?: 0L
+        val tag = query.tag.orEmpty()
+        val items = episodesQueries.searchForUser(
+            userId, pattern, query.status != null, status, query.favoritesOnly, query.minRating,
+            from != null, from ?: epoch, to != null, to ?: epoch, podcastId, tag, limit.toLong(), offset.toLong(), ::episodeItem,
+        ).executeAsList()
+        val total = episodesQueries.countSearchForUser(
+            userId, pattern, query.status != null, status, query.favoritesOnly, query.minRating,
+            from != null, from ?: epoch, to != null, to ?: epoch, podcastId, tag,
+        ).executeAsOne()
+        Page(withTranscripts(items), total, offset, limit)
     }
 
     /** Subscribes to an existing podcast; the boolean tells whether it is a new subscription. */

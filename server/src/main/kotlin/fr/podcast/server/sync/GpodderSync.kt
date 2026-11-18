@@ -170,7 +170,7 @@ class GpodderSync(
             // Listened to through one of our playlist feeds: its enclosure names the episode.
             val episode = playlistEnclosure(action.episode) ?: podcastId?.let { findEpisode(it, action.guid, action.episode) }
             if (episode != null) {
-                apply(user.id, episode, kind, action.position, action.total, happened)
+                apply(user.id, episode, kind, action.started, action.position, action.total, happened)
             } else {
                 database.query {
                     syncQueries.insertPendingAction(
@@ -190,7 +190,7 @@ class GpodderSync(
         val waiting = database.query { syncQueries.pendingActionsForFeed(normalizedFeed(feedUrl)).executeAsList() }
         for (action in waiting) {
             val episode = findEpisode(podcastId, action.guid, action.episode_url) ?: continue
-            apply(action.user_id, episode, action.action, action.position, action.total, action.happened_at)
+            apply(action.user_id, episode, action.action, action.started, action.position, action.total, action.happened_at)
             database.query { syncQueries.deletePendingAction(action.id) }
         }
     }
@@ -215,20 +215,22 @@ class GpodderSync(
      * The newest date wins: an action older than the last change of the state is ignored. gPodder
      * dates stop at the second, so an action of the same second as that change wins.
      */
-    private suspend fun apply(userId: Long, episode: Episode, kind: String, position: Int?, total: Int?, happened: OffsetDateTime) {
+    private suspend fun apply(userId: Long, episode: Episode, kind: String, started: Int?, position: Int?, total: Int?, happened: OffsetDateTime) {
         val changedAt = database.query { syncQueries.stateChangedAt(userId, episode.id).executeAsOneOrNull() }
         if (changedAt != null && happened.isBefore(changedAt.truncatedTo(ChronoUnit.SECONDS))) return
         val catalog = UserCatalog(database, userId)
-        val id = episode.id.toString()
         when (kind) {
-            "new" -> catalog.markUnplayed(id)
+            "new" -> catalog.markUnplayed(episode.id.toString())
             "play" -> {
                 val seconds = position?.takeIf { it > 0 } ?: return
+                // What this session of the client listened to, on its day (ADR 0012).
+                val listened = started?.takeIf { it in 0..seconds }?.let { (seconds - it).toLong() } ?: 0L
+                val day = happened.withOffsetSameInstant(ZoneOffset.UTC).toLocalDate()
                 val length = total?.takeIf { it > 0 } ?: episode.durationSeconds.takeIf { it > 0 }
                 if (length != null && seconds >= length - PLAYED_MARGIN_SECONDS) {
-                    catalog.markPlayed(id)
+                    catalog.markPlayed(episode.id, listened, day)
                 } else {
-                    catalog.updateProgress(id, seconds.coerceAtMost(MAX_POSITION_SECONDS))
+                    catalog.saveProgress(episode.id, seconds.coerceAtMost(MAX_POSITION_SECONDS), listened, day)
                 }
             }
         }

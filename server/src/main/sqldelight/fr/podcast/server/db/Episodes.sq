@@ -158,3 +158,42 @@ ORDER BY
   CASE WHEN :sortOrder = 'OLDEST' THEN d.published_at END ASC,
   d.published_at DESC, d.id DESC
 LIMIT :limit;
+
+-- The search of ADR 0012, among the user's subscriptions. :pattern holds one lookahead per word
+-- ("^(?=.*kotlin)(?=.*ktor)"), empty for none; :podcastId 0, :tag '' and the flags mean "any".
+searchForUser:
+SELECT d.id, d.podcast_id, d.title, d.description, d.published_at, d.duration_seconds,
+       d.chapters_url, d.chapters_type, d.file_status,
+       d.podcast_title, d.podcast_author, d.podcast_description, d.podcast_feed_url, d.podcast_artwork_url,
+       d.podcast_website_url, d.podcast_language, d.podcast_refresh_status, d.podcast_refreshed_at,
+       COALESCE(s.position_seconds, 0) AS position_seconds, COALESCE(s.status, 'NEW') AS status, COALESCE(s.kept, FALSE) AS kept,
+       COALESCE(s.favorite, FALSE) AS favorite, s.rating,
+       q.position AS queue_position
+FROM episode_details d
+JOIN subscriptions sub ON sub.podcast_id = d.podcast_id AND sub.user_id = :userId
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+LEFT JOIN queue_items q ON q.episode_id = d.id AND q.user_id = :userId
+WHERE (:pattern = '' OR d.title || ' ' || COALESCE(d.description, '') || ' ' || d.podcast_title ~* :pattern)
+  AND (:filterByStatus = FALSE OR COALESCE(s.status, 'NEW') = :status)
+  AND (:favoritesOnly = FALSE OR COALESCE(s.favorite, FALSE))
+  AND COALESCE(s.rating, 0) >= :minRating
+  AND (:filterFrom = FALSE OR d.published_at >= :fromTime)
+  AND (:filterTo = FALSE OR d.published_at < :toTime)
+  AND (d.podcast_id = :podcastId OR :podcastId = 0)
+  AND (:tag = '' OR EXISTS (SELECT 1 FROM subscription_tags t WHERE t.subscription_id = sub.id AND lower(t.tag) = lower(:tag)))
+ORDER BY d.published_at DESC, d.id DESC
+LIMIT :limit OFFSET :offset;
+
+countSearchForUser:
+SELECT count(*)
+FROM episode_details d
+JOIN subscriptions sub ON sub.podcast_id = d.podcast_id AND sub.user_id = :userId
+LEFT JOIN playback_states s ON s.episode_id = d.id AND s.user_id = :userId
+WHERE (:pattern = '' OR d.title || ' ' || COALESCE(d.description, '') || ' ' || d.podcast_title ~* :pattern)
+  AND (:filterByStatus = FALSE OR COALESCE(s.status, 'NEW') = :status)
+  AND (:favoritesOnly = FALSE OR COALESCE(s.favorite, FALSE))
+  AND COALESCE(s.rating, 0) >= :minRating
+  AND (:filterFrom = FALSE OR d.published_at >= :fromTime)
+  AND (:filterTo = FALSE OR d.published_at < :toTime)
+  AND (d.podcast_id = :podcastId OR :podcastId = 0)
+  AND (:tag = '' OR EXISTS (SELECT 1 FROM subscription_tags t WHERE t.subscription_id = sub.id AND lower(t.tag) = lower(:tag)));

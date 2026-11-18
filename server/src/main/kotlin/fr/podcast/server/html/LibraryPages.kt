@@ -1,5 +1,6 @@
 package fr.podcast.server.html
 
+import io.ktor.http.encodeURLParameter
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.catalog.ShareRecord
 import fr.podcast.server.catalog.SharedEntry
@@ -54,8 +55,19 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** What the library page shows besides the subscriptions (ADR 0009): shares given and received, and whom one can share with. */
+/** The library filters (ADR 0012): words, a tag, and the user's tags to choose from. */
+data class LibraryFilter(val text: String = "", val tag: String = "", val tags: List<String> = emptyList()) {
+    /** The page with these filters, which the list reloads from. */
+    val path: String
+        get() = buildList {
+            if (text.isNotEmpty()) add("q=${text.encodeURLParameter()}")
+            if (tag.isNotEmpty()) add("tag=${tag.encodeURLParameter()}")
+        }.let { if (it.isEmpty()) "/subscriptions" else "/subscriptions?" + it.joinToString("&") }
+}
+
 data class LibraryView(
     val items: List<SubscriptionItem>,
+    val filter: LibraryFilter = LibraryFilter(),
     /** Shares of the user's subscriptions, by subscription id. */
     val given: Map<Long, List<ShareRecord>> = emptyMap(),
     val received: List<SharedEntry> = emptyList(),
@@ -90,11 +102,13 @@ fun HTML.libraryPage(library: LibraryView, language: Language, user: UserAccount
             }
             p { id = "opml-result" }
         }
+        libraryFilters(library.filter, strings)
         // Outside the list, which reloads after each change: the answer to a share stays visible.
         result("library-notice")
         div {
             id = "library"
-            reloadOn("/subscriptions", "subscriptions-changed", "shares-changed")
+            // With its filters, kept after each change.
+            reloadOn(library.filter.path, "subscriptions-changed", "shares-changed")
             if (library.items.isEmpty()) {
                 p("empty") { +strings.emptyLibrary }
             }
@@ -116,6 +130,16 @@ private fun UL.subscriptionRow(item: SubscriptionItem, shares: List<ShareRecord>
         div("card-body") {
             span("title") { +podcast.title }
             span("meta") { +podcast.author }
+            if (subscription.tags.isNotEmpty()) {
+                span("tags") {
+                    subscription.tags.forEach { tag ->
+                        a(href = LibraryFilter(tag = tag).path, classes = "tag") {
+                            attributes["hx-boost"] = "true"
+                            +tag
+                        }
+                    }
+                }
+            }
             when (podcast.refreshStatus) {
                 RefreshStatus.PENDING -> span("badge") { +strings.refreshPending }
                 RefreshStatus.FAILED -> span("badge warning") { +strings.refreshFailed }
@@ -147,6 +171,11 @@ private fun FlowContent.noteForm(subscription: Subscription, strings: Strings) {
             placeholder = strings.notePlaceholder
             attributes["aria-label"] = strings.note
             +(subscription.note ?: "")
+        }
+        input(type = InputType.text, name = "tags") {
+            value = subscription.tags.joinToString(", ")
+            placeholder = strings.tagsHint
+            attributes["aria-label"] = strings.tags
         }
         button(type = ButtonType.submit, classes = "action") { +strings.save }
     }
@@ -418,5 +447,39 @@ private fun FlowContent.hitArtwork(hit: SearchHit) {
         img(src = image, alt = "", classes = "artwork") { attributes["loading"] = "lazy" }
     } else {
         aside("artwork") { +hit.title.take(2).uppercase() }
+    }
+}
+
+/** Words and a tag; boosted, so that the player keeps going. Also the way to the episode search. */
+private fun FlowContent.libraryFilters(filter: LibraryFilter, strings: Strings) {
+    form(action = "/subscriptions", method = FormMethod.get, classes = "search") {
+        attributes["hx-boost"] = "true"
+        input(type = InputType.search, name = "q") {
+            value = filter.text
+            placeholder = strings.filterLibrary
+            attributes["aria-label"] = strings.filterLibrary
+        }
+        if (filter.tags.isNotEmpty()) {
+            select {
+                name = "tag"
+                attributes["aria-label"] = strings.tags
+                option {
+                    value = ""
+                    +strings.allTags
+                }
+                filter.tags.forEach { tag ->
+                    option {
+                        value = tag
+                        selected = tag.equals(filter.tag, ignoreCase = true)
+                        +tag
+                    }
+                }
+            }
+        }
+        button(type = ButtonType.submit) { +strings.search }
+        a(href = "/episodes", classes = "button") {
+            attributes["hx-boost"] = "true"
+            +strings.searchEpisodes
+        }
     }
 }

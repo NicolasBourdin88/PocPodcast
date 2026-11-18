@@ -356,4 +356,33 @@ class WebTest {
         // From then on, one of the devices.
         assertContains(alice.page("/me"), "<span class=\"title\">AntennaPod</span>")
     }
+
+    @Test
+    fun searchTagsAndListeningInTheThinClient() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+
+        // Tags typed with the note, then the library filtered by one, and reloaded with its filters.
+        alice.htmx(HttpMethod.Patch, "/subscriptions/2", "note" to "", "tags" to "tech, english")
+        val library = alice.page("/subscriptions?tag=tech")
+        assertEquals(1, Regex("<li class=\"subscription\">").findAll(library).count())
+        assertContains(library, "<span class=\"title\">Talking Kotlin</span>")
+        assertContains(library, "hx-get=\"/subscriptions?tag=tech\"")
+        assertContains(library, "value=\"english, tech\"")
+
+        // The episode search, every criterion in one form sent by GET.
+        val search = alice.page("/episodes?q=kotlin&status=NEW&favorite=false&minRating=0")
+        assertContains(search, "2 épisodes")
+        assertContains(search, "Compose Multiplatform for iOS is stable")
+        assertContains(search, "name=\"from\"")
+
+        // My listening, in Settings.
+        assertContains(alice.page("/me"), "Rien d'écouté pour l'instant.")
+        alice.htmx(HttpMethod.Post, "/episodes/7/played")
+        val settings = alice.page("/me")
+        assertContains(settings, "Mon écoute")
+        assertContains(settings, "1 épisode terminé")
+        assertContains(settings, "Fragmented")
+    }
 }

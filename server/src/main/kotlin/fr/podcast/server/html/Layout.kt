@@ -216,6 +216,17 @@ private val STYLES = """
     }
     select.rating { font: inherit; font-size: .8rem; padding: 4px 8px; border: none; border-radius: 999px; background: var(--card); color: var(--text); }
     .result { margin: 4px 0; }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    a.tag { font-size: .75rem; padding: 2px 8px; border-radius: 999px; background: var(--card); color: var(--text); text-decoration: none; }
+    form.note input[name=tags] { font: inherit; font-size: .85rem; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--card); background: var(--surface); color: var(--text); }
+    nav.pages { display: flex; gap: 8px; margin: 12px 0; }
+    .stats .figures { display: flex; flex-wrap: wrap; gap: 12px 24px; list-style: none; padding: 0; margin: 8px 0; }
+    .stats .figures li { display: flex; flex-direction: column; }
+    .stats .value { font-size: 1.4rem; font-weight: 600; }
+    .bars { display: flex; align-items: stretch; gap: 6px; height: 140px; margin: 8px 0 16px; }
+    .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+    .bar .fill { width: 100%; max-width: 32px; background: var(--accent); border-radius: 4px 4px 0 0; }
+    .bar .label { font-size: .7rem; color: var(--muted); }
 
     .login { max-width: 360px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: 12px; }
     .login label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }

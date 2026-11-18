@@ -1,0 +1,32 @@
+-- Step 9: tags on subscriptions and listening time (ADR 0012).
+
+-- The owner's labels of a subscription; they go with it.
+CREATE TABLE subscription_tags (
+    subscription_id BIGINT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL CHECK (char_length(tag) BETWEEN 1 AND 30),
+    PRIMARY KEY (subscription_id, tag)
+);
+
+-- Seconds listened (episode time) and episodes finished, per user, day (UTC) and podcast. The
+-- podcast is named by its feed and title, so that the history outlives a podcast nobody follows.
+CREATE TABLE listening_days (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    feed_url TEXT NOT NULL,
+    podcast_title TEXT NOT NULL,
+    seconds BIGINT NOT NULL DEFAULT 0 CHECK (seconds >= 0),
+    finished INTEGER NOT NULL DEFAULT 0 CHECK (finished >= 0),
+    PRIMARY KEY (user_id, day, feed_url)
+);
+
+-- The history so far, estimated from the current state: played episodes count in full, the
+-- others up to their position, on the day their state last changed.
+INSERT INTO listening_days(user_id, day, feed_url, podcast_title, seconds, finished)
+SELECT s.user_id, CAST(s.updated_at AS DATE), p.feed_url, p.title,
+       SUM(CASE WHEN s.status = 'PLAYED' THEN e.duration_seconds ELSE s.position_seconds END),
+       SUM(CASE WHEN s.status = 'PLAYED' THEN 1 ELSE 0 END)
+FROM playback_states s
+JOIN episodes e ON e.id = s.episode_id
+JOIN podcasts p ON p.id = e.podcast_id
+WHERE s.status = 'PLAYED' OR s.position_seconds > 0
+GROUP BY s.user_id, CAST(s.updated_at AS DATE), p.feed_url, p.title;
