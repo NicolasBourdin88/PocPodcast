@@ -153,6 +153,30 @@ paths:
             application/prs.hal-forms+json:
               schema: { $ref: "#/components/schemas/DeviceCollection" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [comptes]
+      operationId: createAppPassword
+      summary: Créer un mot de passe d'application (template `create-app-password`)
+      description: |
+        Un jeton d'appareil à saisir comme mot de passe dans un client gPodder, AntennaPod par exemple
+        (ADR 0011). Il n'est montré qu'ici ; il apparaît ensuite parmi les appareils, révocable comme eux.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100, description: "Pour quelle appli, par exemple « AntennaPod »." }
+      responses:
+        "201":
+          description: Le mot de passe, une seule fois
+          content:
+            application/hal+json:
+              schema: { $ref: "#/components/schemas/AppPassword" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /me/devices/{deviceId}:
     parameters:
@@ -1964,6 +1988,11 @@ components:
           properties:
             self: { $ref: "#/components/schemas/Link" }
           additionalProperties: false
+        _templates:
+          type: object
+          properties:
+            create-app-password: { $ref: "#/components/schemas/Template" }
+          additionalProperties: false
         _embedded:
           type: object
           required: [devices]
@@ -2819,4 +2848,19 @@ components:
       properties:
         code: { type: integer, const: 410 }
         message: { type: string }
+      additionalProperties: false
+
+    AppPassword:
+      type: object
+      required: [name, password, createdAt, _links]
+      properties:
+        name: { type: string }
+        password: { type: string, description: "À saisir comme mot de passe dans le client gPodder ; montré une seule fois." }
+        createdAt: { type: string, format: date-time }
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self: { $ref: "#/components/schemas/Link" }
+          additionalProperties: false
       additionalProperties: false

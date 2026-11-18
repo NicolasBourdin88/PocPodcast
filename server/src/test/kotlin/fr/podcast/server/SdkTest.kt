@@ -1,5 +1,8 @@
 package fr.podcast.server
 
+import io.ktor.http.HttpHeaders
+import io.ktor.client.request.header
+import io.ktor.client.request.post
 import fr.podcast.shared.account.AccountService
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.userMessage
@@ -102,6 +105,20 @@ class SdkTest {
         val refused = assertFailsWith<ApiException.Rejected> { repository.subscribe("https://feeds.test/not-a-feed.html") }
         assertEquals("/problems/not-a-feed", refused.type)
         assertEquals(Language.French.strings.notAFeed, refused.userMessage(Language.French.strings))
+    }
+
+    @Test
+    fun sdkCreatesAnAppPasswordForAGpodderClient() = testApplication {
+        podcastServer()
+        val account = AccountService(client, deviceName = "SDK test").signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
+        val repository = RemotePodcastRepository(account, client)
+
+        val password = repository.createAppPassword("AntennaPod")
+        assertTrue(repository.devices().any { it.name == "AntennaPod" })
+        // What AntennaPod then sends (ADR 0011).
+        val basic = "Basic " + java.util.Base64.getEncoder().encodeToString("${TestSeed.ALICE}:$password".toByteArray())
+        val login = client.post("/api/2/auth/alice/login.json") { header(HttpHeaders.Authorization, basic) }
+        assertEquals(HttpStatusCode.OK, login.status)
     }
 
     @Test

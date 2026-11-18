@@ -98,6 +98,7 @@ object EnglishStrings : Strings {
         "reset-password" -> resetPassword
         "delete-user" -> deleteUser
         "revoke" -> revokeDevice
+        "create-app-password" -> newAppPassword
         "favorite" -> addFavorite
         "unfavorite" -> removeFavorite
         "rate" -> "Rate"
@@ -153,6 +154,13 @@ object EnglishStrings : Strings {
         FileStatus.READY -> "On the server"
         FileStatus.FAILED -> "Download failed"
     }
+
+    override val appPasswords = "App passwords"
+    override val appPasswordsHint = "To synchronise AntennaPod or another gPodder-compatible app: give it this server's address, your username and an app password, which you can revoke like a device."
+    override val newAppPassword = "New app password"
+    override val appPasswordName = "App name"
+    override fun appPasswordCreated(name: String) = "App password for \"$name\":"
+    override val appPasswordShownOnce = "It will not be shown again: write it down or copy it now."
 
     override val favorite = "Favorite"
     override val addFavorite = "Add to favorites"
@@ -317,6 +325,7 @@ object EnglishStrings : Strings {
     override val cliPasswdDescription = "Changes your password; your other devices will have to sign in again."
     override val cliDevicesDescription = "Lists the devices signed in to the account."
     override val cliDevicesRevokeDescription = "Signs a device out (number in the list)."
+    override val cliDevicesAddDescription = "Creates an app password (AntennaPod…) and shows it once."
     override val cliUsersDescription = "Lists the server's accounts."
     override val cliUsersAddDescription = "Creates an account (administrators); the password is asked for."
     override val cliUsersRemoveDescription = "Deletes an account (administrators; number in the list)."

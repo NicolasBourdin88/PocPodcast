@@ -16,6 +16,7 @@ import kotlinx.html.FlowContent
 import kotlinx.html.HTML
 import kotlinx.html.InputType
 import kotlinx.html.button
+import kotlinx.html.code
 import kotlinx.html.details
 import kotlinx.html.div
 import kotlinx.html.form
@@ -27,6 +28,7 @@ import kotlinx.html.li
 import kotlinx.html.p
 import kotlinx.html.section
 import kotlinx.html.span
+import kotlinx.html.stream.createHTML
 import kotlinx.html.summary
 import kotlinx.html.title
 import kotlinx.html.ul
@@ -77,6 +79,23 @@ fun HTML.settingsPage(user: UserAccount, devices: List<Device>, users: List<User
         section("settings") {
             h2 { +strings.devices }
             deviceList(devices, strings)
+            h2 { +strings.appPasswords }
+            p("meta") { +strings.appPasswordsHint }
+            form(classes = "fields") {
+                attributes["hx-post"] = "/me/devices"
+                attributes["hx-target"] = "#app-password-result"
+                attributes["hx-on::after-request"] = RESET_WHEN_ACCEPTED
+                label {
+                    +strings.appPasswordName
+                    input(type = InputType.text, name = "name") {
+                        required = true
+                        maxLength = "100"
+                        placeholder = "AntennaPod"
+                    }
+                }
+                button(type = ButtonType.submit) { +strings.newAppPassword }
+            }
+            result("app-password-result")
         }
         users?.let { usersSection(user, it, strings) }
     })
@@ -222,3 +241,12 @@ internal fun kotlinx.html.HTMLTag.reloadOn(page: String, vararg events: String) 
 }
 
 private fun Role.toUserRole() = UserRole.valueOf(name)
+
+/** The new app password, shown this once; the devices list reloads with it (ADR 0011). */
+fun appPasswordFragment(name: String, password: String, strings: Strings): String = createHTML(prettyPrint = false).span("notice") {
+    +strings.appPasswordCreated(name)
+    +" "
+    code("secret") { +password }
+    +" "
+    +strings.appPasswordShownOnce
+}

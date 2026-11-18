@@ -340,4 +340,20 @@ class WebTest {
             elements.forEach { assertContains(it, "hx-disinherit=\"*\"", message = "$path: $it") }
         }
     }
+
+    @Test
+    fun anAppPasswordIsShownOnceInSettings() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+        assertContains(alice.page("/me"), "hx-post=\"/me/devices\"")
+
+        val created = alice.htmx(HttpMethod.Post, "/me/devices", "name" to "AntennaPod")
+        assertEquals("devices-changed", created.headers["HX-Trigger"])
+        val answer = created.bodyAsText()
+        assertContains(answer, "Mot de passe d'application pour « AntennaPod » :")
+        assertTrue(Regex("<code class=\"secret\">[A-Za-z0-9_-]{43}</code>").containsMatchIn(answer))
+        // From then on, one of the devices.
+        assertContains(alice.page("/me"), "<span class=\"title\">AntennaPod</span>")
+    }
 }

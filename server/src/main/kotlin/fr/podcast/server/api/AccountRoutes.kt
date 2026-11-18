@@ -9,10 +9,12 @@ import fr.podcast.server.auth.TokenPrincipal
 import fr.podcast.server.auth.UserAccount
 import fr.podcast.server.auth.UserSession
 import fr.podcast.server.auth.authPrincipal
+import fr.podcast.server.hal.appPasswordResource
 import fr.podcast.server.hal.deviceCollection
 import fr.podcast.server.hal.meResource
 import fr.podcast.server.hal.userCollection
 import fr.podcast.server.hal.userResource
+import fr.podcast.server.html.appPasswordFragment
 import fr.podcast.server.html.settingsPage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.ProblemTypes
@@ -29,6 +31,8 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
+import io.ktor.server.response.respondText
+import fr.podcast.server.http.HalJson
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -102,6 +106,22 @@ fun Route.accountRoutes(services: ServerServices) {
             val token = (call.authPrincipal as? TokenPrincipal)?.token
             val representation = call.representation()
             call.respondResource(deviceCollection(accounts.devices(call.user.id, token), representation.forms), representation)
+        }
+
+        post("/me/devices") {
+            val user = call.mutatingUser() ?: return@post
+            val name = call.receiveFields()?.stringField("name")?.trim()
+            if (name.isNullOrEmpty() || name.length > MAX_DEVICE_NAME) {
+                return@post call.respondProblem(
+                    HttpStatusCode.UnprocessableEntity, "Invalid app password", listOf(FieldError("name", "1 to $MAX_DEVICE_NAME characters")),
+                )
+            }
+            val token = accounts.issueToken(user, name)
+            if (call.isHtmx) {
+                call.response.header("HX-Trigger", "devices-changed")
+                return@post call.respondFragment(appPasswordFragment(token.deviceName, token.value, call.language().strings))
+            }
+            call.respondText(appPasswordResource(token).toString(), HalJson, HttpStatusCode.Created)
         }
 
         delete("/me/devices/{id}") {
@@ -209,6 +229,9 @@ private fun passwordError(password: String, field: String): FieldError? =
     if (password.length < AccountRules.MIN_PASSWORD_LENGTH) FieldError(field, "at least ${AccountRules.MIN_PASSWORD_LENGTH} characters") else null
 
 /** 429 with Retry-After: too many wrong passwords from this address (ADR 0009). */
+/** As the device name of a token (POST /auth/tokens). */
+private const val MAX_DEVICE_NAME = 100
+
 internal suspend fun ApplicationCall.respondTooManyAttempts(retryAfterSeconds: Long) {
     response.header(HttpHeaders.RetryAfter, retryAfterSeconds.toString())
     respondProblem(

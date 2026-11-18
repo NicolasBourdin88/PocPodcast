@@ -272,7 +272,7 @@ fun main(args: Array<String>) = PodcastCommand()
             PlaylistShareCommand(), PlaylistUnshareCommand(), PlaylistFeedCommand(),
         ),
         LoginCommand(), AccountsCommand(), UseCommand(), LogoutCommand(),
-        ProfileCommand(), PasswdCommand(), DevicesCommand().subcommands(DevicesRevokeCommand()),
+        ProfileCommand(), PasswdCommand(), DevicesCommand().subcommands(DevicesRevokeCommand(), DevicesAddCommand()),
         UsersCommand().subcommands(UsersAddCommand(), UsersRemoveCommand(), UsersPasswdCommand(), UsersRoleCommand()),
     )
     .main(args)

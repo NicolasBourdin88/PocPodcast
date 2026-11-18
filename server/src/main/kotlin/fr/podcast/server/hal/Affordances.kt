@@ -93,6 +93,12 @@ object Affordances {
 
     fun revokeDevice(deviceId: Long) = Affordance("revoke", HttpMethod.Delete, "/me/devices/$deviceId")
 
+    /** A device token to type as the password of a gPodder client, such as AntennaPod (ADR 0011). */
+    val createAppPassword = Affordance(
+        "create-app-password", HttpMethod.Post, "/me/devices",
+        listOf(AffordanceProperty("name", required = true)),
+    )
+
     val clearQueue = Affordance("clear-queue", HttpMethod.Delete, "/queue")
 
     val subscribe = Affordance(

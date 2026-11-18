@@ -161,6 +161,10 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
         device.submit("revoke")
     }
 
+    override suspend fun createAppPassword(name: String): String =
+        deviceCollection().submit("create-app-password", mapOf("name" to JsonPrimitive(name))).resource().string("password")
+            ?: throw ApiException.NotOffered("create-app-password")
+
     override suspend fun users(): List<User> = userCollection().embedded("users").map { it.toUser() }
 
     override suspend fun createUser(username: String, displayName: String, password: String, role: UserRole): User {
@@ -289,8 +293,10 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     private suspend fun meResource(): HalResource = api.get(link("me"))
 
-    private suspend fun deviceResources(): List<HalResource> =
-        api.get(meResource().link("devices") ?: throw ApiException.NotOffered("devices")).embedded("devices")
+    private suspend fun deviceCollection(): HalResource =
+        api.get(meResource().link("devices") ?: throw ApiException.NotOffered("devices"))
+
+    private suspend fun deviceResources(): List<HalResource> = deviceCollection().embedded("devices")
 
     private suspend fun userCollection(): HalResource = api.get(link("users"))
 

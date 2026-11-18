@@ -116,6 +116,14 @@ interface Strings {
     val transcript: String
     fun fileStatus(status: FileStatus): String?
 
+    // App passwords, for gPodder clients such as AntennaPod (ADR 0011)
+    val appPasswords: String
+    val appPasswordsHint: String
+    val newAppPassword: String
+    val appPasswordName: String
+    fun appPasswordCreated(name: String): String
+    val appPasswordShownOnce: String
+
     // Favorites and ratings (ADR 0010)
     val favorite: String
     val addFavorite: String
@@ -298,6 +306,7 @@ interface Strings {
     val cliPasswdDescription: String
     val cliDevicesDescription: String
     val cliDevicesRevokeDescription: String
+    val cliDevicesAddDescription: String
     val cliUsersDescription: String
     val cliUsersAddDescription: String
     val cliUsersRemoveDescription: String

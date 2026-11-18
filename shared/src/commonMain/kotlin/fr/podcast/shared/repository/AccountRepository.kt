@@ -19,6 +19,12 @@ interface AccountRepository {
     /** Signs a device out (a lost phone…): its token stops working. */
     suspend fun revokeDevice(deviceId: String)
 
+    /**
+     * A password for a gPodder client such as AntennaPod (ADR 0011), returned this once: a device
+     * token named [name], listed and revoked with the devices.
+     */
+    suspend fun createAppPassword(name: String): String
+
     /** Every account of the server, by name: whom to share with. */
     suspend fun users(): List<User>
 

@@ -1,5 +1,8 @@
 package fr.podcast.ui.account
 
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +71,11 @@ private sealed interface SettingsDialog {
     data class ResetPassword(val user: User) : SettingsDialog
     data class DeleteUser(val user: User) : SettingsDialog
     data class RevokeDevice(val device: Device) : SettingsDialog
+    data object NewAppPassword : SettingsDialog
 }
+
+/** An app password just created: shown once (ADR 0011). */
+private data class CreatedAppPassword(val name: String, val password: String)
 
 /** What the server says about the active account: who they are, their devices, the server's accounts. */
 private data class AccountDetails(val me: User, val devices: List<Device>, val users: List<User>)
@@ -92,6 +99,7 @@ fun SettingsScreen(
     var failure by remember(client) { mutableStateOf<Throwable?>(null) }
     var reloads by remember { mutableIntStateOf(0) }
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
+    var created by remember { mutableStateOf<CreatedAppPassword?>(null) }
 
     LaunchedEffect(client, reloads) {
         attempt {
@@ -156,6 +164,23 @@ fun SettingsScreen(
                 items(devices, key = { "device-${it.id}" }) { device ->
                     DeviceItem(device, onRevoke = { dialog = SettingsDialog.RevokeDevice(device) })
                 }
+                item(key = "app-passwords") {
+                    Column {
+                        SectionTitle(strings.appPasswords) {
+                            TextButton(onClick = { dialog = SettingsDialog.NewAppPassword }) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(strings.newAppPassword)
+                            }
+                        }
+                        Text(
+                            strings.appPasswordsHint,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.widthIn(max = FORM_WIDTH).padding(horizontal = 16.dp),
+                        )
+                    }
+                }
                 if (me.role == UserRole.ADMIN) {
                     item(key = "users") {
                         SectionTitle(strings.users) {
@@ -211,7 +236,54 @@ fun SettingsScreen(
                 reloads++
             },
         ) { Text(strings.revokeDeviceConfirm(current.device.name)) }
+        SettingsDialog.NewAppPassword -> NewAppPasswordDialog(onDismiss = close) { name ->
+            created = CreatedAppPassword(name, client.createAppPassword(name))
+            reloads++
+        }
     }
+    created?.let { AppPasswordDialog(it, onDismiss = { created = null }) }
+}
+
+/** For which app the password is: its name in the list of devices. */
+@Composable
+private fun NewAppPasswordDialog(onDismiss: () -> Unit, onCreate: suspend (String) -> Unit) {
+    val strings = LocalStrings.current
+    var name by remember { mutableStateOf("AntennaPod") }
+    FormDialog(
+        title = strings.newAppPassword,
+        confirmLabel = strings.create,
+        onDismiss = onDismiss,
+        canConfirm = name.isNotBlank() && name.length <= 100,
+        onConfirm = { onCreate(name.trim()) },
+    ) {
+        Text(strings.appPasswordsHint, style = MaterialTheme.typography.bodyMedium)
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(strings.appPasswordName) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** The password, selectable to copy it, this once only. */
+@Composable
+private fun AppPasswordDialog(created: CreatedAppPassword, onDismiss: () -> Unit) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.appPasswordCreated(created.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SelectionContainer {
+                    Text(created.password, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge)
+                }
+                Text(strings.appPasswordShownOnce, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.close) } },
+    )
 }
 
 @Composable

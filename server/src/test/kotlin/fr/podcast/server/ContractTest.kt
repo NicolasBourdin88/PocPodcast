@@ -249,6 +249,9 @@ class ContractTest {
         check(delete, "/auth/tokens/current", "/auth/tokens/current", HttpStatusCode.NoContent, token = disposable)
         check(delete, "/auth/tokens/current", "/auth/tokens/current", HttpStatusCode.Unauthorized, token = disposable)
 
+        check(post, "/me/devices", "/me/devices", HttpStatusCode.Created, body = """{"name":"AntennaPod"}""")
+        check(post, "/me/devices", "/me/devices", HttpStatusCode.UnprocessableEntity, body = """{"name":""}""")
+        check(post, "/me/devices", "/me/devices", HttpStatusCode.Unauthorized, token = null, body = """{"name":"AntennaPod"}""")
         check(get, "/me", "/me", HttpStatusCode.OK)
         check(get, "/me", "/me", HttpStatusCode.Unauthorized, token = null)
         check(patch, "/me", "/me", HttpStatusCode.OK, body = """{"displayName":"Alice"}""")

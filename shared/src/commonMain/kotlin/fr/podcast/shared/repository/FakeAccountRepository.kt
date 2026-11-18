@@ -53,6 +53,17 @@ internal class FakeAccountRepository : AccountRepository {
         mutex.withLock { if (!devices.removeAll { it.id == deviceId }) throw ApiException.NotFound("device $deviceId") }
     }
 
+    /** As the server: a random password, shown once, then one more device. */
+    override suspend fun createAppPassword(name: String): String = mutex.withLock {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed.length > 100) throw invalid("name")
+        appPasswords++
+        devices += Device("app$appPasswords", trimmed, kotlin.time.Clock.System.now())
+        buildString { repeat(43) { append(PASSWORD_ALPHABET.random()) } }
+    }
+
+    private var appPasswords = 0
+
     override suspend fun users(): List<User> = mutex.withLock { users.sortedBy { it.displayName.lowercase() } }
 
     override suspend fun createUser(username: String, displayName: String, password: String, role: UserRole): User = mutex.withLock {
@@ -96,3 +107,5 @@ internal class FakeAccountRepository : AccountRepository {
         const val BOB = "u3"
     }
 }
+
+private const val PASSWORD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"

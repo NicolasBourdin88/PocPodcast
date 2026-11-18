@@ -125,6 +125,14 @@ fun rootResource(serverName: String, user: UserAccount?, home: HomeState?, forms
     }
 }
 
+/** A new app password: its only appearance; it is then one of the devices (ADR 0011). */
+fun appPasswordResource(token: IssuedToken): JsonObject = buildJsonObject {
+    put("name", token.deviceName)
+    put("password", token.value)
+    put("createdAt", token.createdAt.toString())
+    links("self" to "/me/devices")
+}
+
 fun tokenResource(token: IssuedToken): JsonObject = buildJsonObject {
     put("token", token.value)
     put("deviceName", token.deviceName)
@@ -158,10 +166,11 @@ fun userCollection(users: List<UserAccount>, viewer: UserAccount, forms: Boolean
     if (viewer.role == Role.ADMIN) templates(forms, listOf(Affordances.createUser))
 }
 
-/** The devices signed in to the account, each with its `revoke` template. */
+/** The devices signed in to the account, each with its `revoke` template; app passwords are created here. */
 fun deviceCollection(devices: List<Device>, forms: Boolean): JsonObject = buildJsonObject {
     put("count", devices.size)
     links("self" to "/me/devices")
+    templates(forms, listOf(Affordances.createAppPassword))
     putJsonObject("_embedded") {
         put(
             "devices",

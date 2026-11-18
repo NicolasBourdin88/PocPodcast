@@ -2,6 +2,7 @@ package fr.podcast.cli
 
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.prompt
@@ -50,6 +51,21 @@ class DevicesCommand : ServerCommand("devices") {
     override fun help(context: Context) = systemLanguage.strings.cliDevicesDescription
     override fun run() {
         if (currentContext.invokedSubcommand == null) echo(renderDevicesText(call { client().devices() }, cli.strings))
+    }
+}
+
+/** `podcast devices add AntennaPod`: an app password for a gPodder client, shown this once (ADR 0011). */
+class DevicesAddCommand : ServerCommand("add") {
+    private val name by argument(help = "AntennaPod").multiple(required = true)
+
+    override fun help(context: Context) = systemLanguage.strings.cliDevicesAddDescription
+    override fun run() {
+        val appName = name.joinToString(" ")
+        val password = call { client().createAppPassword(appName) }
+        echo(cli.strings.appPasswordCreated(appName))
+        echo(password)
+        echo(cli.strings.appPasswordShownOnce)
+        echo(cli.strings.appPasswordsHint)
     }
 }
 
