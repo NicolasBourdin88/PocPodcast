@@ -1,0 +1,70 @@
+09:14:11 ← 200  set-cookie=[]
+09:14:11 ← 200  set-cookie=[]
+09:16:06 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[]  ua=AntennaPod/3.12.3
+09:16:06 ← 200  set-cookie=[sessionid]
+09:16:07 → GET /api/2/devices/demo.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:07 ← 200  set-cookie=[]
+09:16:19 → POST /api/2/devices/demo/antennapod_on_sdk_gphone64_arm64.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:19    body: {"caption":"AntennaPod on sdk_gphone64_arm64","type":"mobile"}
+09:16:19 ← 200  set-cookie=[]
+09:16:31 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:31 ← 200  set-cookie=[sessionid]
+09:16:31 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=0  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:31 ← 200  set-cookie=[]
+09:16:32 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:32 ← 200  set-cookie=[sessionid]
+09:16:32 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794989791  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:32 ← 200  set-cookie=[]
+09:16:32 → GET /api/2/episodes/demo.json?since=0  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:16:32 ← 200  set-cookie=[]
+09:18:08 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:18:08 ← 200  set-cookie=[sessionid]
+09:18:09 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794989792  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:18:09 ← 200  set-cookie=[]
+09:18:09 → POST /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:18:09    body: {"add":["https:\/\/feeds.simplecast.com\/LpAGSLnY"],"remove":[]}
+09:18:09 ← 200  set-cookie=[]
+09:18:09 → GET /api/2/episodes/demo.json?since=1794989792  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:18:09 ← 200  set-cookie=[]
+09:19:33 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:33 ← 200  set-cookie=[sessionid]
+09:19:33 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794989889  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:33 ← 200  set-cookie=[]
+09:19:33 → GET /api/2/episodes/demo.json?since=1794989889  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:33 ← 200  set-cookie=[]
+09:19:33 → POST /api/2/episodes/demo.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:33    body: [{"podcast":"https:\/\/feeds.simplecast.com\/LpAGSLnY","episode":"https:\/\/cdn.simplecast.com\/media\/audio\/transcoded\/eea5748e-09ed-4c46-8f6a-b2569dd75851\/20f35050-e836-44cd-8f7f-fd13e8cb2e44\/episodes\/audio\/group\/f0e664ee-0422-4c14-bbbb-24b1feafabe5\/group-item\/47c538c7-ae23-4576-b915-1137d96e8005\/128_default_tc.mp3?aid=rss_feed&feed=LpAGSLnY","guid":"46386e99-e9db-4dba-b442-1d6181bce956","action":"play","timestamp":"2026-11-18T08:19:12","started":0,"position":37,"total":3642,"device":"antennapod_on_sdk_gphone64_arm64"}]
+09:19:33 ← 200  set-cookie=[]
+09:19:35 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:35 ← 200  set-cookie=[sessionid]
+09:19:35 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794989973  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:35 ← 200  set-cookie=[]
+09:19:35 → GET /api/2/episodes/demo.json?since=1794989973  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:19:35 ← 200  set-cookie=[]
+09:20:03    body: {"podcast":"https://feeds.simplecast.com/LpAGSLnY","episode":"https://cdn.simplecast.com/media/audio/transcoded/eea5748e-09ed-4c46-8f6a-b2569dd75851/20f35050-e836-44cd-8f7f-fd13e8cb2e44/episodes/audio/group/f0e664ee-0422-4c14-bbbb-24b1feafabe5/group-item/47c538c7-ae23-4576-b915-1137d96e8005/128_default_tc.mp3?aid=rss_feed&feed=LpAGSLnY","guid":"46386e99-e9db-4dba-b442-1d6181bce956","timestamp":"2026-11-18T08:20:03","started":0,"position":1200,"total":3642,"device":"poc-server"}
+09:20:03 ← 200  set-cookie=[]
+09:20:06 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:20:06 ← 200  set-cookie=[sessionid]
+09:20:06 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794989975  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:20:06 ← 200  set-cookie=[]
+09:20:06 → GET /api/2/episodes/demo.json?since=1794989975  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:20:06 ← 200  set-cookie=[]
+09:21:26 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:21:26 ← 200  set-cookie=[sessionid]
+09:21:26 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794990006  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:21:26 ← 200  set-cookie=[]
+09:21:26 → GET /api/2/episodes/demo.json?since=1794990006  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:21:26 ← 200  set-cookie=[]
+09:21:26 → POST /api/2/episodes/demo.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:21:26    body: [{"podcast":"https:\/\/feeds.simplecast.com\/LpAGSLnY","episode":"https:\/\/cdn.simplecast.com\/media\/audio\/transcoded\/eea5748e-09ed-4c46-8f6a-b2569dd75851\/20f35050-e836-44cd-8f7f-fd13e8cb2e44\/episodes\/audio\/group\/24f9efa4-5cf1-4bc5-9b4b-4f947d5863ae\/group-item\/260d1105-b721-4097-97c6-4ab390e71a35\/128_default_tc.mp3?aid=rss_feed&feed=LpAGSLnY","guid":"2d5ecc59-f3c2-451b-a789-9605efb069f9","action":"play","timestamp":"2026-11-18T08:21:09","started":761,"position":761,"total":761,"device":"antennapod_on_sdk_gphone64_arm64"}]
+09:21:26 ← 200  set-cookie=[]
+09:22:39 ← 200  set-cookie=[]
+09:23:12 → POST /api/2/auth/demo/login.json  auth=Basic(demo)  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:23:12 ← 200  set-cookie=[sessionid]
+09:23:12 → GET /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json?since=1794990086  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:23:12 ← 200  set-cookie=[]
+09:23:12 → POST /api/2/subscriptions/demo/antennapod_on_sdk_gphone64_arm64.json  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:23:12    body: {"add":[],"remove":["https:\/\/feeds.simplecast.com\/LpAGSLnY"]}
+09:23:12 ← 200  set-cookie=[]
+09:23:12 → GET /api/2/episodes/demo.json?since=1794990086  auth=none  cookies=[sessionid]  ua=AntennaPod/3.12.3
+09:23:12 ← 200  set-cookie=[]
