@@ -124,6 +124,42 @@ interface Strings {
     fun appPasswordCreated(name: String): String
     val appPasswordShownOnce: String
 
+    // Search, tags and statistics (ADR 0012)
+    val subscriptionsTab: String
+    val episodesTab: String
+    val filterLibrary: String
+    val searchEpisodes: String
+    val searchEpisodesHint: String
+    fun statusFilter(status: EpisodeStatus): String
+    val statusLabel: String
+    val anyStatus: String
+    val podcastLabel: String
+    val anyPodcast: String
+    val period: String
+    val anyDate: String
+    fun lastDays(days: Int): String
+    val publishedFrom: String
+    val publishedTo: String
+    val noEpisodeFound: String
+    val previousPage: String
+    val nextPage: String
+    val tags: String
+    val tagsHint: String
+    val allTags: String
+    fun tagsInvalid(count: Int, length: Int): String
+    val myListening: String
+    val listeningTime: String
+    val last7Days: String
+    val last30Days: String
+    fun episodesFinished(count: Int): String
+    val mostListened: String
+    val byMonth: String
+    fun listeningSince(date: LocalDate): String
+    val noListeningYet: String
+
+    /** A month of the year (1 to 12), short: "nov.", "Nov". */
+    fun shortMonth(month: Int): String
+
     // Favorites and ratings (ADR 0010)
     val favorite: String
     val addFavorite: String
@@ -307,6 +343,9 @@ interface Strings {
     val cliDevicesDescription: String
     val cliDevicesRevokeDescription: String
     val cliDevicesAddDescription: String
+    val cliEpisodesDescription: String
+    val cliTagsDescription: String
+    val cliStatsDescription: String
     val cliUsersDescription: String
     val cliUsersAddDescription: String
     val cliUsersRemoveDescription: String

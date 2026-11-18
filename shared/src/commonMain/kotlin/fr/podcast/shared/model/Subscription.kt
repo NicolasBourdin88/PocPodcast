@@ -20,9 +20,26 @@ data class Subscription(
     val access: Access = Access.OWNER,
     /** Who shared it, when it is not the viewer's own. */
     val ownerName: String? = null,
+    /** The owner's labels ("trajets", "tech"…), which group the library and filter searches (ADR 0012). */
+    val tags: List<String> = emptyList(),
 )
 
 data class SubscriptionItem(val subscription: Subscription, val podcast: Podcast)
+
+/** The tags of a subscription (ADR 0012): checked by the server, and by clients before sending. */
+object TagRules {
+    const val MAX_TAGS = 10
+    const val MAX_LENGTH = 30
+
+    /** "trajets, Tech , tech" → [trajets, Tech]: trimmed, without empty ones nor duplicates differing by case. */
+    fun parse(text: String): List<String> = normalize(text.split(','))
+
+    fun normalize(tags: List<String>): List<String> =
+        tags.map { it.trim().replace(Regex("\\s+"), " ") }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+
+    fun valid(tags: List<String>): Boolean =
+        tags.size <= MAX_TAGS && tags.all { it.isNotBlank() && it.length <= MAX_LENGTH && ',' !in it }
+}
 
 /** A podcast found by a search source (Podcast Index, Apple Podcasts…). */
 @Serializable

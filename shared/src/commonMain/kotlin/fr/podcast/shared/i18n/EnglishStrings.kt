@@ -1,5 +1,6 @@
 package fr.podcast.shared.i18n
 
+import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.PlaylistOrder
@@ -154,6 +155,43 @@ object EnglishStrings : Strings {
         FileStatus.READY -> "On the server"
         FileStatus.FAILED -> "Download failed"
     }
+
+    override val subscriptionsTab = "Subscriptions"
+    override val episodesTab = "Episodes"
+    override val filterLibrary = "Filter the library"
+    override val searchEpisodes = "Search episodes"
+    override val searchEpisodesHint = "Each word must appear in the title, the description or the podcast"
+    override fun statusFilter(status: EpisodeStatus) = when (status) {
+        EpisodeStatus.NEW -> "New"
+        EpisodeStatus.IN_PROGRESS -> "In progress"
+        EpisodeStatus.PLAYED -> "Played"
+    }
+    override val statusLabel = "Status"
+    override val anyStatus = "All"
+    override val podcastLabel = "Podcast"
+    override val anyPodcast = "All podcasts"
+    override val period = "Published"
+    override val anyDate = "Any date"
+    override fun lastDays(days: Int) = "The last $days days"
+    override val publishedFrom = "From"
+    override val publishedTo = "To"
+    override val noEpisodeFound = "No episode matches."
+    override val previousPage = "Previous"
+    override val nextPage = "Next"
+    override val tags = "Tags"
+    override val tagsHint = "Separated by commas: commute, tech"
+    override val allTags = "All"
+    override fun tagsInvalid(count: Int, length: Int) = "At most $count tags of $length characters, without commas."
+    override val myListening = "My listening"
+    override val listeningTime = "Listening time"
+    override val last7Days = "Last 7 days"
+    override val last30Days = "Last 30 days"
+    override fun episodesFinished(count: Int) = if (count == 1) "1 episode finished" else "$count episodes finished"
+    override val mostListened = "Most listened to"
+    override val byMonth = "By month"
+    override fun listeningSince(date: LocalDate) = "Since ${shortDate(date)}, ${date.year}"
+    override val noListeningYet = "Nothing listened to yet."
+    override fun shortMonth(month: Int) = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[(month - 1).coerceIn(0, 11)]
 
     override val appPasswords = "App passwords"
     override val appPasswordsHint = "To synchronise AntennaPod or another gPodder-compatible app: give it this server's address, your username and an app password, which you can revoke like a device."
@@ -325,6 +363,9 @@ object EnglishStrings : Strings {
     override val cliPasswdDescription = "Changes your password; your other devices will have to sign in again."
     override val cliDevicesDescription = "Lists the devices signed in to the account."
     override val cliDevicesRevokeDescription = "Signs a device out (number in the list)."
+    override val cliEpisodesDescription = "Searches episodes: keywords, status, favorites, rating, period, podcast, tag."
+    override val cliTagsDescription = "Shows or changes the tags of a subscription (number in `subscriptions`)."
+    override val cliStatsDescription = "Shows your listening time and your most listened podcasts."
     override val cliDevicesAddDescription = "Creates an app password (AntennaPod…) and shows it once."
     override val cliUsersDescription = "Lists the server's accounts."
     override val cliUsersAddDescription = "Creates an account (administrators); the password is asked for."

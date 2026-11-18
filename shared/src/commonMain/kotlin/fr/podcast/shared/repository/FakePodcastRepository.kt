@@ -1,5 +1,16 @@
 package fr.podcast.shared.repository
 
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.minus
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.DateTimeUnit
+import fr.podcast.shared.model.TagRules
+import fr.podcast.shared.model.PodcastListening
+import fr.podcast.shared.model.MonthListening
+import fr.podcast.shared.model.ListeningStats
+import fr.podcast.shared.model.EpisodeQuery
+import fr.podcast.shared.model.EpisodePage
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.FieldError
 import fr.podcast.shared.home.EpisodeItem
@@ -57,10 +68,10 @@ class FakePodcastRepository private constructor(
     private data class Followed(val subscription: Subscription, val podcastId: String, val ownerId: String)
 
     private val subscriptions = mutableListOf(
-        Followed(Subscription("s1", subscribedAt = subscribedAt), "p1", ME),
-        Followed(Subscription("s2", subscribedAt = subscribedAt), "p2", ME),
-        Followed(Subscription("s3", subscribedAt = subscribedAt), "p3", ME),
-        Followed(Subscription("s4", subscribedAt = subscribedAt), "p4", ME),
+        Followed(Subscription("s1", subscribedAt = subscribedAt, tags = listOf("tech")), "p1", ME),
+        Followed(Subscription("s2", subscribedAt = subscribedAt, tags = listOf("english", "tech")), "p2", ME),
+        Followed(Subscription("s3", subscribedAt = subscribedAt, tags = listOf("culture")), "p3", ME),
+        Followed(Subscription("s4", subscribedAt = subscribedAt, tags = listOf("english", "tech")), "p4", ME),
         Followed(Subscription("s5", note = "Une question de science par semaine", subscribedAt = subscribedAt), "p5", ALICE),
     )
     private var nextSubscription = 6
@@ -195,12 +206,16 @@ class FakePodcastRepository private constructor(
         SubscriptionItem(followed.subscription, podcast)
     }
 
-    override suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean): SubscriptionItem {
+    override suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean, tags: List<String>?): SubscriptionItem {
         val (followed, access) = mutex.withLock { visibleSubscription(subscriptionId) } ?: throw ApiException.NotFound("subscription $subscriptionId")
         if (access == Access.READ) throw forbidden("This subscription is shared with you read-only")
+        val newTags = tags?.let(TagRules::normalize) ?: followed.subscription.tags
+        if (!TagRules.valid(newTags)) {
+            throw ApiException.Rejected(422, null, "Invalid tags", listOf(FieldError("tags", "invalid")))
+        }
         val owner = ownerName(followed)
         return mutex.withLock {
-            val updated = followed.copy(subscription = followed.subscription.copy(note = note, autoDownload = autoDownload))
+            val updated = followed.copy(subscription = followed.subscription.copy(note = note, autoDownload = autoDownload, tags = newTags))
             subscriptions[subscriptions.indexOf(followed)] = updated
             updated.asItem(access, owner)!!
         }
@@ -537,6 +552,53 @@ class FakePodcastRepository private constructor(
         podcasts.find { it.id == podcastId }?.let { SubscriptionItem(subscription.copy(access = access, ownerName = ownerName), it) }
 
     private fun itemOf(episode: Episode) = EpisodeItem(episode, podcasts.first { it.id == episode.podcastId })
+
+    /** As the server: every word in the title, description or podcast title, and every other criterion. */
+    override suspend fun searchEpisodes(query: EpisodeQuery, limit: Int, offset: Int): EpisodePage = mutex.withLock {
+        val own = subscriptions.filter { it.ownerId == ME }
+        val words = query.text.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val matching = episodes.filter { episode ->
+            val followed = own.firstOrNull { it.podcastId == episode.podcastId } ?: return@filter false
+            val podcast = podcasts.first { it.id == episode.podcastId }
+            val text = "${episode.title} ${episode.description.orEmpty()} ${podcast.title}".lowercase()
+            val day = episode.publishedAt.toLocalDateTime(TimeZone.UTC).date
+            words.all { it in text } &&
+                (query.status == null || episode.status == query.status) &&
+                (!query.favoritesOnly || episode.favorite) &&
+                (episode.rating ?: 0) >= query.minRating &&
+                (query.from == null || day >= query.from) &&
+                (query.to == null || day <= query.to) &&
+                (query.podcastId == null || episode.podcastId == query.podcastId) &&
+                (query.tag == null || followed.subscription.tags.any { it.equals(query.tag, ignoreCase = true) })
+        }
+        EpisodePage(matching.drop(offset).take(limit).map(::itemOf), matching.size)
+    }
+
+    /** The demo listened to each episode on the day it was published, up to its position. */
+    override suspend fun listeningStats(): ListeningStats = mutex.withLock {
+        val listened = episodes.filter { it.status != EpisodeStatus.NEW }
+        fun seconds(episode: Episode) = (if (episode.status == EpisodeStatus.PLAYED) episode.durationSeconds else episode.positionSeconds).toLong()
+        val days = listened.associateWith { it.publishedAt.toLocalDateTime(TimeZone.UTC).date }
+        val today = LocalDate(2026, 10, 12)
+        val months = (11 downTo 0).map { back ->
+            val total = today.year * 12 + today.month.ordinal - back
+            "${total / 12}-${(total % 12 + 1).toString().padStart(2, '0')}"
+        }
+        ListeningStats(
+            totalSeconds = listened.sumOf(::seconds),
+            last7DaysSeconds = listened.filter { days.getValue(it) > today.minus(7, DateTimeUnit.DAY) }.sumOf(::seconds),
+            last30DaysSeconds = listened.filter { days.getValue(it) > today.minus(30, DateTimeUnit.DAY) }.sumOf(::seconds),
+            episodesFinished = listened.count { it.status == EpisodeStatus.PLAYED },
+            since = days.values.minOrNull(),
+            byPodcast = listened.groupBy { it.podcastId }.map { (podcastId, items) ->
+                val podcast = podcasts.first { it.id == podcastId }
+                PodcastListening(podcast.title, podcast.feedUrl, items.sumOf(::seconds), items.count { it.status == EpisodeStatus.PLAYED })
+            }.sortedByDescending { it.seconds },
+            byMonth = months.map { month ->
+                MonthListening(month, listened.filter { days.getValue(it).toString().startsWith(month) }.sumOf(::seconds))
+            },
+        )
+    }
 
     private suspend fun update(episodeId: String, change: (Episode) -> Episode) = mutex.withLock {
         val index = episodes.indexOfFirst { it.id == episodeId }

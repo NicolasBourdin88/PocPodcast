@@ -1,5 +1,9 @@
 package fr.podcast.shared.repository
 
+import kotlinx.serialization.json.JsonArray
+import fr.podcast.shared.model.ListeningStats
+import fr.podcast.shared.model.EpisodeQuery
+import fr.podcast.shared.model.EpisodePage
 import fr.podcast.shared.account.Account
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.HalResource
@@ -79,10 +83,35 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     override suspend fun subscribe(feedUrl: String): SubscriptionItem =
         subscriptionCollection().submit("subscribe", mapOf("feedUrl" to JsonPrimitive(feedUrl))).resource().toSubscriptionItem()
 
-    override suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean): SubscriptionItem {
-        val values = mapOf("note" to note.orNull(), "autoDownload" to JsonPrimitive(autoDownload))
+    override suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean, tags: List<String>?): SubscriptionItem {
+        val values = buildMap {
+            put("note", note.orNull())
+            put("autoDownload", JsonPrimitive(autoDownload))
+            tags?.let { put("tags", JsonArray(it.map(::JsonPrimitive))) }
+        }
         return subscriptionResource(subscriptionId).submit("update", values).resource().toSubscriptionItem()
     }
+
+    override suspend fun searchEpisodes(query: EpisodeQuery, limit: Int, offset: Int): EpisodePage {
+        val values = mapOf(
+            "q" to query.text.trim().ifEmpty { null },
+            "status" to query.status?.name,
+            "favorite" to "true".takeIf { query.favoritesOnly },
+            "minRating" to query.minRating.takeIf { it > 0 },
+            "from" to query.from?.toString(),
+            "to" to query.to?.toString(),
+            "podcast" to query.podcastId,
+            "tag" to query.tag,
+            "offset" to offset.takeIf { it > 0 },
+            "limit" to limit.coerceIn(1, MAX_PAGE),
+        )
+        val page = api.get(link("episodes", values))
+        val items = page.embedded("episodes").map { it.asEpisodeItem() }
+        return EpisodePage(items, page.int("total") ?: items.size)
+    }
+
+    override suspend fun listeningStats(): ListeningStats =
+        api.get(meResource().link("stats") ?: throw ApiException.NotOffered("stats")).decode(ListeningStats.serializer())
 
     override suspend fun unsubscribe(subscriptionId: String) {
         subscriptionResource(subscriptionId).submit("unsubscribe")

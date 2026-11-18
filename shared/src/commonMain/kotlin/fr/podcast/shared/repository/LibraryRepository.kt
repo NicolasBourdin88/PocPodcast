@@ -1,6 +1,9 @@
 package fr.podcast.shared.repository
 
 import fr.podcast.shared.model.Episode
+import fr.podcast.shared.model.EpisodePage
+import fr.podcast.shared.model.EpisodeQuery
+import fr.podcast.shared.model.ListeningStats
 import fr.podcast.shared.model.OpmlImportReport
 import fr.podcast.shared.model.Podcast
 import fr.podcast.shared.model.SearchResult
@@ -16,8 +19,11 @@ interface LibraryRepository {
 
     /** Subscribes to a feed; the server reads it first and refuses what is not a podcast feed. */
     suspend fun subscribe(feedUrl: String): SubscriptionItem
-    /** For its owner, or someone it is shared with in [fr.podcast.shared.model.SharePermission.WRITE]. */
-    suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean): SubscriptionItem
+    /**
+     * For its owner, or someone it is shared with in [fr.podcast.shared.model.SharePermission.WRITE].
+     * [tags] null keeps them (ADR 0012).
+     */
+    suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean, tags: List<String>? = null): SubscriptionItem
 
     /** For its owner only. */
     suspend fun unsubscribe(subscriptionId: String)
@@ -42,6 +48,12 @@ interface LibraryRepository {
 
     suspend fun exportOpml(): String
     suspend fun importOpml(opml: String): OpmlImportReport
+
+    /** The episodes of the user's subscriptions that match [query], newest first (ADR 0012). */
+    suspend fun searchEpisodes(query: EpisodeQuery, limit: Int = 50, offset: Int = 0): EpisodePage
+
+    /** How much the user listened, and to what (ADR 0012). */
+    suspend fun listeningStats(): ListeningStats
 }
 
 /** Everything a client needs from a server, or from the demo data. */
