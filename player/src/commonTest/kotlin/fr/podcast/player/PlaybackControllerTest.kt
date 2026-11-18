@@ -22,9 +22,16 @@ private class ManualAudioPlayer : AudioPlayer {
     override val state = MutableStateFlow(PlayerState())
     val loads = mutableListOf<Pair<Media, Double>>()
 
+    /** Like AVPlayer before its item is ready: still opening, at 0, the start not applied yet. */
+    var opening = false
+
     override fun load(media: Media, startSeconds: Double, play: Boolean) {
         loads += media to startSeconds
-        state.value = PlayerState(media.id, PlayerStatus.READY, play, positionSeconds = startSeconds, durationSeconds = media.durationHint)
+        state.value = if (opening) {
+            PlayerState(media.id, PlayerStatus.LOADING, false, positionSeconds = 0.0, durationSeconds = media.durationHint)
+        } else {
+            PlayerState(media.id, PlayerStatus.READY, play, positionSeconds = startSeconds, durationSeconds = media.durationHint)
+        }
     }
 
     override fun play() = state.update { it.copy(playing = true) }
@@ -94,6 +101,21 @@ class PlaybackControllerTest {
         advanceTimeBy(2.seconds)
         runCurrent()
         assertEquals(600, repository.episode("e1")!!.positionSeconds)
+    }
+
+    @Test
+    fun aFileStillOpeningDoesNotOverwriteTheSavedPosition() = runTest {
+        val controller = controller()
+        val saved = repository.episode("e2")!!.positionSeconds
+        player.opening = true
+        controller.play("e2")
+        runCurrent()
+
+        // The app goes to the background, or closes, before the file opened.
+        controller.saveNow()
+        runCurrent()
+        controller.flush()
+        assertEquals(saved, repository.episode("e2")!!.positionSeconds)
     }
 
     @Test

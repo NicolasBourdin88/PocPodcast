@@ -34,9 +34,11 @@
     position: Number(data.position || 0),
   });
 
+  // Not before the file's metadata: until then currentTime is 0, not the saved position (Home
+  // primes the player without playing it), and sending it would erase that position.
   function save(keepalive = false) {
     const audio = byId('audio');
-    if (!current || !audio || !audio.src || audio.ended) return;
+    if (!current || !audio || !audio.src || audio.ended || audio.readyState < HTMLMediaElement.HAVE_METADATA) return;
     const position = Math.floor(audio.currentTime);
     if (position === lastSaved) return;
     lastSaved = position;

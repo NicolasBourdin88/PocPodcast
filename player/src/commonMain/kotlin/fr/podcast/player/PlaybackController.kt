@@ -248,12 +248,15 @@ class PlaybackController(
         player.load(fresh.toMedia(url), position, play = true)
     }
 
-    /** Sends the current position if it changed. Called with [mutex] held. */
+    /**
+     * Sends the current position if it changed. Called with [mutex] held. Only once the file is
+     * open (READY): before, the player is at 0, and sending that would erase the saved position.
+     */
     private suspend fun save() {
         val item = current.value ?: return
         val client = client ?: return
         val state = player.state.value
-        if (state.mediaId != item.episode.id || state.status == PlayerStatus.ENDED || state.status == PlayerStatus.ERROR) return
+        if (state.mediaId != item.episode.id || state.status != PlayerStatus.READY) return
         val position = state.positionSeconds.toInt()
         if (position == lastSaved) return
         if (attempt { client.updateProgress(item.episode.id, position) } != null) lastSaved = position
