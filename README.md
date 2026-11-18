@@ -187,6 +187,32 @@ cli/build/install/podcast/bin/podcast playlists create Kotlin --keywords "kotlin
 
 Ensuite : `playlists` (les siennes puis celles partagées, numérotées), `playlists show 1`, `playlists play 1`, `playlists create Pour le train` puis `playlists add 2 4` (épisode n° 4 de `list`), `playlists move 2 3 1`, `playlists remove 2 1`, `playlists edit 1 --order random --limit 20`, `playlists shuffle 1`, `playlists share 1 bob --write`, `playlists feed 1` (`--renew`, `--off`), `playlists delete 1 --yes`, `favorite 3` (`--off` pour le retirer), `rate 3 4` (`0` efface la note).
 
+## Clients tiers
+
+Le serveur parle aussi l'**API gPodder** et l'**Open Podcast API** ([ADR 0011](docs/adr/0011-synchronisation-clients-tiers.md)). Un client qui les connaît retrouve les abonnements, les positions et les épisodes écoutés, et nos clients voient ce qu'il en fait.
+
+**AntennaPod** :
+1. Dans les Réglages d'un de nos clients, créer un **mot de passe d'application** (« AntennaPod »). Il n'est montré qu'une fois ; le terminal le fait aussi, avec `podcast devices add AntennaPod`.
+2. Dans AntennaPod : Settings › Synchronization › Choose synchronization provider › gpodder.net.
+3. Saisir l'adresse du serveur, `http://10.0.2.2:8080` depuis l'émulateur Android, l'identifiant et le mot de passe d'application.
+4. Créer l'appareil, puis Synchronize now.
+
+Ce qui suit : les abonnements, les positions et l'état « écouté ». La file d'attente, les favoris, les notes et les playlists ne passent pas, car ces API n'ont pas d'équivalent ; une playlist s'écoute en revanche dans n'importe quelle appli par son flux RSS (« Add podcast by RSS address »). Le mot de passe d'application apparaît parmi les appareils et se révoque comme eux.
+
+**Open Podcast API** : `/v1/subscriptions` avec un jeton (`Bearer`) ou un mot de passe d'application (`Basic`). Les formats sont dans la documentation de l'API (http://localhost:8080/docs).
+
+**OPML et flux de playlist dans un autre client**, par exemple newsboat :
+
+```bash
+cli/build/install/podcast/bin/podcast opml export podcasts.opml
+```
+
+```bash
+newsboat -i podcasts.opml
+```
+
+L'adresse du flux d'une playlist (`podcast playlists feed 1`) s'ajoute au fichier `urls` de newsboat, ou dans toute appli de podcasts.
+
 ## Tests
 
 ```bash

@@ -67,7 +67,7 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque 
 |---|---|
 | SDK, CLI, clients riches | `Authorization: Bearer <jeton>`. Le jeton s'obtient par `POST /auth/tokens` (`username`, `password`, `deviceName`) et se révoque par `DELETE /auth/tokens/current`. |
 | Client léger | Cookie de session après le formulaire `/login`. Les requêtes qui modifient l'état exigent l'en-tête `HX-Request` (envoyé par htmx), en plus de `SameSite=Lax`, contre le CSRF. |
-| Clients gPodder (étape 8) | HTTP Basic, mot de passe ou mot de passe d'application |
+| Clients gPodder, Open Podcast API | HTTP Basic avec le mot de passe du compte ou un **mot de passe d'application** (un jeton d'appareil, créé par `POST /me/devices`). `login.json` pose le cookie `sessionid` (chemin `/api/2`, `SameSite=Strict`), que les clients gPodder envoient ensuite seul ; un jeton `Bearer` convient aussi (ADR 0011). |
 
 - **Pas authentifié** : `401` avec `WWW-Authenticate: Bearer realm="podcast"`. Le client léger est redirigé vers `/login`.
 - **Ressource invisible** : `404`, y compris si elle existe mais n'est pas visible pour l'utilisateur.
@@ -121,6 +121,24 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
   - ses templates suivent les droits : `update-playlist`, `add-episode` (statique), `shuffle` (aléatoire), `share`, `publish-feed`, `unpublish-feed`, `delete-playlist` ; ses épisodes portent `remove-from-playlist` et `move-in-playlist` dans une statique modifiable.
 - **Flux RSS de playlists** (ADR 0010) : le lien `feed` (`application/rss+xml`), visible du propriétaire une fois le flux publié, mène à `/feeds/{secret}`. Cette adresse et les enclosures `/feeds/{secret}/episodes/{id}` s'ouvrent sans authentification : le secret en tient lieu.
 - **File d'attente** : `GET /queue` (lien `queue` de la racine) donne les épisodes dans l'ordre d'écoute. Chaque épisode indique `inQueue` et porte `enqueue` (hors de la file), ou `dequeue` et `move` (dans la file). `enqueue` envoie `episodeId` (pré-rempli, `readOnly`) et une `position` facultative : `0` pour « lire ensuite », absente pour la fin de la file.
+
+## API gPodder et Open Podcast API
+
+Ces deux API ne sont **pas hypermédia** : leurs formats sont imposés par les clients existants, en premier lieu AntennaPod (ADR 0011). Elles figurent quand même dans la spécification OpenAPI, sous leurs propres étiquettes, et `ContractTest` les vérifie comme le reste.
+
+- **API gPodder v2**, le sous-ensemble qu'utilise AntennaPod :
+  - `/api/2/auth/{user}/login.json` et `logout.json` ;
+  - `/api/2/devices/{user}.json` et `/api/2/devices/{user}/{device}.json` ;
+  - `/api/2/subscriptions/{user}/{device}.json` (`since`) ;
+  - `/api/2/episodes/{user}.json` (`since`, `podcast`).
+- **Abonnements** : les appareils d'un compte partagent ses abonnements. Le journal `subscription_changes` est tenu par tous les chemins d'abonnement, donc un client gPodder voit ce que font les autres clients, et inversement.
+- **Actions sur les épisodes** :
+  - un état d'écoute est envoyé comme une action `play` (`position = total` pour un épisode écouté) ;
+  - une action reçue s'applique si sa date est la plus récente ;
+  - celle d'un épisode inconnu attend la prochaine lecture de son flux ;
+  - celle qui vise une enclosure de flux de playlist (`/feeds/{secret}/episodes/{id}`) s'applique à cet épisode.
+- **Horodatages** : en secondes Unix ; `since` est inclusif, et une action peut revenir deux fois.
+- **Open Podcast API v1** : `/v1/subscriptions` (pagination `page`, `per_page`, `next`, `previous`), `/v1/subscriptions/{guid}`, `/v1/deletions/{id}`. Le GUID est celui du client, sinon le `podcast:guid` de l'URL du flux. Une entrée supprimée répond `410`.
 
 ## Évolution
 

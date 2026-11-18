@@ -230,9 +230,19 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 8 — Interopérabilité
 
-- [ ] Sous-ensemble de l'API gPodder (abonnements + actions d'épisodes) ; test avec AntennaPod.
-- [ ] Open Podcast API pour les abonnements.
-- [ ] Vérifier OPML et RSS de playlists avec au moins deux clients tiers.
+- [x] Sous-ensemble de l'API gPodder (abonnements + actions d'épisodes) ; test avec AntennaPod. → le sous-ensemble observé sur AntennaPod 3.12.3 (étude 2) ; connexion par mot de passe d'application ; la date la plus récente gagne. Vérifié avec un vrai AntennaPod, dans les deux sens (ADR 0011).
+- [x] Open Podcast API pour les abonnements. → `/v1/subscriptions` et `/v1/deletions`, sur le même journal que gPodder ; aucun client répandu ne l'implémente encore : vérifiée par les tests.
+- [x] Vérifier OPML et RSS de playlists avec au moins deux clients tiers. → AntennaPod (Android) et newsboat (macOS) : import de notre OPML, export relu par le serveur, flux de playlist lu et écouté.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| I1 | API gPodder : connexion (mot de passe ou mot de passe d'application) puis cookie, appareils, abonnements depuis `since`, actions dans les deux sens, action en attente d'un flux pas encore lu, enclosure de playlist | `./gradlew :server:test` (`GpodderTest`, `ContractTest`) |
+| I2 | Open Podcast API : liste paginée, ajout, modification, suppression (410), état de suppression, GUID `podcast:guid` | `./gradlew :server:test` (`OpenPodcastApiTest`, `ContractTest`) |
+| I3 | Mots de passe d'application dans chaque client | `./gradlew :server:test` (`WebTest`, `SdkTest`), captures `settings-*`, `podcast devices add` |
+| I4 | AntennaPod synchronisé : abonnements, positions et « écouté » dans les deux sens | `README.md`, section « Clients tiers » |
+| I5 | OPML et flux RSS de playlist dans AntennaPod et newsboat | `README.md`, section « Clients tiers » |
 
 ## Étape 9 — Confort
 

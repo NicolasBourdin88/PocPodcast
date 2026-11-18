@@ -60,7 +60,8 @@ Autres observations :
   - `new` : non écouté ;
   - `download` et `delete` concernent les fichiers de l'appareil et n'ont pas d'effet ;
   - **règle des conflits : la date la plus récente gagne.** Une action plus ancienne que le dernier changement de l'état (`playback_states.updated_at`) est ignorée ; une action sans date prend celle de sa réception ;
-  - **épisode inconnu** (flux pas encore lu, par exemple juste après un ajout) : l'action est gardée dans `episode_actions`, puis appliquée après la lecture suivante du flux, avec la même règle.
+  - **épisode inconnu** (flux pas encore lu, par exemple juste après un ajout) : l'action est gardée dans `episode_actions`, puis appliquée après la lecture suivante du flux, avec la même règle ;
+  - **écoute à travers un flux de playlist** (ADR 0010) : AntennaPod signale l'épisode avec les adresses du flux de la playlist. Une URL d'enclosure `/feeds/{secret}/episodes/{id}` désigne l'épisode `id`, à qui l'action s'applique.
 - **Actions sur les épisodes envoyées** (`GET … ?since=t`) :
   - le serveur ne garde pas d'historique d'actions : il décrit l'**état actuel** de chaque épisode changé depuis `t`, sous la forme d'une action `play` ;
   - épisode écouté : `started = position = total = durée` ;
@@ -88,4 +89,8 @@ Autres observations :
 - Les routes gPodder et Open Podcast API figurent dans la spécification OpenAPI, sous leurs propres étiquettes. Elles ne sont pas hypermédia : leurs formats sont imposés par les clients existants.
 - **Non synchronisé**, faute d'équivalent dans ces API : la file d'attente, les favoris, les notes, les playlists, et le retour d'un épisode à « non écouté ».
 - Une playlist reste accessible aux clients tiers par son flux RSS (ADR 0010), l'ensemble des abonnements par l'OPML (ADR 0007).
+- **Vérifié avec de vrais clients** :
+  - AntennaPod 3.12.3 sur le serveur de développement, connecté par un mot de passe d'application : abonnements, positions et « écouté » dans les deux sens, écoute à travers un flux de playlist ;
+  - newsboat 2.45.1 : import de notre OPML, export relu par le serveur, flux de playlist avec ses enclosures ;
+  - la même vérification a révélé un défaut du lecteur, corrigé : une position nulle envoyée avant l'ouverture du fichier effaçait celle du serveur.
 - Hors périmètre : abonnements propres à chaque appareil, annuaire et recherche de gpodder.net, extension « Episodes » de l'Open Podcast API quand elle sera publiée.

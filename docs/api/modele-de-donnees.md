@@ -33,6 +33,10 @@ erDiagram
     playlists ||--o| playlist_feeds : "exposée en RSS"
     users ||--o{ shares : "donne"
     users ||--o{ shares : "reçoit"
+    users ||--o{ gpodder_devices : "appareils gPodder"
+    users ||--o{ subscription_changes : "journal des abonnements"
+    users ||--o{ episode_actions : "actions en attente"
+    users ||--o{ subscription_deletions : "suppressions (Open Podcast API)"
 
     users {
         bigint id PK
@@ -160,6 +164,39 @@ erDiagram
         text secret UK "URL à capacité"
         timestamptz created_at
     }
+    gpodder_devices {
+        bigint user_id PK
+        text device_id PK "choisi par le client"
+        text caption
+        text type "mobile, desktop…"
+    }
+    subscription_changes {
+        bigint user_id PK
+        text feed_url PK
+        boolean subscribed
+        timestamptz changed_at "since des clients"
+        text guid "Open Podcast API"
+        timestamptz deleted_at
+    }
+    episode_actions {
+        bigint id PK
+        bigint user_id FK
+        text podcast_url
+        text podcast_key "URL normalisée"
+        text episode_url
+        text guid
+        text action "play | new"
+        int position
+        int total
+        timestamptz happened_at
+        timestamptz received_at
+    }
+    subscription_deletions {
+        bigint id PK
+        bigint user_id FK
+        text feed_url
+        timestamptz deleted_at
+    }
     shares {
         bigint id PK
         text resource_type "SUBSCRIPTION | EPISODE | PLAYLIST"
@@ -187,6 +224,7 @@ erDiagram
 | `shares`, `users.credentials_version` | Partages et droits ; expiration des sessions à chaque nouveau mot de passe | Étape 6 (`V4`) |
 | `playback_states.favorite`, `playback_states.rating` | Favoris et notes de chaque utilisateur | Étape 7 (`V5`) |
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 (`V6`) |
+| `gpodder_devices`, `subscription_changes`, `episode_actions`, `subscription_deletions` | Synchronisation avec les clients tiers (API gPodder, Open Podcast API) | Étape 8 (`V7`) |
 
 ## Règles
 
@@ -212,4 +250,8 @@ erDiagram
   - `keywords` liste les mots-clés séparés par des virgules ; `shuffle_seed` fixe l'ordre `RANDOM` jusqu'au prochain mélange ;
   - un épisode d'une playlist statique n'est jamais purgé ;
   - une playlist disparaît avec son propriétaire, ses épisodes avec leur podcast, et son flux et ses partages avec elle.
+- **Clients tiers** (ADR 0011) :
+  - `subscription_changes` garde, par utilisateur et par URL de flux, le dernier état d'abonnement et sa date. Tous les chemins d'abonnement l'écrivent ; la migration l'a rempli à partir des abonnements existants ;
+  - `episode_actions` ne garde que les actions reçues pour un épisode encore inconnu : elles s'appliquent après la lecture suivante du flux (`podcast_key`) et disparaissent au bout de 30 jours sinon ;
+  - les autres actions modifient directement `playback_states`, si leur date est postérieure à `updated_at`.
 - **Mots de passe** : `credentials_version` augmente à chaque nouveau mot de passe. Une session du client léger porte la version de sa connexion et n'est plus acceptée ensuite.
