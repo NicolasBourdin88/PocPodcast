@@ -95,7 +95,7 @@ class WebTest {
         val queue = page("/fragments/queue")
         assertTrue(queue.indexOf("KMP in production") < queue.indexOf("Compose Multiplatform for iOS is stable"))
         assertContains(queue, "hx-delete=\"/queue/1\"")
-        assertContains(queue, "Monter dans la file")
+        assertContains(queue, ">Monter<")
 
         // Without HX-Request a session cannot change the queue (CSRF, ADR 0005).
         assertEquals(HttpStatusCode.Forbidden, browser.submitForm("/queue", parameters { append("episodeId", "4") }).status)

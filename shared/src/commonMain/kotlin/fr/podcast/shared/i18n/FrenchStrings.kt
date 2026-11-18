@@ -220,7 +220,7 @@ object FrenchStrings : Strings {
     override val addToQueue = "Ajouter à la file d'attente"
     override val removeFromQueue = "Retirer de la file d'attente"
     override val playNext = "Lire ensuite"
-    override val moveUp = "Monter dans la file"
+    override val moveUp = "Monter"
     override val clearQueue = "Vider la file d'attente"
     override val playbackFailed = "Impossible de lire cet épisode."
 
