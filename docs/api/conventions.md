@@ -16,12 +16,13 @@ Les réponses portent `Vary: Accept, Accept-Language`. Le JSON est **neutre en l
 
 Sans type précis (`*/*`), la réponse est du JSON, sauf pour htmx : une requête `HX-Request` reçoit du HTML tant qu'elle ne demande pas explicitement du JSON. C'est ce qui permet la navigation boostée du client léger.
 
-Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque (`/subscriptions`) et les Réglages (`/me`). Les autres arrivent avec leurs fonctionnalités.
+Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque (`/subscriptions`), les Playlists (`/playlists` et `/playlists/{id}`) et les Réglages (`/me`). Les autres arrivent avec leurs fonctionnalités.
 
 **Client léger (htmx)** : une action envoyée par htmx (`HX-Request`) reçoit un **fragment HTML** à insérer, par exemple la phrase qui dit ce qui a été fait.
 - **Refus** : il garde son statut (403, 404, 422, 429), mais son corps est la phrase que les apps afficheraient, traduite avec la même correspondance que le SDK. La page configure htmx (`responseHandling`) pour insérer ces réponses-là à côté du formulaire.
 - **Refus plus anciens** : l'abonnement à un flux et l'import OPML répondent encore `200` avec un fragment d'erreur.
-- **Rechargements** : quand une action change une liste, l'en-tête `HX-Trigger` demande à la page de la recharger : `subscriptions-changed`, `queue-changed`, `episodes-changed`, `shares-changed`, `users-changed`, `devices-changed`.
+- **Rechargements** : quand une action change une liste, l'en-tête `HX-Trigger` demande à la page de la recharger : `subscriptions-changed`, `queue-changed`, `episodes-changed`, `shares-changed`, `users-changed`, `devices-changed`, `playlists-changed`.
+- **Changement de page** : quand l'action crée, renomme ou supprime ce que montre la page (une playlist), la réponse porte `HX-Location` vers la page à afficher. htmx la charge comme un lien boosté, sans arrêter le lecteur.
 
 **Lecteur du client léger** : un `<audio>` dans un pied de page `hx-preserve`, conservé de page en page grâce à `hx-boost` sur la navigation, et piloté par `static/player.js`. Ses requêtes de modification portent aussi `HX-Request`.
 
@@ -29,7 +30,7 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque 
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, `users`, `shared`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`), `podcast` (`/podcasts/{id}`), `subscription` (`/subscriptions/{id}`) et `share` (`/shares/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
+- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, `users`, `shared`, `playlists`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`), `podcast` (`/podcasts/{id}`), `subscription` (`/subscriptions/{id}`), `share` (`/shares/{id}`) et `playlist` (`/playlists/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
 - **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
@@ -83,6 +84,8 @@ Le format des erreurs est **Problem Details** (RFC 9457), en `application/proble
 
 Les erreurs de validation (`422`) ajoutent `errors: [{ "field": "positionSeconds", "message": "…" }]`.
 
+Une action permise mais incompatible avec l'état de la ressource répond `409` : changer un à un les épisodes d'une playlist dynamique, mélanger une playlist qui n'est pas en ordre aléatoire. Les templates ne la proposent pas dans ce cas.
+
 Quand le client doit réagir différemment selon la cause, `type` la nomme. Le SDK la garde (`ApiException.Rejected`) et la traduit pour l'utilisateur.
 
 | `type` | Statut | Cause |
@@ -111,6 +114,12 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
   - un abonnement porte `access` (`OWNER`, `WRITE`, `READ`) et `ownerName` quand il est partagé avec l'utilisateur ; ses templates suivent ces droits (`update`, `unsubscribe`, `share`, `subscribe`) ;
   - `share` (`userId`, `permission`, `message`) et `recommend` (`userId`, `message`) créent un partage ; le même destinataire une seconde fois remplace le droit et le message ;
   - `GET /shared` donne ce que les autres partagent avec l'utilisateur ; `/shares/{id}` porte `unshare` (propriétaire et destinataire) et `change-permission` (propriétaire, sauf une recommandation).
+- **Favoris et notes** (ADR 0010) : un épisode porte `favorite` et `rating` (1 à 5, absent s'il n'est pas noté), propres à l'utilisateur, et les templates `favorite` ou `unfavorite`, `rate` (`rating`) et `clear-rating`.
+- **Playlists** (ADR 0010) :
+  - `GET /playlists` donne les playlists de l'utilisateur et porte `create-playlist` (`title`, `description`, `kind`, et pour une dynamique `keywords`, `favoritesOnly`, `minRating`, `unplayedOnly`, `order`, `limit`) ;
+  - une playlist embarque ses épisodes dans l'ordre d'écoute, avec l'état de l'utilisateur, et porte `kind`, `rules` (dynamique), `episodeCount`, `access` et `ownerName` (partagée) ;
+  - ses templates suivent les droits : `update-playlist`, `add-episode` (statique), `shuffle` (aléatoire), `share`, `publish-feed`, `unpublish-feed`, `delete-playlist` ; ses épisodes portent `remove-from-playlist` et `move-in-playlist` dans une statique modifiable.
+- **Flux RSS de playlists** (ADR 0010) : le lien `feed` (`application/rss+xml`), visible du propriétaire une fois le flux publié, mène à `/feeds/{secret}`. Cette adresse et les enclosures `/feeds/{secret}/episodes/{id}` s'ouvrent sans authentification : le secret en tient lieu.
 - **File d'attente** : `GET /queue` (lien `queue` de la racine) donne les épisodes dans l'ordre d'écoute. Chaque épisode indique `inQueue` et porte `enqueue` (hors de la file), ou `dequeue` et `move` (dans la file). `enqueue` envoie `episodeId` (pré-rempli, `readOnly`) et une `position` facultative : `0` pour « lire ensuite », absente pour la fin de la file.
 
 ## Évolution

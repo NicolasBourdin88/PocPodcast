@@ -108,6 +108,8 @@ erDiagram
         int position_seconds
         text status "NEW | IN_PROGRESS | PLAYED"
         boolean kept "jamais purgé"
+        boolean favorite "étape 7"
+        int rating "1 à 5, ou absente"
         timestamptz updated_at
     }
     queue_items {
@@ -135,17 +137,28 @@ erDiagram
         bigint id PK
         bigint owner_id FK
         text title
+        text description
         text kind "STATIC | DYNAMIC"
-        jsonb rules "playlists dynamiques"
+        text keywords "règles d'une dynamique"
+        boolean favorites_only
+        int min_rating "0 = toutes"
+        boolean unplayed_only
+        text sort_order "NEWEST | OLDEST | RANDOM"
+        int max_episodes "1 à 100"
+        int shuffle_seed "ordre aléatoire"
+        timestamptz created_at
+        timestamptz updated_at
     }
     playlist_items {
         bigint playlist_id PK
         bigint episode_id PK
-        int position
+        int position "0 = premier"
+        timestamptz added_at
     }
     playlist_feeds {
         bigint playlist_id PK
         text secret UK "URL à capacité"
+        timestamptz created_at
     }
     shares {
         bigint id PK
@@ -172,13 +185,15 @@ erDiagram
 | `queue_items` | File d'attente de chaque utilisateur (« à suivre ») | Étape 5 (`V3`) |
 | `server_secrets` | Clés générées par le serveur (signature des liens audio) | Étape 5 (`V3`) |
 | `shares`, `users.credentials_version` | Partages et droits ; expiration des sessions à chaque nouveau mot de passe | Étape 6 (`V4`) |
-| `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 |
+| `playback_states.favorite`, `playback_states.rating` | Favoris et notes de chaque utilisateur | Étape 7 (`V5`) |
+| `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 (`V6`) |
 
 ## Règles
 
 - **Absence d'état** : un épisode sans ligne dans `playback_states` vaut `NEW`, position 0.
 - **Écouté** : marquer un épisode comme écouté met `status = PLAYED` et `position_seconds = duration_seconds`. Le marquer comme non écouté remet `NEW` et la position à 0, sans supprimer la ligne, qui garde `kept` (étape 4).
 - **Gardé** : `kept` est propre à chaque utilisateur. Un fichier gardé par au moins un utilisateur n'est jamais purgé (ADR 0007).
+- **Favoris et notes** : `favorite` et `rating` sont propres à chaque utilisateur, comme `kept`. Les marquer crée la ligne d'état si l'épisode n'en a pas encore.
 - **Suppression d'un podcast** : quand son dernier abonné se désabonne, le podcast est supprimé avec ses épisodes, leurs transcriptions, leurs fichiers et les états d'écoute qui s'y rapportent (`ON DELETE CASCADE`, fichiers effacés du disque avant).
 - **Lecture des flux** : `refresh_status` vaut `PENDING` tant que le flux n'a jamais été lu (import OPML), `FAILED` si la dernière lecture a échoué (`refresh_error` dit pourquoi). `last_attempt_at` règle le rafraîchissement périodique.
 - **Unicité** : `(podcast_id, guid)` identifie un épisode lors des rafraîchissements du flux. `feed_url` identifie un podcast ; elle suit les déménagements du flux.
@@ -192,4 +207,9 @@ erDiagram
   - un seul par ressource, propriétaire et destinataire : partager de nouveau met à jour le droit et le message ;
   - on ne partage pas avec soi-même (`CHECK owner_id <> grantee_id`) ;
   - ils disparaissent avec ce qu'ils partagent : avec l'abonnement quand on s'en désabonne, avec les épisodes d'un podcast supprimé, et avec le compte du propriétaire ou du destinataire (`ON DELETE CASCADE`).
+- **Playlists** (ADR 0010) :
+  - une playlist statique ordonne ses épisodes dans `playlist_items` (positions denses à partir de 0, comme la file d'attente) ; une dynamique n'y a rien, ses règles sont dans `playlists` et ses épisodes sont calculés à chaque lecture sur les abonnements, favoris, notes et statuts de son propriétaire ;
+  - `keywords` liste les mots-clés séparés par des virgules ; `shuffle_seed` fixe l'ordre `RANDOM` jusqu'au prochain mélange ;
+  - un épisode d'une playlist statique n'est jamais purgé ;
+  - une playlist disparaît avec son propriétaire, ses épisodes avec leur podcast, et son flux et ses partages avec elle.
 - **Mots de passe** : `credentials_version` augmente à chaque nouveau mot de passe. Une session du client léger porte la version de sa connexion et n'est plus acceptée ensuite.

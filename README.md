@@ -165,6 +165,26 @@ cli/build/install/podcast/bin/podcast share 2 bob --write --message "Pour le tra
 
 Ensuite : `share 2` (avec qui il est partagé), `unshare 2 bob`, `shared` puis `shared remove 1`, `recommend 3 alice`, `profile --name …`, `passwd`, `devices` puis `devices revoke 2`, et pour un administrateur `users`, `users add carol --name Carol`, `users role 3 admin`, `users passwd 3`, `users remove 3 --yes`.
 
+## Playlists
+
+Une playlist est **statique** (on choisit ses épisodes et leur ordre) ou **dynamique** : des règles choisissent parmi les abonnements de son propriétaire (mots-clés, favoris, note minimale, non écoutés), du plus récent au plus ancien ou au hasard ([ADR 0010](docs/adr/0010-playlists.md)).
+
+- **Favoris et notes** : le cœur et les étoiles d'un épisode sont propres à chaque compte ; les playlists dynamiques s'en servent.
+- **Tout lire** : lance le premier épisode et place les suivants en tête de la file d'attente.
+- **Partager** : comme un abonnement, en lecture seule ou en modification (titre, règles, épisodes). Seul le propriétaire la partage, publie son flux ou la supprime.
+- **Flux RSS** : le propriétaire publie la playlist à une adresse secrète, à donner à n'importe quelle appli de podcasts. « Nouvelle adresse » rend l'ancienne inutilisable.
+- **Purge** : un épisode d'une playlist statique n'est jamais retiré du serveur.
+- **Où** :
+  - apps : onglet Playlists ; sur chaque épisode et dans le lecteur, le cœur, les étoiles et « Ajouter à une playlist » ;
+  - client léger : Playlists dans le menu ; sur l'Accueil, le cœur, la note et « Ajouter à une playlist » sous chaque épisode ;
+  - CLI : les commandes ci-dessous.
+
+```bash
+cli/build/install/podcast/bin/podcast playlists create Kotlin --keywords "kotlin, ktor" --unplayed
+```
+
+Ensuite : `playlists` (les siennes puis celles partagées, numérotées), `playlists show 1`, `playlists play 1`, `playlists create Pour le train` puis `playlists add 2 4` (épisode n° 4 de `list`), `playlists move 2 3 1`, `playlists remove 2 1`, `playlists edit 1 --order random --limit 20`, `playlists shuffle 1`, `playlists share 1 bob --write`, `playlists feed 1` (`--renew`, `--off`), `playlists delete 1 --yes`, `favorite 3` (`--off` pour le retirer), `rate 3 4` (`0` efface la note).
+
 ## Tests
 
 ```bash

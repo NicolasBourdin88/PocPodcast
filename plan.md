@@ -210,10 +210,23 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 7 — Playlists
 
-- [ ] Playlists statiques.
-- [ ] Playlists dynamiques : mots-clés, favoris / notes, aléatoire.
-- [ ] Partage de playlists.
-- [ ] Chaque playlist exposée en **flux RSS** (enclosures vers les fichiers hébergés).
+- [x] Playlists statiques. → épisodes choisis et ordonnés ; un épisode qui y figure n'est jamais purgé (ADR 0010).
+- [x] Playlists dynamiques : mots-clés, favoris / notes, aléatoire. → règles calculées sur les abonnements du propriétaire, ordre aléatoire stable jusqu'au prochain « Mélanger ». **Favoris et notes sont avancés de l'étape 9** pour cela.
+- [x] Partage de playlists. → même table et même règle `can()` qu'à l'étape 6 : lecture, ou modification du titre, des règles et des épisodes.
+- [x] Chaque playlist exposée en **flux RSS** (enclosures vers les fichiers hébergés). → adresse secrète publiée par le propriétaire, renouvelable ; enclosures servies par le serveur et limitées aux épisodes de la playlist.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| P1 | Favoris et notes par utilisateur ; playlists statiques et dynamiques (mots-clés, favoris, note minimale, non écoutés, ordre), aléatoire stable jusqu'au mélange, 409 pour ce qu'une dynamique ne permet pas | `./gradlew :server:test` (`EpisodeMarksTest`, `PlaylistsTest`) |
+| P2 | Partage d'une playlist : lecture seule, modification, 404 et 403 | `./gradlew :server:test` (`SharingTest`, `ContractTest`) |
+| P3 | Flux RSS : adresse secrète, nouvelle adresse, retrait, relu par l'analyseur RSS du serveur ; enclosures limitées à la playlist | `./gradlew :server:test` (`PlaylistFeedTest`) |
+| P4 | Purge : un épisode d'une playlist statique n'est pas purgé | `./gradlew :server:test` (`DownloadsTest`) |
+| P5 | SDK de bout en bout ; la démo a ses playlists, dont une partagée par Bob | `./gradlew :server:test` (`SdkTest`), `./gradlew :shared:jvmTest` |
+| P6 | Client léger : pages Playlists, « Tout lire », partage, flux, ajout et note depuis l'Accueil | `./gradlew :server:test` (`WebTest`), puis http://localhost:8080/playlists |
+| P7 | Apps : destination Playlists, création et modification, ajout depuis un épisode, cœur et étoiles | `./gradlew :composeApp:desktopTest` (captures `playlist*`), puis chaque app |
+| P8 | CLI : `playlists …`, `favorite`, `rate` | `./gradlew :cli:test`, voir `README.md` |
 
 ## Étape 8 — Interopérabilité
 
@@ -224,7 +237,7 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 ## Étape 9 — Confort
 
 - [ ] Recherche et filtres multicritères (note, description, date, statut, mots-clés).
-- [ ] Notation, favoris, tags.
+- [ ] Notation, favoris, tags. → notation et favoris faits à l'étape 7 (ADR 0010) ; restent les tags.
 - [ ] Statistiques d'écoute.
 
 ## Étape 10 — Finition

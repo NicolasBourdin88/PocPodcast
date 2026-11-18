@@ -74,7 +74,7 @@ Un fichier n'est **jamais** purgé tant que :
 - quelqu'un a l'épisode **en cours d'écoute** et l'a écouté pendant la durée de rétention ;
 - l'épisode est dans la **file d'attente** de quelqu'un (étape 5, ADR 0008).
 
-Les épisodes **en playlist** rejoindront ces exceptions à l'étape 7.
+Les épisodes d'une **playlist statique** ont rejoint ces exceptions à l'étape 7 (ADR 0010).
 
 Quand le dernier abonné se désabonne, le podcast, ses épisodes et ses fichiers sont supprimés.
 
@@ -83,5 +83,5 @@ Quand le dernier abonné se désabonne, le podcast, ses épisodes et ses fichier
 - **Clients simples** : ils ne contactent ni les annuaires ni les flux, seulement leur serveur. Seuls les chapitres et transcriptions sont chargés chez l'éditeur, ce qui lui révèle l'adresse IP du client ; un relais par le serveur reste possible plus tard.
 - **Risque résiduel SSRF** : l'adresse est vérifiée, puis résolue à nouveau par le client HTTP au moment de la connexion. Un DNS malveillant (*DNS rebinding*) pourrait changer de réponse entre les deux. Pour un serveur auto-hébergé par un groupe, le risque est accepté ; le corriger demanderait de fixer l'adresse résolue dans le moteur HTTP.
 - **Disque** : le volume dépend des demandes, pas du nombre d'utilisateurs. La rétention et le quota sont réglables, et ce qui est gardé échappe au quota : un administrateur peut donc le dépasser.
-- **Étape 7** : la requête de purge (`purgeCandidates`) devra exclure les épisodes en playlist.
+- **Étape 7** : la requête de purge (`purgeCandidates`) exclut les épisodes des playlists statiques (ADR 0010).
 - **Tests sans réseau** : les flux de test sont servis par un faux hôte (`https://feeds.test`, `MockEngine`), ainsi que les réponses d'Apple Podcasts et de Podcast Index. Le serveur de développement lit, lui, de vrais flux.

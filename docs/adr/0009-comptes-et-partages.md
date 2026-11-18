@@ -41,7 +41,7 @@ L'ADR 0005 a déjà fixé la table `shares`, la règle unique `can()` et le choi
 |---|---|---|
 | Abonnement | `READ`, `WRITE` | Changer la note et le téléchargement automatique |
 | Épisode | `READ` seulement : une **recommandation**, avec un message | — |
-| Playlist | `READ`, `WRITE` | Étape 7 |
+| Playlist | `READ`, `WRITE` | Changer le titre, les règles et les épisodes, mélanger (étape 7, ADR 0010) |
 
 - **Une seule table** `shares(resource_type, resource_id, owner_id, grantee_id, permission, message)`. Partager de nouveau avec la même personne remplace le droit et le message.
 - **Pas de désabonnement ni de repartage** pour un destinataire, même en `WRITE` : `DELETE` et `SHARE` restent au propriétaire et aux administrateurs (`can()`, ADR 0005).
