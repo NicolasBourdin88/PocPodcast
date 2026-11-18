@@ -1,6 +1,7 @@
 package fr.podcast.server.dev
 
 import fr.podcast.server.ServerConfig
+import fr.podcast.server.auth.Accounts
 import fr.podcast.server.db.ServerDatabase
 import fr.podcast.server.feeds.FeedFetcher
 import fr.podcast.server.feeds.FeedRefresher
@@ -16,6 +17,8 @@ import java.nio.file.Path
  * `./gradlew :server:run`: starts the server with an embedded PostgreSQL (no Docker needed)
  * kept in `server/build/dev-postgres-<port>`, and demo data read from real feeds on first start
  * (see [DevSeed]). Downloaded files go to `server/build/dev-media-<port>`.
+ *
+ * In the browser, `/dev/login/alice` signs in without a password, from this machine only ([devLogin]).
  *
  * With DATABASE_URL set, uses that database instead. PORT and SERVER_NAME allow running a
  * second server (e.g. `PORT=8081 SERVER_NAME="Serveur B"`) to try multi-server clients.
@@ -38,7 +41,8 @@ fun main() {
     client.close()
     println("Serveur « ${config.name} » : http://localhost:${config.port} — API : http://localhost:${config.port}/docs")
     println("Comptes de démo : voir server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt")
-    startServer(config, database)
+    println("Client léger sans mot de passe, depuis cette machine : http://localhost:${config.port}/dev/login/${DevSeed.ALICE} (ou ${DevSeed.BOB})")
+    startServer(config, database) { devLogin(Accounts(database)) }
 }
 
 private fun embeddedDatabase(port: Int): ServerDatabase {

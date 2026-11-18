@@ -185,8 +185,12 @@ suspend fun bootstrapAdmin(accounts: Accounts, username: String?, password: Stri
     return accounts.create(username, username, password, Role.ADMIN)
 }
 
-fun startServer(config: ServerConfig, database: ServerDatabase) {
-    embeddedServer(Netty, port = config.port, host = config.host) { module(config, database) }.start(wait = true)
+/** Serves the API; [extra] adds to it, such as the development server's sign-in link. */
+fun startServer(config: ServerConfig, database: ServerDatabase, extra: Application.() -> Unit = {}) {
+    embeddedServer(Netty, port = config.port, host = config.host) {
+        module(config, database)
+        extra()
+    }.start(wait = true)
 }
 
 fun Application.module(config: ServerConfig, database: ServerDatabase, outgoing: HttpClient = outgoingHttpClient()) =

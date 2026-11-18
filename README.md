@@ -40,10 +40,12 @@ L'interface existe en français et en anglais. Les textes, les couleurs et la na
 ./gradlew :server:run
 ```
 
-- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer, Bibliothèque et Réglages)
+- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer, Bibliothèque, Playlists et Réglages)
 - http://localhost:8080/docs : documentation de l'API (Swagger UI)
 
 Au premier lancement, un PostgreSQL embarqué est créé dans `server/build/dev-postgres-8080`, avec des données de démo lues dans de **vrais flux** (Les Cast Codeurs, Talking Kotlin, Fragmented, Podnews Weekly Review, qui a des chapitres et des transcriptions). Sans réseau, les podcasts sont créés vides et lus plus tard. Les **comptes de démo** sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt) : Alice est abonnée aux quatre podcasts, Bob à deux, chacun avec sa propre progression. Les fichiers téléchargés vont dans `server/build/dev-media-8080`.
+
+Sans mot de passe, depuis cette machine seulement, http://localhost:8080/dev/login/alice (ou `bob`) connecte le navigateur au compte de démo ; `?next=/playlists` choisit la page d'arrivée. Ce lien n'existe que sur le serveur de développement (source set `dev`), pas dans la distribution.
 
 Pour repartir de zéro, on arrête le serveur et on supprime ces deux dossiers.
 
