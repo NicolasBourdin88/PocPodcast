@@ -29,7 +29,7 @@ fun renderHomeText(state: HomeState, strings: Strings): String = buildString {
     state.latest.forEach { item ->
         val episode = item.episode
         appendLine("${label(++number)} ${strings.shortDate(episode.publishedOn()).padEnd(8)} ${episode.title}")
-        appendLine("    ${" ".repeat(8)} ${item.podcast.title} · ${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}${marks(episode, strings)}")
+        appendLine("    ${" ".repeat(8)} ${item.podcast.title} · ${strings.duration(episode.durationSeconds)} · ${(listOf(strings.status(episode)) + strings.marks(episode)).joinToString(" · ")}")
     }
 }.trimEnd()
 

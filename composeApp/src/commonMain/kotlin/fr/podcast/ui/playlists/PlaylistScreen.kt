@@ -250,7 +250,7 @@ private fun PlaylistEpisode(item: EpisodeItem, onMoveUp: (() -> Unit)?, onRemove
         headlineContent = { Text(item.episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(strings.status(item.episode), modifier = Modifier.weight(1f, fill = false))
+                Text((listOf(strings.status(item.episode)) + strings.marks(item.episode)).joinToString(" · "), modifier = Modifier.weight(1f, fill = false))
                 onMoveUp?.let { IconButton(onClick = it) { Icon(Icons.Default.KeyboardArrowUp, contentDescription = strings.moveUp) } }
                 onRemove?.let { IconButton(onClick = it) { Icon(Icons.Default.Close, contentDescription = strings.removeFromPlaylist) } }
             }

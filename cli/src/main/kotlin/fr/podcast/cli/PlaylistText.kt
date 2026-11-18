@@ -2,7 +2,6 @@ package fr.podcast.cli
 
 import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.model.Access
-import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.Playlist
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.repository.PlaylistDetails
@@ -45,7 +44,7 @@ fun renderPlaylistText(position: Int, details: PlaylistDetails, strings: Strings
     details.episodes.forEachIndexed { index, item ->
         val episode = item.episode
         appendLine("${number(index)} ${episode.title} — ${item.podcast.title}")
-        appendLine("    ${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}${marks(episode, strings)}")
+        appendLine("    ${strings.duration(episode.durationSeconds)} · ${(listOf(strings.status(episode)) + strings.marks(episode)).joinToString(" · ")}")
     }
 }.trimEnd()
 
@@ -56,7 +55,3 @@ private fun summary(playlist: Playlist, strings: Strings): String = listOfNotNul
     strings.playlistKind(playlist.kind),
     strings.episodeCount(playlist.episodeCount),
 ).joinToString(" · ")
-
-/** " · ♥ · ★★★★☆": the user's favorite and rating, when they gave them. */
-internal fun marks(episode: Episode, strings: Strings): String =
-    listOfNotNull("♥".takeIf { episode.favorite }, episode.rating?.let(strings::stars)).joinToString("") { " · $it" }

@@ -298,7 +298,7 @@ private fun UL.playlistEpisodeRow(playlistId: String, item: EpisodeItem, index: 
         div("card-body") {
             span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn())}" }
             span("title") { +episode.title }
-            span("meta") { +strings.status(episode) }
+            span("meta") { +(listOf(strings.status(episode)) + strings.marks(episode)).joinToString(" · ") }
             if (editable) {
                 div("actions") {
                     if (index > 0) {

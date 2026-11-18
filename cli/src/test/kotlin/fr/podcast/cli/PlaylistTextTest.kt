@@ -29,7 +29,7 @@ class PlaylistTextTest {
         val text = renderPlaylistText(1, client.playlist("pl2")!!, french)
         assertContains(text, " 1. Kotlin — Dynamique · 2 épisodes")
         assertContains(text, " 1. Compose Multiplatform for iOS is stable — Talking Kotlin\n    52 min · Nouveau · ★★★★☆")
-        assertContains(text, " 2. LCC 330 - Les nouveautés de Kotlin 2.4 — Les Cast Codeurs\n    1 h 35 · 57 min restantes · ♥")
+        assertContains(text, " 2. LCC 330 - Les nouveautés de Kotlin 2.4 — Les Cast Codeurs\n    1 h 35 · 57 min restantes · Favori")
         assertFalse(text.contains("Flux RSS"))
 
         // Only its owner sees the feed, once published.

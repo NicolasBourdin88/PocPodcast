@@ -118,14 +118,12 @@ private fun UL.episodeRow(item: EpisodeItem, extras: HomeExtras, strings: String
             span("overline") { +"${item.podcast.title} · ${strings.shortDate(episode.publishedOn())}" }
             a(href = "/episodes/${episode.id}", classes = "title") { +episode.title }
             span("meta") {
-                +listOfNotNull(
+                val details = listOfNotNull(
                     strings.duration(episode.durationSeconds).takeIf { episode.durationSeconds > 0 },
                     strings.status(episode),
                     strings.kept.takeIf { episode.kept },
-                    strings.favorite.takeIf { episode.favorite },
-                    episode.rating?.let(strings::stars),
-                    strings.fileStatus(episode.fileStatus),
-                ).joinToString(" · ")
+                ) + strings.marks(episode) + listOfNotNull(strings.fileStatus(episode.fileStatus))
+                +details.joinToString(" · ")
             }
             // Same affordances as the HAL-FORMS templates; those without input become buttons.
             div("actions") {

@@ -97,7 +97,7 @@ private fun TuiScreen(state: HomeState, playback: PlaybackController, strings: S
             val index = state.resume.size + offset
             EpisodeLine(index, item, selected == index, nowPlaying)
             Text(
-                "      ${item.podcast.title} · ${strings.shortDate(item.episode.publishedOn())} · ${strings.duration(item.episode.durationSeconds)} · ${strings.status(item.episode)}",
+                "      ${item.podcast.title} · ${strings.shortDate(item.episode.publishedOn())} · ${strings.duration(item.episode.durationSeconds)} · ${(listOf(strings.status(item.episode)) + strings.marks(item.episode)).joinToString(" · ")}",
                 textStyle = TextStyle.Dim,
             )
         }

@@ -112,7 +112,7 @@ private fun EpisodeRow(item: EpisodeItem) {
         leadingContent = { Artwork(item.podcast, size = 48.dp) },
         overlineContent = { Text("${item.podcast.title} · ${strings.shortDate(episode.publishedOn())}") },
         headlineContent = { Text(episode.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text("${strings.duration(episode.durationSeconds)} · ${strings.status(episode)}") },
+        supportingContent = { Text((listOf(strings.duration(episode.durationSeconds), strings.status(episode)) + strings.marks(episode)).joinToString(" · ")) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QueueToggleButton(episode.id)

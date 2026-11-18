@@ -127,6 +127,9 @@ interface Strings {
     /** A rating as stars, "★★★★☆" (the same in every language). */
     fun stars(rating: Int): String = rating.coerceIn(0, 5).let { "★".repeat(it) + "☆".repeat(5 - it) }
 
+    /** The user's own marks of an episode, shown after its status: "Favorite", "★★★★☆". */
+    fun marks(episode: Episode): List<String> = listOfNotNull(favorite.takeIf { episode.favorite }, episode.rating?.let(::stars))
+
     // Playlists (ADR 0010)
     val newPlaylist: String
     val playlistTitle: String
