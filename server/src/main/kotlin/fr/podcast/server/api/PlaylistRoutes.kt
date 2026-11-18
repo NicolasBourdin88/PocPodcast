@@ -11,6 +11,11 @@ import fr.podcast.server.feeds.Enclosure
 import fr.podcast.server.feeds.PlaylistFeed
 import fr.podcast.server.hal.playlistCollection
 import fr.podcast.server.hal.playlistResource
+import fr.podcast.server.html.PlaylistPage
+import fr.podcast.server.html.playlistPage
+import fr.podcast.server.html.playlistsPage
+import fr.podcast.server.http.Representation
+import fr.podcast.server.web.language
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.isHtmx
 import fr.podcast.server.http.representation
@@ -20,12 +25,14 @@ import fr.podcast.shared.model.PlaylistKind
 import fr.podcast.shared.model.PlaylistLimits
 import fr.podcast.shared.model.PlaylistOrder
 import fr.podcast.shared.model.PlaylistRules
+import fr.podcast.shared.model.ShareType
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.withCharset
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
@@ -85,6 +92,11 @@ fun Route.playlistRoutes(services: ServerServices) {
         get("/playlists") {
             val user = call.user
             val representation = call.representation()
+            if (representation == Representation.Html) {
+                val own = playlists.playlistsOf(user)
+                val shared = services.sharing.received(user).filter { it.playlist != null }
+                return@get call.respondHtml { playlistsPage(own, shared, call.language(), user) }
+            }
             call.respondResource(playlistCollection(playlists.playlistsOf(user), user, representation.forms, services.audioLinks), representation)
         }
 
@@ -92,6 +104,7 @@ fun Route.playlistRoutes(services: ServerServices) {
             val user = call.mutatingUser() ?: return@post
             val request = call.receivePlaylistRequest(current = null) ?: return@post
             val id = playlists.create(user.id, request.title, request.description, request.kind, request.rules)
+            if (call.isHtmx) return@post call.respondLocation("/playlists/$id")
             call.response.header(HttpHeaders.Location, "/playlists/$id")
             call.respondPlaylist(id, user, HttpStatusCode.Created)
         }
@@ -100,6 +113,19 @@ fun Route.playlistRoutes(services: ServerServices) {
             val user = call.user
             val view = call.visiblePlaylist(user) ?: return@get
             val representation = call.representation()
+            if (representation == Representation.Html) {
+                val owner = user.can(Action.SHARE, view.ownerId, view.permission)
+                val page = PlaylistPage(
+                    view = view,
+                    episodes = playlists.episodes(view, user.id),
+                    canModify = user.can(Action.MODIFY, view.ownerId, view.permission),
+                    owner = owner,
+                    shares = if (owner) services.sharing.sharesOf(ShareType.PLAYLIST, view.id) else emptyList(),
+                    others = if (owner) services.accounts.users().filter { it.id != view.ownerId } else emptyList(),
+                    feedUrl = view.feedSecret?.takeIf { owner }?.let { "${call.baseUrl()}/feeds/$it" },
+                )
+                return@get call.respondHtml { playlistPage(page, call.language(), user, services.audioLinks) }
+            }
             call.respondResource(playlistResource(view, user, representation.forms, services.audioLinks, playlists.episodes(view, user.id)), representation)
         }
 
@@ -108,6 +134,8 @@ fun Route.playlistRoutes(services: ServerServices) {
             val view = call.playlistFor(user, Action.MODIFY) ?: return@patch
             val request = call.receivePlaylistRequest(current = view.playlist) ?: return@patch
             playlists.update(view.id, request.title, request.description, request.rules)
+            // The title is also the page's: the page is read again.
+            if (call.isHtmx) return@patch call.respondLocation("/playlists/${view.id}")
             call.respondPlaylist(view.id, user)
         }
 
@@ -115,6 +143,7 @@ fun Route.playlistRoutes(services: ServerServices) {
             val user = call.mutatingUser() ?: return@delete
             val view = call.playlistFor(user, Action.DELETE) ?: return@delete
             playlists.delete(view.id)
+            if (call.isHtmx) return@delete call.respondLocation("/playlists")
             call.respondChanged("playlists-changed")
         }
 
@@ -134,7 +163,7 @@ fun Route.playlistRoutes(services: ServerServices) {
                     HttpStatusCode.UnprocessableEntity, "Unknown episode", listOf(FieldError("episodeId", "an existing episode expected")),
                 )
             }
-            if (call.isHtmx) return@post call.respondChanged("playlists-changed")
+            if (call.isHtmx) return@post call.respondNotice(call.language().strings.addedTo(view.playlist.title), "playlists-changed")
             call.respondPlaylist(view.id, user)
         }
 

@@ -131,8 +131,8 @@ private fun UL.subscriptionRow(item: SubscriptionItem, shares: List<ShareRecord>
                     +strings.unsubscribe
                 }
             }
-            if (shares.isNotEmpty()) sharedWith(shares, strings)
-            if (others.isNotEmpty()) shareForm(subscription.id, others, strings)
+            if (shares.isNotEmpty()) sharedWith(shares, strings, "#library-notice")
+            if (others.isNotEmpty()) shareForm("/subscriptions/${subscription.id}/shares", others, strings, "#library-notice")
         }
     }
 }
@@ -164,8 +164,11 @@ private fun FlowContent.autoDownloadToggle(subscription: Subscription, strings: 
     }
 }
 
-/** Whom the owner shares a subscription with: what each may do (`change-permission`), or stop (`unshare`). */
-private fun FlowContent.sharedWith(shares: List<ShareRecord>, strings: Strings) {
+/**
+ * Whom the owner shares a subscription or a playlist with: what each may do (`change-permission`), or
+ * stop (`unshare`); answers appear in [notice].
+ */
+internal fun FlowContent.sharedWith(shares: List<ShareRecord>, strings: Strings, notice: String) {
     div("shared-with") {
         span("meta") { +strings.sharedWith }
         ul {
@@ -177,7 +180,7 @@ private fun FlowContent.sharedWith(shares: List<ShareRecord>, strings: Strings) 
                         name = "permission"
                         attributes["aria-label"] = strings.sharePermission
                         attributes["hx-patch"] = "/shares/${share.id}"
-                        attributes["hx-target"] = "#library-notice"
+                        attributes["hx-target"] = notice
                         permissionOptions(share.permission, strings)
                     }
                     button(classes = "link danger") {
@@ -191,13 +194,13 @@ private fun FlowContent.sharedWith(shares: List<ShareRecord>, strings: Strings) 
     }
 }
 
-/** The `share` template: with whom, what they may do, and a word. */
-private fun FlowContent.shareForm(subscriptionId: String, others: List<UserAccount>, strings: Strings) {
+/** The `share` template, posted to [target]: with whom, what they may do, and a word; the answer appears in [notice]. */
+internal fun FlowContent.shareForm(target: String, others: List<UserAccount>, strings: Strings, notice: String) {
     details("share") {
         summary("action") { +strings.share }
         form(classes = "fields") {
-            attributes["hx-post"] = "/subscriptions/$subscriptionId/shares"
-            attributes["hx-target"] = "#library-notice"
+            attributes["hx-post"] = target
+            attributes["hx-target"] = notice
             attributes["hx-on::after-request"] = RESET_WHEN_ACCEPTED
             recipientSelect(others, strings)
             label {
@@ -213,7 +216,7 @@ private fun FlowContent.shareForm(subscriptionId: String, others: List<UserAccou
     }
 }
 
-private fun SELECT.permissionOptions(current: SharePermission, strings: Strings) {
+internal fun SELECT.permissionOptions(current: SharePermission, strings: Strings) {
     SharePermission.entries.forEach { permission ->
         option {
             value = permission.name

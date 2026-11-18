@@ -49,6 +49,12 @@ internal suspend fun ApplicationCall.respondNotice(message: String, trigger: Str
     respondFragment(noticeFragment(message))
 }
 
+/** For htmx: goes to [path] like a boosted link, so the player keeps playing (HX-Location). */
+internal suspend fun ApplicationCall.respondLocation(path: String) {
+    response.header("HX-Location", path)
+    respondText("", ContentType.Text.Html)
+}
+
 /** 204; htmx also gets [trigger] so the page reloads what changed. */
 internal suspend fun ApplicationCall.respondChanged(trigger: String = "episodes-changed") {
     if (isHtmx) response.header("HX-Trigger", trigger)

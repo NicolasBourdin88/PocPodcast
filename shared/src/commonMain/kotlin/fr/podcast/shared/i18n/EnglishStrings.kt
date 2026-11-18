@@ -183,6 +183,7 @@ object EnglishStrings : Strings {
         PlaylistOrder.OLDEST -> "Oldest first"
         PlaylistOrder.RANDOM -> "Random"
     }
+    override val sortOrder = "Order"
     override val episodeLimit = "At most this many episodes"
     override fun episodeCount(count: Int) = if (count == 1) "1 episode" else "$count episodes"
     override val playAll = "Play all"

@@ -95,6 +95,19 @@ fun FlowContent.playButton(item: EpisodeItem, strings: Strings, audio: AudioLink
     }
 }
 
+/**
+ * Plays a list (a playlist, ADR 0010): player.js puts the others first in the queue, in order, then
+ * plays the first one.
+ */
+fun FlowContent.playAllButton(items: List<EpisodeItem>, strings: Strings, audio: AudioLinks) {
+    val first = items.first()
+    button(classes = "action") {
+        attributes["data-play-all"] = items.joinToString(",") { it.episode.id }
+        episodeData(first, audio.path(first.episode.id), attribute = "data-episode")
+        +strings.playAll
+    }
+}
+
 /** What player.js needs to open an episode without asking the server. */
 private fun HTMLTag.episodeData(item: EpisodeItem, audioPath: String, attribute: String) {
     val episode = item.episode

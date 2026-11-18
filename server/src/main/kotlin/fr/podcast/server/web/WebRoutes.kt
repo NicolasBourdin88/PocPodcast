@@ -33,12 +33,18 @@ import io.ktor.server.routing.post
 import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
+import fr.podcast.server.ServerServices
+import fr.podcast.server.api.homeExtras
 
 /** Interface language negotiated from Accept-Language (JSON stays language-neutral). */
 fun ApplicationCall.language(): Language = Language.negotiate(request.acceptLanguageItems().map { it.value })
 
 /** Thin client pages that only exist in HTML: sign-in, sign-out, htmx fragments, the player script. */
-fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLinks, throttle: LoginThrottle) {
+fun Route.webRoutes(services: ServerServices) {
+    val database = services.database
+    val accounts = services.accounts
+    val audio = services.audioLinks
+    val throttle = services.loginThrottle
     staticResources("/static", "static")
 
     get("/login") {
@@ -75,8 +81,7 @@ fun Route.webRoutes(database: ServerDatabase, accounts: Accounts, audio: AudioLi
             val user = call.authPrincipal!!.user
             val catalog = UserCatalog(database, user.id)
             val home = LoadHomeState(catalog)()
-            val others = accounts.users().filter { it.id != user.id }
-            call.respondText(homeFragmentHtml(home, catalog.queue(), others, call.language().strings, audio), ContentType.Text.Html)
+            call.respondText(homeFragmentHtml(home, catalog.queue(), services.homeExtras(user), call.language().strings, audio), ContentType.Text.Html)
         }
 
         get("/fragments/queue") {

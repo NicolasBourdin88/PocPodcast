@@ -140,6 +140,7 @@ interface Strings {
     val anyRating: String
     val unplayedOnly: String
     fun playlistOrder(order: PlaylistOrder): String
+    val sortOrder: String
     val episodeLimit: String
     fun episodeCount(count: Int): String
     val playAll: String

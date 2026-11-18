@@ -43,6 +43,10 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import fr.podcast.server.html.HomeExtras
+import fr.podcast.server.auth.UserAccount
+import fr.podcast.shared.model.PlaylistKind
+import fr.podcast.shared.model.SharePermission
 
 /** Root, auth, podcast and episode resources (server/src/main/resources/openapi/podcast-api.yaml). */
 fun Route.apiRoutes(services: ServerServices) {
@@ -58,8 +62,8 @@ fun Route.apiRoutes(services: ServerServices) {
                     val catalog = UserCatalog(services.database, user.id)
                     val home = LoadHomeState(catalog)()
                     val queue = catalog.queue()
-                    val others = accounts.users().filter { it.id != user.id }
-                    call.respondHtml { homePage(home, queue, others, call.language(), user, services.audioLinks) }
+                    val extras = services.homeExtras(user)
+                    call.respondHtml { homePage(home, queue, extras, call.language(), user, services.audioLinks) }
                 }
                 else -> {
                     val home = user?.let { LoadHomeState(UserCatalog(services.database, it.id))() }
@@ -273,4 +277,12 @@ internal suspend fun ApplicationCall.respondEpisodeAudio(services: ServerService
     }
     response.header(HttpHeaders.Location, audioUrl)
     respond(HttpStatusCode.Found)
+}
+
+/** What Home offers besides the episodes: whom to recommend them to, which playlists to add them to (ADR 0009, 0010). */
+internal suspend fun ServerServices.homeExtras(user: UserAccount): HomeExtras {
+    val others = accounts.users().filter { it.id != user.id }
+    val own = playlists.playlistsOf(user).map { it.playlist }
+    val shared = sharing.received(user).mapNotNull { it.playlist }.filter { it.permission == SharePermission.WRITE }.map { it.playlist }
+    return HomeExtras(others, (own + shared).filter { it.kind == PlaylistKind.STATIC })
 }

@@ -291,4 +291,35 @@ class WebTest {
         assertContains(recommended.bodyAsText(), "Recommandé à Alice.")
         assertContains(alice.page("/subscriptions"), "Recommandé par Bob")
     }
+
+    @Test
+    fun playlistsInTheThinClient() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+        assertContains(alice.page("/playlists"), "hx-post=\"/playlists\"")
+
+        // Created from the form: htmx goes to its page, as a boosted link would.
+        val rules = arrayOf("keywords" to "", "favoritesOnly" to "false", "unplayedOnly" to "false", "minRating" to "0", "order" to "NEWEST", "limit" to "50")
+        val created = alice.htmx(HttpMethod.Post, "/playlists", "title" to "Pour le train", "kind" to "STATIC", *rules)
+        assertEquals("/playlists/1", created.headers["HX-Location"])
+        val added = alice.htmx(HttpMethod.Post, "/playlists/1/episodes", "episodeId" to "2")
+        assertContains(added.bodyAsText(), "Ajouté à « Pour le train ».")
+        alice.htmx(HttpMethod.Put, "/playlists/1/feed")
+
+        val page = alice.page("/playlists/1")
+        assertContains(page, "LCC 330 - Les nouveautés de Kotlin 2.4")
+        assertContains(page, "data-play-all=\"2\"")
+        assertContains(page, "http://localhost/feeds/")
+        assertContains(page, "hx-post=\"/playlists/1/shares\"")
+        assertContains(alice.page("/"), "hx-post=\"/playlists/1/episodes\"") // Home adds to it
+
+        // A dynamic one: a checked box sends "false" then "true", the last value counts.
+        alice.htmx(
+            HttpMethod.Post, "/playlists", "title" to "Kotlin", "kind" to "DYNAMIC", *rules,
+            "keywords" to "kotlin", "unplayedOnly" to "true",
+        )
+        assertContains(alice.page("/playlists/2"), "kotlin · Non écoutés seulement")
+        assertEquals("/playlists", alice.htmx(HttpMethod.Delete, "/playlists/2").headers["HX-Location"])
+    }
 }

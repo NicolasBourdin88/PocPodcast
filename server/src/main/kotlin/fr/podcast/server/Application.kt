@@ -211,7 +211,7 @@ fun Application.module(services: ServerServices) {
         playlistRoutes(services)
         playlistFeedRoutes(services)
         searchRoutes(services)
-        webRoutes(database, services.accounts, services.audioLinks, services.loginThrottle)
+        webRoutes(services)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")
     }
 

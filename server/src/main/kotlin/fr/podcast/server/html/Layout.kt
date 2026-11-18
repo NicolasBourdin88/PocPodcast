@@ -204,6 +204,17 @@ private val STYLES = """
     .shared-with { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
     .shared-with li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     q.message { font-style: italic; color: var(--muted); }
+    form.fields fieldset {
+      display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; width: 100%; margin: 0;
+      padding: 8px 12px; border: 1px solid var(--card); border-radius: 10px;
+    }
+    form.fields fieldset.choices { flex-direction: column; align-items: flex-start; padding: 0; border: none; }
+    form.fields legend { font-size: .85rem; color: var(--muted); padding: 0 4px; }
+    .feed-url {
+      width: 100%; font: inherit; padding: 8px 12px; border-radius: 10px;
+      border: 1px solid var(--card); background: var(--surface); color: var(--text);
+    }
+    select.rating { font: inherit; font-size: .8rem; padding: 4px 8px; border: none; border-radius: 999px; background: var(--card); color: var(--text); }
     .result { margin: 4px 0; }
 
     .login { max-width: 360px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: 12px; }

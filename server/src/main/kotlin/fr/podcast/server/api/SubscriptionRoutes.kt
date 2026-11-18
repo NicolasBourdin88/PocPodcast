@@ -67,7 +67,8 @@ fun Route.subscriptionRoutes(services: ServerServices) {
                     val library = LibraryView(
                         items = items,
                         given = services.sharing.sharesGiven(user.id, ShareType.SUBSCRIPTION),
-                        received = services.sharing.received(user),
+                        // Shared playlists are on the Playlists page.
+                        received = services.sharing.received(user).filter { it.playlist == null },
                         others = services.accounts.users().filter { it.id != user.id },
                     )
                     call.respondHtml { libraryPage(library, call.language(), user, services.audioLinks) }

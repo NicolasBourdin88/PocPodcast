@@ -80,7 +80,7 @@
   }
 
   document.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-play], [data-skip], [data-speed], [data-next]');
+    const button = event.target.closest('[data-play], [data-play-all], [data-skip], [data-speed], [data-next]');
     if (!button) return;
     event.preventDefault();
     const audio = byId('audio');
@@ -90,6 +90,13 @@
       } else {
         load(fromDataset(button.dataset), true);
       }
+    } else if (button.dataset.playAll) {
+      // A playlist (ADR 0010): the others first in the queue, in order, then the first one plays.
+      const ids = button.dataset.playAll.split(',');
+      (async () => {
+        for (const [index, id] of ids.slice(1).entries()) await send('POST', '/queue', { episodeId: id, position: index });
+        load(fromDataset(button.dataset), true);
+      })();
     } else if (button.dataset.skip) {
       audio.currentTime = Math.max(0, audio.currentTime + Number(button.dataset.skip));
     } else if ('speed' in button.dataset) {
