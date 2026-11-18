@@ -1,0 +1,128 @@
+-- Synchronisation with third-party clients (ADR 0011).
+
+-- gPodder devices of a user, oldest first.
+gpodderDevices:
+SELECT device_id, caption, type
+FROM gpodder_devices
+WHERE user_id = :userId
+ORDER BY created_at;
+
+gpodderDevice:
+SELECT device_id, caption, type
+FROM gpodder_devices
+WHERE user_id = :userId AND device_id = :deviceId;
+
+saveGpodderDevice:
+INSERT INTO gpodder_devices(user_id, device_id, caption, type)
+VALUES (:userId, :deviceId, :caption, :type)
+ON CONFLICT (user_id, device_id) DO UPDATE
+SET caption = excluded.caption, type = excluded.type, updated_at = now();
+
+-- Every subscription path records here: our clients, OPML, gPodder, Open Podcast API.
+recordSubscriptionChange:
+INSERT INTO subscription_changes(user_id, feed_url, subscribed)
+VALUES (:userId, :feedUrl, :subscribed)
+ON CONFLICT (user_id, feed_url) DO UPDATE
+SET subscribed = excluded.subscribed, changed_at = now(), deleted_at = NULL;
+
+-- Changed at or after :since (inclusive: a change may come back twice, which is harmless).
+subscriptionChangesSince:
+SELECT feed_url, subscribed, changed_at, guid, deleted_at
+FROM subscription_changes
+WHERE user_id = :userId AND changed_at >= :since
+ORDER BY changed_at, feed_url;
+
+-- The Open Podcast API entries of a user: current or unsubscribed, not deleted.
+subscriptionEntries:
+SELECT feed_url, subscribed, changed_at, guid, deleted_at
+FROM subscription_changes
+WHERE user_id = :userId AND deleted_at IS NULL
+ORDER BY feed_url;
+
+-- The entries changed or deleted after :since, deleted ones included.
+subscriptionEntriesSince:
+SELECT feed_url, subscribed, changed_at, guid, deleted_at
+FROM subscription_changes
+WHERE user_id = :userId AND (changed_at > :since OR deleted_at > :since)
+ORDER BY changed_at, feed_url;
+
+allSubscriptionEntries:
+SELECT feed_url, subscribed, changed_at, guid, deleted_at
+FROM subscription_changes
+WHERE user_id = :userId
+ORDER BY feed_url;
+
+setSubscriptionGuid:
+UPDATE subscription_changes
+SET guid = :guid
+WHERE user_id = :userId AND feed_url = :feedUrl;
+
+markSubscriptionDeleted:
+UPDATE subscription_changes
+SET subscribed = FALSE, changed_at = now(), deleted_at = now()
+WHERE user_id = :userId AND feed_url = :feedUrl;
+
+forgetSubscriptionEntry:
+DELETE FROM subscription_changes
+WHERE user_id = :userId AND feed_url = :feedUrl;
+
+-- The user's podcasts and their feeds, to find the one an action or a removal names.
+subscribedPodcasts:
+SELECT s.id AS subscription_id, p.id AS podcast_id, p.feed_url
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id
+WHERE s.user_id = :userId;
+
+episodeByGuid:
+SELECT id, duration_seconds
+FROM episodes
+WHERE podcast_id = :podcastId AND guid = :guid;
+
+episodeByAudioUrl:
+SELECT id, duration_seconds
+FROM episodes
+WHERE podcast_id = :podcastId AND audio_url = :audioUrl
+LIMIT 1;
+
+-- When the user's state of the episode last changed (position or status), if it ever did.
+stateChangedAt:
+SELECT updated_at
+FROM playback_states
+WHERE user_id = :userId AND episode_id = :episodeId;
+
+-- The states changed since :since that a gPodder client can apply: played, or in progress.
+-- :podcastUrl filters on one feed; empty, it does not filter.
+statesChangedSince:
+SELECT p.feed_url, e.audio_url, e.guid, e.duration_seconds, s.position_seconds, s.status, s.updated_at
+FROM playback_states s
+JOIN episodes e ON e.id = s.episode_id
+JOIN podcasts p ON p.id = e.podcast_id
+WHERE s.user_id = :userId AND s.updated_at >= :since
+  AND (s.status = 'PLAYED' OR s.position_seconds > 0)
+  AND (:podcastUrl = '' OR p.feed_url = :podcastUrl)
+ORDER BY s.updated_at;
+
+insertPendingAction:
+INSERT INTO episode_actions(user_id, device_id, podcast_url, podcast_key, episode_url, guid, action, started, position, total, happened_at)
+VALUES (:userId, :deviceId, :podcastUrl, :podcastKey, :episodeUrl, :guid, :action, :started, :position, :total, :happenedAt);
+
+pendingActionsSince:
+SELECT podcast_url, episode_url, guid, action, started, position, total, happened_at, device_id
+FROM episode_actions
+WHERE user_id = :userId AND received_at >= :since AND (:podcastUrl = '' OR podcast_url = :podcastUrl)
+ORDER BY received_at;
+
+pendingActionsForFeed:
+SELECT id, user_id, episode_url, guid, action, position, total, happened_at
+FROM episode_actions
+WHERE podcast_key = :podcastKey
+ORDER BY happened_at;
+
+deletePendingAction:
+DELETE FROM episode_actions
+WHERE id = :id;
+
+-- Actions whose episode never appeared: not kept for ever.
+prunePendingActions:
+DELETE FROM episode_actions
+WHERE received_at < :before;

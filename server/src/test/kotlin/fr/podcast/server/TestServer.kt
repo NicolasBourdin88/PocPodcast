@@ -59,7 +59,8 @@ object TestDatabase {
         dataSource.connection.use {
             it.createStatement().execute(
                 "TRUNCATE users, api_tokens, http_sessions, podcasts, episodes, episode_transcripts, subscriptions, " +
-                    "playback_states, media_files, queue_items, shares, playlists, playlist_items, playlist_feeds RESTART IDENTITY CASCADE",
+                    "playback_states, media_files, queue_items, shares, playlists, playlist_items, playlist_feeds, " +
+                    "gpodder_devices, subscription_changes, episode_actions RESTART IDENTITY CASCADE",
             )
         }
         mediaDirectory.toFile().listFiles()?.forEach { it.deleteRecursively() }

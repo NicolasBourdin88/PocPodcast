@@ -59,6 +59,9 @@ object TestSeed {
             podcastIds.values.forEach { catalogQueries.insertSubscription(alice.id, it, null).executeAsOne() }
             catalogQueries.insertSubscription(bob.id, podcastIds.getValue("tk"), "Le podcast officiel de JetBrains").executeAsOne()
             catalogQueries.insertSubscription(bob.id, podcastIds.getValue("frag"), null).executeAsOne()
+            // As the subscription paths do: what third-party clients are told (ADR 0011).
+            podcasts.forEach { syncQueries.recordSubscriptionChange(alice.id, "https://feeds.test/${it.key}.xml", true) }
+            listOf("tk", "frag").forEach { syncQueries.recordSubscriptionChange(bob.id, "https://feeds.test/$it.xml", true) }
 
             episodes.mapIndexed { index, episode ->
                 catalogQueries.insertEpisode(

@@ -150,10 +150,53 @@ class ContractTest {
         run.queue()
         run.sharing()
         run.playlists()
+        run.gpodder()
         run.tooManyAttempts()
 
         val missing = documented - run.exercised
         assertTrue(missing.isEmpty(), "Operations never exercised by this test: $missing")
+    }
+
+    /** The gPodder API (ADR 0011): Basic then the session, or a Bearer token as here. */
+    private suspend fun Run.gpodder() {
+        val json = ContentType.Application.Json
+        val basic = mapOf(
+            HttpHeaders.Authorization to "Basic " + java.util.Base64.getEncoder().encodeToString("${TestSeed.ALICE}:${TestSeed.ALICE_PASSWORD}".toByteArray()),
+        )
+        val login = "/api/2/auth/{username}/login.json"
+        check(post, "/api/2/auth/alice/login.json", login, HttpStatusCode.OK, token = null, headers = basic, accept = json)
+        check(post, "/api/2/auth/alice/login.json", login, HttpStatusCode.Unauthorized, token = null, accept = json)
+
+        val device = "/api/2/devices/{username}/{deviceId}.json"
+        check(post, "/api/2/devices/alice/phone.json", device, HttpStatusCode.OK, body = """{"caption":"Téléphone","type":"mobile"}""", accept = json)
+        check(post, "/api/2/devices/alice/bad%20id.json", device, HttpStatusCode.BadRequest, accept = json)
+        check(post, "/api/2/devices/alice/phone.json", device, HttpStatusCode.Unauthorized, token = null, accept = json)
+        val devices = "/api/2/devices/{username}.json"
+        check(get, "/api/2/devices/alice.json", devices, HttpStatusCode.OK, accept = json)
+        check(get, "/api/2/devices/bob.json", devices, HttpStatusCode.Unauthorized, accept = json)
+
+        val subscriptions = "/api/2/subscriptions/{username}/{deviceId}.json"
+        check(get, "/api/2/subscriptions/alice/phone.json?since=0", subscriptions, HttpStatusCode.OK, accept = json)
+        check(get, "/api/2/subscriptions/alice/phone.json?since=yesterday", subscriptions, HttpStatusCode.BadRequest, accept = json)
+        check(get, "/api/2/subscriptions/alice/phone.json", subscriptions, HttpStatusCode.Unauthorized, token = null, accept = json)
+        check(post, "/api/2/subscriptions/alice/phone.json", subscriptions, HttpStatusCode.OK, accept = json,
+            body = """{"add":["https://feeds.test/podcast20.xml","ftp://example.org/feed"],"remove":[]}""")
+        check(post, "/api/2/subscriptions/alice/phone.json", subscriptions, HttpStatusCode.BadRequest, accept = json,
+            body = """{"add":["https://feeds.test/tk.xml"],"remove":["https://feeds.test/tk.xml"]}""")
+        check(post, "/api/2/subscriptions/alice/phone.json", subscriptions, HttpStatusCode.Unauthorized, token = null, accept = json,
+            body = """{"add":[],"remove":[]}""")
+
+        val episodes = "/api/2/episodes/{username}.json"
+        check(post, "/api/2/episodes/alice.json", episodes, HttpStatusCode.OK, accept = json,
+            body = """[{"podcast":"https://feeds.test/tk.xml","episode":"https://cdn.test/podcast/seed-1.mp3","guid":"seed-1","action":"play","timestamp":"2030-01-01T00:00:00","started":0,"position":60,"total":3120},""" +
+                """{"podcast":"https://feeds.test/unknown.xml","episode":"https://cdn.test/unknown.mp3","action":"play","position":30,"total":600}]""")
+        check(post, "/api/2/episodes/alice.json", episodes, HttpStatusCode.BadRequest, accept = json, body = """{"not":"a list"}""")
+        check(post, "/api/2/episodes/alice.json", episodes, HttpStatusCode.Unauthorized, token = null, accept = json, body = "[]")
+        check(get, "/api/2/episodes/alice.json?since=0", episodes, HttpStatusCode.OK, accept = json)
+        check(get, "/api/2/episodes/alice.json?since=-1", episodes, HttpStatusCode.BadRequest, accept = json)
+        check(get, "/api/2/episodes/alice.json", episodes, HttpStatusCode.Unauthorized, token = null, accept = json)
+
+        check(post, "/api/2/auth/alice/logout.json", "/api/2/auth/{username}/logout.json", HttpStatusCode.OK, token = null, accept = json)
     }
 
     private suspend fun Run.rootAndAccounts() {
@@ -411,7 +454,8 @@ class ContractTest {
         val segments = generateSequence(this) { it.parent }.toList().reversed().mapNotNull { node ->
             when (val selector = node.selector) {
                 is PathSegmentConstantRouteSelector -> selector.value
-                is PathSegmentParameterRouteSelector -> "{${selector.name}}"
+                // `{username}.json`: gPodder routes put a suffix after the parameter.
+                is PathSegmentParameterRouteSelector -> "${selector.prefix.orEmpty()}{${selector.name}}${selector.suffix.orEmpty()}"
                 else -> null
             }
         }

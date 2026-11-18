@@ -1,0 +1,56 @@
+-- Step 8: synchronisation with third-party clients through the gPodder API and the Open Podcast
+-- API (ADR 0011).
+
+-- gPodder devices, named by their client; all of a user's devices share the user's subscriptions.
+CREATE TABLE gpodder_devices (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL,
+    caption TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'other',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, device_id)
+);
+
+-- The last change of each feed in each user's subscriptions, whatever the client: what gPodder
+-- clients ask for `since` a timestamp, and the entries of the Open Podcast API.
+CREATE TABLE subscription_changes (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    feed_url TEXT NOT NULL,
+    subscribed BOOLEAN NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Sent by an Open Podcast API client; otherwise derived from the feed URL (podcast:guid rule).
+    guid TEXT,
+    -- Deleted through the Open Podcast API: answered 410 from then on.
+    deleted_at TIMESTAMPTZ,
+    PRIMARY KEY (user_id, feed_url)
+);
+
+CREATE INDEX subscription_changes_by_time ON subscription_changes(user_id, changed_at);
+
+INSERT INTO subscription_changes(user_id, feed_url, subscribed, changed_at)
+SELECT s.user_id, p.feed_url, TRUE, s.subscribed_at
+FROM subscriptions s
+JOIN podcasts p ON p.id = s.podcast_id;
+
+-- Episode actions from gPodder clients whose episode is not known yet (its feed not read): applied
+-- after the next refresh of the podcast, and passed on to the user's other devices meanwhile.
+CREATE TABLE episode_actions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_id TEXT,
+    podcast_url TEXT NOT NULL,
+    -- The feed URL normalized (no scheme, case or trailing slash), to find its podcast.
+    podcast_key TEXT NOT NULL,
+    episode_url TEXT NOT NULL,
+    guid TEXT,
+    action TEXT NOT NULL CHECK (action IN ('play', 'new')),
+    started INTEGER,
+    position INTEGER,
+    total INTEGER,
+    happened_at TIMESTAMPTZ NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX episode_actions_by_user ON episode_actions(user_id, received_at);
+CREATE INDEX episode_actions_by_feed ON episode_actions(podcast_key);

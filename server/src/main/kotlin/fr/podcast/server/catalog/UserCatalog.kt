@@ -128,8 +128,16 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
     /** Subscribes to an existing podcast; the boolean tells whether it is a new subscription. */
     suspend fun subscribe(podcastId: Long): Pair<SubscriptionItem, Boolean> = database.transaction {
         val existing = catalogQueries.subscriptionIdFor(userId, podcastId).executeAsOneOrNull()
-        val id = existing ?: catalogQueries.insertSubscription(userId, podcastId, null).executeAsOne()
+        val id = existing ?: catalogQueries.insertSubscription(userId, podcastId, null).executeAsOne().also {
+            recordChange(podcastId, subscribed = true)
+        }
         catalogQueries.subscriptionOfUser(userId, id, ::subscriptionItem).executeAsOne() to (existing == null)
+    }
+
+    /** What third-party clients will be told (ADR 0011). */
+    private fun PodcastDb.recordChange(podcastId: Long, subscribed: Boolean) {
+        val feedUrl = catalogQueries.podcastFeed(podcastId).executeAsOne().feed_url
+        syncQueries.recordSubscriptionChange(userId, feedUrl, subscribed)
     }
 
     suspend fun updateSubscription(id: String, note: String?, autoDownload: Boolean): SubscriptionItem? {
@@ -149,6 +157,7 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
         val subscriptionId = id.toLongOrNull() ?: return null
         return database.transaction {
             val podcastId = catalogQueries.deleteSubscription(subscriptionId, userId).executeAsOneOrNull() ?: return@transaction null
+            recordChange(podcastId, subscribed = false)
             sharesQueries.deleteSharesOfResource("SUBSCRIPTION", subscriptionId)
             queueQueries.removePodcastFromQueue(userId, podcastId)
             renumberQueue()
@@ -239,6 +248,7 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
                     alreadySubscribed++
                 } else {
                     catalogQueries.insertSubscription(userId, podcastId, null).executeAsOne()
+                    recordChange(podcastId, subscribed = true)
                     imported++
                 }
             }

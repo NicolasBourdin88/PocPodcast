@@ -22,12 +22,22 @@ const val SESSION_AUTH = "session"
 const val BEARER_AUTH = "bearer"
 const val SESSION_COOKIE = "podcast_session"
 
+/** The cookie gPodder clients expect after `login.json` (ADR 0011). */
+const val GPODDER_SESSION_COOKIE = "sessionid"
+
 /**
  * Thin client session; the cookie only carries an id, the data stays in the database.
  * [version] is the account's credentials version: a new password ends the older sessions.
  */
 @Serializable
 data class UserSession(val userId: Long, val version: Int = 0)
+
+/**
+ * Session of a gPodder client, opened by `login.json` (ADR 0011). Like [UserSession] it ends with
+ * a new password, and with the app password it was opened with ([tokenId]), if any.
+ */
+@Serializable
+data class GpodderSession(val userId: Long, val version: Int, val tokenId: Long? = null)
 
 /** Who made the request, and how. */
 sealed interface AuthPrincipal {
@@ -68,6 +78,14 @@ fun Application.installAuthentication(accounts: Accounts, database: ServerDataba
             cookie.secure = secureCookies
             cookie.maxAgeInSeconds = sessionLifetime.inWholeSeconds
             cookie.extensions["SameSite"] = "Lax"
+        }
+        cookie<GpodderSession>(GPODDER_SESSION_COOKIE, DatabaseSessionStorage(database, sessionLifetime)) {
+            cookie.path = "/api/2"
+            cookie.httpOnly = true
+            cookie.secure = secureCookies
+            cookie.maxAgeInSeconds = sessionLifetime.inWholeSeconds
+            // gPodder clients are not browsers: no other site may send it.
+            cookie.extensions["SameSite"] = "Strict"
         }
     }
     install(Authentication) {

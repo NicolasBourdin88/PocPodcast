@@ -1,5 +1,6 @@
 package fr.podcast.server
 
+import fr.podcast.server.api.gpodderRoutes
 import fr.podcast.server.api.accountRoutes
 import fr.podcast.server.api.apiRoutes
 import fr.podcast.server.api.queueRoutes
@@ -22,6 +23,7 @@ import fr.podcast.server.feeds.UrlGuard
 import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.media.MediaService
 import fr.podcast.server.media.MediaStore
+import fr.podcast.server.sync.GpodderSync
 import fr.podcast.server.search.AppleSource
 import fr.podcast.server.search.PodcastIndexSource
 import fr.podcast.server.search.PodcastSearch
@@ -125,13 +127,20 @@ class ServerServices(
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
     val media = MediaService(database, outgoing, guard, MediaStore(config.mediaDirectory), config.maxFileBytes, config.autoDownloadLatest)
-    val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard), onEpisodesStored = media::scheduleAutomatic)
+    val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard)) { podcastId ->
+        media.scheduleAutomatic(podcastId)
+        // Actions of gPodder clients that were waiting for these episodes (ADR 0011).
+        gpodder.applyPending(podcastId)
+    }
     val search = PodcastSearch(
         listOfNotNull(
             AppleSource(outgoing),
             config.podcastIndexKey?.let { key -> config.podcastIndexSecret?.let { PodcastIndexSource(outgoing, key, it) } },
         ),
     )
+
+    /** gPodder API (ADR 0011). */
+    val gpodder = GpodderSync(database, guard, ::refreshSoon, ::removePodcast)
 
     /** Reads new feeds (e.g. after an OPML import) without making the request wait. */
     fun refreshSoon(podcastIds: List<Long>) {
@@ -215,6 +224,7 @@ fun Application.module(services: ServerServices) {
         playlistRoutes(services)
         playlistFeedRoutes(services)
         searchRoutes(services)
+        gpodderRoutes(services)
         webRoutes(services)
         swaggerUI(path = "docs", swaggerFile = "openapi/podcast-api.yaml")
     }

@@ -94,9 +94,25 @@ class Accounts(private val database: ServerDatabase) {
     }
 
     suspend fun userForToken(value: String): UserAccount? {
-        val userId = database.query { tokensQueries.useToken(hashToken(value)).executeAsOneOrNull() } ?: return null
-        return user(userId)
+        val used = database.query { tokensQueries.useToken(hashToken(value)).executeAsOneOrNull() } ?: return null
+        return user(used.user_id)
     }
+
+    /**
+     * For clients that only have a password field, such as gPodder ones (ADR 0011): [secret] is
+     * the account's password or an app password, that is one of its device tokens, whose id
+     * comes along. Null when neither matches [username].
+     */
+    suspend fun authenticateWithSecret(username: String, secret: String): Pair<UserAccount, Long?>? {
+        if (TOKEN_FORMAT.matches(secret)) {
+            database.query { tokensQueries.useToken(hashToken(secret)).executeAsOneOrNull() }?.let { used ->
+                return user(used.user_id)?.takeIf { it.username == username }?.let { it to used.id }
+            }
+        }
+        return authenticate(username, secret)?.let { it to null }
+    }
+
+    suspend fun tokenIsActive(id: Long): Boolean = database.query { tokensQueries.activeToken(id).executeAsOneOrNull() } != null
 
     suspend fun revokeToken(value: String) {
         database.query { tokensQueries.revokeToken(hashToken(value)) }
@@ -121,6 +137,9 @@ class Accounts(private val database: ServerDatabase) {
     private fun hashToken(value: String): String =
         MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
 }
+
+/** What issueToken produces: 32 random bytes in base64url, without padding. */
+private val TOKEN_FORMAT = Regex("[A-Za-z0-9_-]{43}")
 
 @Suppress("UNUSED_PARAMETER")
 private fun account(id: Long, username: String, displayName: String, passwordHash: String, role: String, credentialsVersion: Int) =

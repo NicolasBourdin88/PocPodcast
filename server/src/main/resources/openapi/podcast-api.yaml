@@ -1251,6 +1251,166 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/2/auth/{username}/login.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+    post:
+      tags: [gPodder]
+      operationId: gpodderLogin
+      summary: Connexion d'un client gPodder
+      description: |
+        `Basic` avec le mot de passe du compte ou un mot de passe d'application. Pose le cookie
+        `sessionid`, que les requêtes suivantes portent seul ; une reconnexion qui le porte déjà le garde.
+      security: [{ basic: [] }, { gpodderSession: [] }]
+      responses:
+        "200": { description: Connecté (cookie `sessionid`) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyAttempts" }
+
+  /api/2/auth/{username}/logout.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+    post:
+      tags: [gPodder]
+      operationId: gpodderLogout
+      summary: Fin de la session gPodder
+      security: [{ gpodderSession: [] }, {}]
+      responses:
+        "200": { description: Session terminée }
+
+  /api/2/devices/{username}.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+    get:
+      tags: [gPodder]
+      operationId: gpodderDevices
+      summary: Appareils gPodder du compte
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      responses:
+        "200":
+          description: Appareils ; tous partagent les abonnements du compte
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GpodderDeviceList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/2/devices/{username}/{deviceId}.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+      - $ref: "#/components/parameters/gpodderDevice"
+    post:
+      tags: [gPodder]
+      operationId: gpodderSaveDevice
+      summary: Créer un appareil, ou changer son nom ou son type
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GpodderDeviceUpdate" }
+      responses:
+        "200": { description: Appareil enregistré }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/2/subscriptions/{username}/{deviceId}.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+      - $ref: "#/components/parameters/gpodderDevice"
+    get:
+      tags: [gPodder]
+      operationId: gpodderSubscriptionChanges
+      summary: Abonnements ajoutés et retirés depuis `since`
+      description: "`since=0` donne tous les abonnements actuels."
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      parameters:
+        - $ref: "#/components/parameters/since"
+      responses:
+        "200":
+          description: Changements, et le prochain `since`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubscriptionDelta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [gPodder]
+      operationId: gpodderUploadSubscriptionChanges
+      summary: Abonnements ajoutés et retirés sur l'appareil
+      description: |
+        Un ajout suit le chemin de l'import OPML (podcast lu en arrière-plan, protection SSRF). Une URL
+        qui n'est pas en http(s) est réécrite en "" et ignorée. La même URL dans `add` et `remove` donne 400.
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionUpload" }
+      responses:
+        "200":
+          description: Prochain `since` et URL réécrites
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadAnswer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/2/episodes/{username}.json:
+    parameters:
+      - $ref: "#/components/parameters/gpodderUser"
+    get:
+      tags: [gPodder]
+      operationId: gpodderEpisodeActions
+      summary: État d'écoute changé depuis `since`, en actions `play`
+      description: |
+        Un épisode écouté donne `position = total` ; s'y ajoutent les actions reçues pour des épisodes
+        pas encore connus du serveur.
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      parameters:
+        - $ref: "#/components/parameters/since"
+        - name: podcast
+          in: query
+          required: false
+          schema: { type: string }
+          description: Seulement les épisodes de ce flux.
+        - name: aggregated
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Sans effet ; la réponse ne donne déjà que le dernier état de chaque épisode.
+      responses:
+        "200":
+          description: Actions, et le prochain `since`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EpisodeActionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [gPodder]
+      operationId: gpodderUploadEpisodeActions
+      summary: Actions faites sur l'appareil
+      description: |
+        `play` donne la position (écouté quand elle atteint `total`), `new` remet à « non écouté » ;
+        `download` et `delete` sont sans effet. La date la plus récente gagne (ADR 0011).
+      security: [{ gpodderSession: [] }, { basic: [] }, { bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "#/components/schemas/EpisodeAction" }
+      responses:
+        "200":
+          description: Prochain `since`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadAnswer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+
 components:
   securitySchemes:
     bearer:
@@ -1262,8 +1422,35 @@ components:
       in: cookie
       name: podcast_session
       description: Session du client léger (formulaire `/login`).
+    basic:
+      type: http
+      scheme: basic
+      description: Mot de passe du compte, ou mot de passe d'application (API gPodder, Open Podcast API).
+    gpodderSession:
+      type: apiKey
+      in: cookie
+      name: sessionid
+      description: Session d'un client gPodder, posée par `login.json`.
 
   parameters:
+    gpodderUser:
+      name: username
+      in: path
+      required: true
+      schema: { type: string }
+      description: Identifiant du compte, celui qui s'authentifie.
+    gpodderDevice:
+      name: deviceId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9._-]{1,64}$" }
+      description: Identifiant choisi par le client gPodder.
+    since:
+      name: since
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0 }
+      description: "`timestamp` de la réponse précédente, en secondes (inclusif) ; 0 ou absent : depuis le début."
     offset:
       name: offset
       in: query
@@ -2325,4 +2512,79 @@ components:
       required: [position]
       properties:
         position: { type: integer, minimum: 0, description: Nouvelle place ; au-delà de la fin, en dernier. }
+      additionalProperties: false
+
+    GpodderDevice:
+      type: object
+      required: [id, caption, type, subscriptions]
+      properties:
+        id: { type: string }
+        caption: { type: string }
+        type: { type: string, enum: [desktop, laptop, mobile, server, other] }
+        subscriptions: { type: integer, minimum: 0, description: Abonnements du compte, les mêmes pour chaque appareil. }
+      additionalProperties: false
+
+    GpodderDeviceList:
+      type: array
+      items: { $ref: "#/components/schemas/GpodderDevice" }
+
+    GpodderDeviceUpdate:
+      type: object
+      properties:
+        caption: { type: string, maxLength: 100 }
+        type: { type: string, description: "desktop, laptop, mobile, server ; autre chose devient other" }
+
+    SubscriptionDelta:
+      type: object
+      required: [add, remove, timestamp]
+      properties:
+        add: { type: array, items: { type: string } }
+        remove: { type: array, items: { type: string } }
+        timestamp: { type: integer, description: Le prochain `since`. }
+      additionalProperties: false
+
+    SubscriptionUpload:
+      type: object
+      properties:
+        add: { type: array, items: { type: string } }
+        remove: { type: array, items: { type: string } }
+
+    UploadAnswer:
+      type: object
+      required: [timestamp, update_urls]
+      properties:
+        timestamp: { type: integer, description: Le prochain `since`. }
+        update_urls:
+          type: array
+          description: "Paires [URL envoyée, URL retenue] ; une URL retenue vide est ignorée."
+          items:
+            type: array
+            items: { type: string }
+            minItems: 2
+            maxItems: 2
+      additionalProperties: false
+
+    EpisodeAction:
+      type: object
+      required: [podcast, episode, action]
+      properties:
+        podcast: { type: string, description: URL du flux }
+        episode: { type: string, description: URL du fichier audio, telle que dans le flux }
+        guid: { type: string, description: guid de l'épisode dans son flux }
+        device: { type: string }
+        action: { type: string, enum: [play, new, download, delete] }
+        timestamp: { type: string, description: "UTC, à la seconde, sans fuseau : 2026-11-18T08:19:12" }
+        started: { type: integer, minimum: 0 }
+        position: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+      additionalProperties: false
+
+    EpisodeActionList:
+      type: object
+      required: [actions, timestamp]
+      properties:
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/EpisodeAction" }
+        timestamp: { type: integer, description: Le prochain `since`. }
       additionalProperties: false

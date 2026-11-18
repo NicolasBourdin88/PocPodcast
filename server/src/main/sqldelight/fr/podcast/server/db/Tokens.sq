@@ -8,7 +8,12 @@ useToken:
 UPDATE api_tokens
 SET last_used_at = now()
 WHERE token_hash = :tokenHash AND revoked_at IS NULL
-RETURNING user_id;
+RETURNING user_id, id;
+
+-- A gPodder session opened with an app password ends with it (ADR 0011).
+activeToken:
+SELECT id FROM api_tokens
+WHERE id = :id AND revoked_at IS NULL;
 
 revokeToken:
 UPDATE api_tokens
