@@ -49,7 +49,7 @@ class LibraryTextTest {
         repository.updateSubscription(first.subscription.id, "Pour le train", autoDownload = true)
 
         val text = renderSubscriptionsText(repository.subscriptionItems(), strings)
-        assertContains(text, " 1. Fragmented — Donn Felker & Kaushik Gopal\n    ✎ Pour le train\n    ↓ Télécharger automatiquement")
+        assertContains(text, " 1. Fragmented — Donn Felker & Kaushik Gopal\n    # english · tech\n    ✎ Pour le train\n    ↓ Télécharger automatiquement")
         assertContains(text, " 4. Talking Kotlin — JetBrains")
         assertEquals(strings.emptyLibrary, renderSubscriptionsText(emptyList(), strings))
     }

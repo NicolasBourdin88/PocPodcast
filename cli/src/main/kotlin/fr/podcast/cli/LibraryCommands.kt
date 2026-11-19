@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.int
 import fr.podcast.shared.model.SubscriptionItem
@@ -32,9 +33,16 @@ class SubscribeCommand : ServerCommand("subscribe") {
     }
 }
 
+/** `podcast subscriptions [words…] [--tag t]`: the library, filtered as in the apps (ADR 0012). */
 class SubscriptionsCommand : ServerCommand("subscriptions") {
+    private val words by argument(help = "kotlin").multiple()
+    private val tag by option("--tag", help = systemLanguage.strings.tags)
+
     override fun help(context: Context) = systemLanguage.strings.cliSubscriptionsDescription
-    override fun run() = echo(renderSubscriptionsText(call { client().subscriptionItems() }, cli.strings))
+    override fun run() {
+        val text = words.joinToString(" ")
+        echo(renderSubscriptionsText(call { client().subscriptionItems() }, cli.strings) { it.matches(text, tag) })
+    }
 }
 
 class NoteCommand : ServerCommand("note") {

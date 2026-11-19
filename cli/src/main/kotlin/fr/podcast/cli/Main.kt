@@ -265,7 +265,7 @@ fun main(args: Array<String>) = PodcastCommand()
         SearchCommand(), SubscribeCommand(), SubscriptionsCommand(), NoteCommand(), UnsubscribeCommand(),
         OpmlCommand().subcommands(OpmlExportCommand(), OpmlImportCommand()),
         SharedCommand().subcommands(SharedRemoveCommand()), ShareCommand(), UnshareCommand(), RecommendCommand(),
-        FavoriteCommand(), RateCommand(),
+        FavoriteCommand(), RateCommand(), EpisodesCommand(), TagsCommand(), StatsCommand(),
         PlaylistsCommand().subcommands(
             PlaylistShowCommand(), PlaylistCreateCommand(), PlaylistEditCommand(), PlaylistAddCommand(), PlaylistRemoveCommand(),
             PlaylistMoveCommand(), PlaylistDeleteCommand(), PlaylistPlayCommand(), PlaylistShuffleCommand(),

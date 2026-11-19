@@ -147,6 +147,8 @@ interface Strings {
     val tagsHint: String
     val allTags: String
     fun tagsInvalid(count: Int, length: Int): String
+    val clearTags: String
+    val noSubscriptionFound: String
     val myListening: String
     val listeningTime: String
     val last7Days: String

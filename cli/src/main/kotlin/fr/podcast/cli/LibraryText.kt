@@ -16,10 +16,14 @@ fun renderSearchText(results: List<SearchResult>, strings: Strings): String = bu
     }
 }.trimEnd()
 
-/** Numbered subscriptions for `podcast subscriptions`; `note` and `unsubscribe` use the numbers. */
-fun renderSubscriptionsText(items: List<SubscriptionItem>, strings: Strings): String = buildString {
+/**
+ * Numbered subscriptions for `podcast subscriptions`; `note`, `tags`, `unsubscribe`… use the
+ * numbers. Those [shown] (ADR 0012) keep their number in the whole list.
+ */
+fun renderSubscriptionsText(items: List<SubscriptionItem>, strings: Strings, shown: (SubscriptionItem) -> Boolean = { true }): String = buildString {
     if (items.isEmpty()) return strings.emptyLibrary
     items.forEachIndexed { index, item ->
+        if (!shown(item)) return@forEachIndexed
         val podcast = item.podcast
         val status = when (podcast.refreshStatus) {
             RefreshStatus.PENDING -> "  [${strings.refreshPending}]"
@@ -27,9 +31,11 @@ fun renderSubscriptionsText(items: List<SubscriptionItem>, strings: Strings): St
             RefreshStatus.OK -> ""
         }
         appendLine("${number(index)} ${podcast.title} — ${podcast.author}$status")
+        item.subscription.tags.takeIf { it.isNotEmpty() }?.let { appendLine("    # ${it.joinToString(" · ")}") }
         item.subscription.note?.takeIf { it.isNotBlank() }?.let { appendLine("    ✎ $it") }
         if (item.subscription.autoDownload) appendLine("    ↓ ${strings.autoDownload}")
     }
+    if (isEmpty()) append(strings.noSubscriptionFound)
 }.trimEnd()
 
 fun renderOpmlReport(report: OpmlImportReport, strings: Strings): String = buildString {
