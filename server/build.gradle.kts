@@ -28,7 +28,7 @@ sqldelight {
 }
 
 // Development only: embedded PostgreSQL and demo data, kept out of the production distribution.
-val dev by sourceSets.creating {
+val dev: SourceSet = sourceSets.create("dev") {
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
     runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
 }

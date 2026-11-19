@@ -5,7 +5,12 @@ plugins {
 
 android {
     namespace = "fr.podcast.android"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    // Compose 1.13 compiles against Android 37.1 or later.
+    compileSdk {
+        version = release(libs.versions.android.compileSdk.get().toInt()) {
+            minorApiLevel = libs.versions.android.compileSdkMinor.get().toInt()
+        }
+    }
 
     defaultConfig {
         applicationId = "fr.podcast"
