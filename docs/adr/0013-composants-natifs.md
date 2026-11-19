@@ -76,4 +76,5 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
 - Deux apps sur iPhone : l'app Compose (`fr.podcast.Podcast`) et l'app SwiftUI (`fr.podcast.apple`).
 - Une modification du Kotlin relance sur Mac un lien d'une dizaine de minutes. Avec un Xcode plus récent, le framework de débogage suffirait.
 - Les positions en attente vivent en mémoire : si l'app est fermée hors ligne, elles sont perdues. Le serveur prend toujours la dernière écriture, et l'API ne transmet pas l'heure de la mesure.
-- Hors périmètre : tests d'interface automatisés de l'app SwiftUI, gestion des comptes du serveur (administrateurs) et partages dans l'app SwiftUI. Le client léger et les apps Compose les offrent.
+- L'app SwiftUI gère aussi les comptes du serveur pour un administrateur (créer, rendre administrateur, réinitialiser un mot de passe, supprimer) : il n'y a pas d'inscription libre (ADR 0009).
+- Hors périmètre : tests d'interface automatisés de l'app SwiftUI, partages et édition des playlists dans l'app SwiftUI. Le client léger et les apps Compose les offrent.
