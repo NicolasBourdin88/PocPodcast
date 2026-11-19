@@ -183,11 +183,13 @@ erDiagram
     episode_actions {
         bigint id PK
         bigint user_id FK
+        text device_id "appareil gPodder"
         text podcast_url
         text podcast_key "URL normalisée"
         text episode_url
         text guid
         text action "play | new"
+        int started "début de l'écoute (play)"
         int position
         int total
         timestamptz happened_at
