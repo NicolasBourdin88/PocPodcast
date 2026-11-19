@@ -274,10 +274,10 @@ private fun SubscriptionList(
                 }
             }
         }
-        if (items.isEmpty()) {
+        if (shown.isEmpty()) {
             item(key = "empty") {
                 Text(
-                    strings.emptyLibrary,
+                    if (items.isEmpty()) strings.emptyLibrary else strings.noSubscriptionFound,
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

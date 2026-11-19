@@ -370,6 +370,8 @@ class WebTest {
         assertContains(library, "<span class=\"title\">Talking Kotlin</span>")
         assertContains(library, "hx-get=\"/subscriptions?tag=tech\"")
         assertContains(library, "value=\"english, tech\"")
+        // Filters that hide every subscription say so, rather than "no subscriptions yet".
+        assertContains(alice.page("/subscriptions?q=nothing"), "Aucun abonnement ne correspond.")
 
         // The episode search, every criterion in one form sent by GET.
         val search = alice.page("/episodes?q=kotlin&status=NEW&favorite=false&minRating=0")

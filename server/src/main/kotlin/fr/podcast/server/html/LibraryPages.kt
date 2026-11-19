@@ -54,9 +54,10 @@ import kotlinx.html.ul
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** What the library page shows besides the subscriptions (ADR 0009): shares given and received, and whom one can share with. */
 /** The library filters (ADR 0012): words, a tag, and the user's tags to choose from. */
 data class LibraryFilter(val text: String = "", val tag: String = "", val tags: List<String> = emptyList()) {
+    val active: Boolean get() = text.isNotBlank() || tag.isNotEmpty()
+
     /** The page with these filters, which the list reloads from. */
     val path: String
         get() = buildList {
@@ -65,6 +66,7 @@ data class LibraryFilter(val text: String = "", val tag: String = "", val tags: 
         }.let { if (it.isEmpty()) "/subscriptions" else "/subscriptions?" + it.joinToString("&") }
 }
 
+/** What the library page shows besides the subscriptions (ADR 0009): shares given and received, and whom one can share with. */
 data class LibraryView(
     val items: List<SubscriptionItem>,
     val filter: LibraryFilter = LibraryFilter(),
@@ -110,7 +112,7 @@ fun HTML.libraryPage(library: LibraryView, language: Language, user: UserAccount
             // With its filters, kept after each change.
             reloadOn(library.filter.path, "subscriptions-changed", "shares-changed")
             if (library.items.isEmpty()) {
-                p("empty") { +strings.emptyLibrary }
+                p("empty") { +if (library.filter.active) strings.noSubscriptionFound else strings.emptyLibrary }
             }
             ul("subscriptions") {
                 library.items.forEach { item ->
