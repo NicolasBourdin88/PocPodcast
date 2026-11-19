@@ -1,5 +1,6 @@
 package fr.podcast.player
 
+import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.repository.PodcastClient
@@ -38,7 +39,9 @@ data class NowPlaying(val item: EpisodeItem, val state: PlayerState) {
  * Playback shared by every client (ADR 0008): it plays episodes of the current account on an
  * [AudioPlayer] and keeps the server informed.
  * - Position: sent every [syncInterval] while playing, and at once on pause, seek or change of
- *   episode. The last write wins; a failed send is retried at the next one.
+ *   episode. The last write wins; a failed send is retried at the next one. Without network, the
+ *   latest position of each episode waits and goes at the first sync the server answers, the
+ *   loss of network said once (ADR 0013).
  * - End: the episode is marked played (the server takes it out of the queue), then the next one
  *   in the queue starts.
  * - Errors: the episode is read again once (a signed link may have expired), then the error stays.
@@ -61,6 +64,10 @@ class PlaybackController(
     private var pendingSave: Job? = null
     private var previous = PlayerState()
 
+    /** Positions the server could not get (no network), the latest of each episode. */
+    private val unsent = mutableMapOf<String, Int>()
+    private var unreachable = false
+
     val nowPlaying: StateFlow<NowPlaying?> = combine(current, player.state) { item, state ->
         item?.let { NowPlaying(it, if (state.mediaId == it.episode.id) state else PlayerState(mediaId = it.episode.id)) }
     }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -75,7 +82,10 @@ class PlaybackController(
         scope.launch {
             while (isActive) {
                 delay(syncInterval)
-                if (player.state.value.playing) mutex.withLock { save() }
+                mutex.withLock {
+                    sendUnsent()
+                    if (player.state.value.playing) save()
+                }
             }
         }
     }
@@ -86,6 +96,9 @@ class PlaybackController(
             mutex.withLock {
                 if (client === this@PlaybackController.client) return@withLock
                 save()
+                sendUnsent()
+                // What the previous account could not send stays its own.
+                unsent.clear()
                 player.stop()
                 current.value = null
                 mutableQueue.value = emptyList()
@@ -169,8 +182,11 @@ class PlaybackController(
         scope.launch { mutex.withLock { save() } }
     }
 
-    /** Sends the position and waits for the answer, before the app closes. */
-    suspend fun flush() = mutex.withLock { save() }
+    /** Sends the position (and what waited for the network) and waits for the answer, before the app closes. */
+    suspend fun flush() = mutex.withLock {
+        save()
+        sendUnsent()
+    }
 
     private fun queueChange(change: suspend (PodcastClient) -> Unit) {
         scope.launch {
@@ -259,7 +275,42 @@ class PlaybackController(
         if (state.mediaId != item.episode.id || state.status != PlayerStatus.READY) return
         val position = state.positionSeconds.toInt()
         if (position == lastSaved) return
-        if (attempt { client.updateProgress(item.episode.id, position) } != null) lastSaved = position
+        if (send(client, item.episode.id, position)) lastSaved = position
+    }
+
+    /** True once the server has it, or once kept for later because the network is out. */
+    private suspend fun send(client: PodcastClient, episodeId: String, position: Int): Boolean =
+        try {
+            client.updateProgress(episodeId, position)
+            unsent.remove(episodeId)
+            unreachable = false
+            true
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: ApiException.Unreachable) {
+            unsent[episodeId] = position
+            if (!unreachable) report(failure)
+            unreachable = true
+            true
+        } catch (failure: Exception) {
+            report(failure)
+            false
+        }
+
+    /** What waited for the network, as soon as the server answers; in silence until then. */
+    private suspend fun sendUnsent() {
+        val client = client ?: return
+        for ((episodeId, position) in unsent.toList()) {
+            try {
+                client.updateProgress(episodeId, position)
+                unsent.remove(episodeId)
+                unreachable = false
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                return
+            }
+        }
     }
 
     private suspend fun <T> attempt(block: suspend () -> T): T? =

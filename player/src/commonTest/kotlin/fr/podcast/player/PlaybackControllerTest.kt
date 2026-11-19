@@ -1,6 +1,8 @@
 package fr.podcast.player
 
 import fr.podcast.shared.model.EpisodeStatus
+import fr.podcast.shared.repository.PodcastClient
+import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.repository.FakePodcastRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +46,16 @@ private class ManualAudioPlayer : AudioPlayer {
     fun advance(seconds: Double) = state.update { it.copy(positionSeconds = it.positionSeconds + seconds) }
     fun end() = state.update { it.copy(status = PlayerStatus.ENDED, playing = false) }
     fun fail(message: String) = state.update { it.copy(status = PlayerStatus.ERROR, playing = false, error = message) }
+}
+
+/** The demo client, whose network can go out. */
+private class FlakyClient(private val repository: FakePodcastRepository) : PodcastClient by repository {
+    var offline = false
+
+    override suspend fun updateProgress(episodeId: String, positionSeconds: Int) {
+        if (offline) throw ApiException.Unreachable(IllegalStateException("No network"))
+        repository.updateProgress(episodeId, positionSeconds)
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -101,6 +113,36 @@ class PlaybackControllerTest {
         advanceTimeBy(2.seconds)
         runCurrent()
         assertEquals(600, repository.episode("e1")!!.positionSeconds)
+    }
+
+    @Test
+    fun positionsWaitForTheNetwork() = runTest {
+        val client = FlakyClient(repository)
+        val controller = PlaybackController(player, backgroundScope).also {
+            it.attach(client)
+            runCurrent()
+        }
+        val failures = mutableListOf<Throwable>()
+        backgroundScope.launch { controller.failures.toList(failures) }
+        controller.play("e1")
+        runCurrent()
+
+        client.offline = true
+        player.advance(20.0)
+        advanceTimeBy(15.seconds)
+        runCurrent()
+        player.advance(10.0)
+        controller.pause()
+        runCurrent()
+        assertEquals(0, repository.episode("e1")!!.positionSeconds)
+        // The loss of network is said once, not at every position.
+        assertEquals(1, failures.size)
+
+        // The latest position goes at the first sync the server answers.
+        client.offline = false
+        advanceTimeBy(15.seconds)
+        runCurrent()
+        assertEquals(30, repository.episode("e1")!!.positionSeconds)
     }
 
     @Test
