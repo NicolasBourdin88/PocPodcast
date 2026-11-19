@@ -1,5 +1,3 @@
-import co.touchlab.skie.configuration.DefaultArgumentInterop
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.skie)
@@ -22,15 +20,6 @@ kotlin {
         commonMain.dependencies {
             api(projects.shared)
             api(projects.player)
-        }
-    }
-}
-
-skie {
-    features {
-        group {
-            // Swift calls Kotlin functions without repeating their default values.
-            DefaultArgumentInterop.Enabled(true)
         }
     }
 }
