@@ -10,6 +10,11 @@ struct SettingsView: View {
     @State private var name = ""
     @State private var pickingAvatar = false
     @State private var addingAccount = false
+    // The server's accounts, for an administrator (ADR 0009).
+    @State private var users: [User] = []
+    @State private var addingUser = false
+    @State private var resetting: User?
+    @State private var deleting: User?
 
     var body: some View {
         let strings = model.strings
@@ -66,6 +71,29 @@ struct SettingsView: View {
             if let stats {
                 Section(strings.myListening) { ListeningView(stats: stats) }
             }
+
+            if let me, me.role == .admin {
+                Section(strings.users) {
+                    ForEach(users, id: \.id) { user in
+                        UserRow(user: user, isMe: user.id == me.id)
+                            .swipeActions {
+                                if user.id != me.id {
+                                    Button(strings.deleteUser, role: .destructive) { deleting = user }
+                                }
+                            }
+                            .contextMenu {
+                                if user.id != me.id {
+                                    Button { Task { await setRole(user, user.role == .admin ? .user : .admin) } } label: {
+                                        Label(user.role == .admin ? strings.removeAdmin : strings.makeAdmin, systemImage: "person.badge.key")
+                                    }
+                                    Button { resetting = user } label: { Label(strings.resetPassword, systemImage: "key") }
+                                    Button(role: .destructive) { deleting = user } label: { Label(strings.deleteUser, systemImage: "trash") }
+                                }
+                            }
+                    }
+                    Button { addingUser = true } label: { Label(strings.addUser, systemImage: "person.badge.plus") }
+                }
+            }
         }
         .formStyle(.grouped)
         .navigationTitle(strings.destination(destination: .settings))
@@ -77,6 +105,21 @@ struct SettingsView: View {
         .sheet(isPresented: $addingAccount) {
             NavigationStack { SignInView(onDemo: nil) }
         }
+        .sheet(isPresented: $addingUser) {
+            NewUserView { Task { await load() } }
+        }
+        .sheet(isPresented: Binding(get: { resetting != nil }, set: { if !$0 { resetting = nil } })) {
+            if let resetting { ResetPasswordView(user: resetting) }
+        }
+        .confirmationDialog(
+            deleting.map { strings.deleteUserConfirm(name: $0.displayName) } ?? "",
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(strings.deleteUser, role: .destructive) {
+                if let user = deleting { Task { await delete(user) } }
+            }
+        }
         .refreshable { await load() }
         .task(id: model.changes) { await load() }
     }
@@ -87,6 +130,22 @@ struct SettingsView: View {
             me = user
             name = user.displayName
             stats = try? await model.client.listeningStats()
+            users = user.role == .admin ? (try? await model.client.users()) ?? [] : []
+        }
+    }
+
+    private func setRole(_ user: User, _ role: UserRole) async {
+        await model.attempt {
+            _ = try await model.client.updateUser(userId: user.id, displayName: nil, role: role)
+            await load()
+        }
+    }
+
+    private func delete(_ user: User) async {
+        await model.attempt {
+            try await model.client.deleteUser(userId: user.id)
+            model.notice = model.strings.userDeleted(name: user.displayName)
+            await load()
         }
     }
 
@@ -185,5 +244,119 @@ struct AvatarPicker: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// An account of the server, as an administrator sees it.
+private struct UserRow: View {
+    @Environment(AppModel.self) private var model
+    let user: User
+    let isMe: Bool
+
+    var body: some View {
+        let strings = model.strings
+        HStack(spacing: 12) {
+            AvatarView(avatar: user.picture, size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isMe ? "\(user.displayName) (\(strings.you))" : user.displayName)
+                Text("\(user.username) · \(strings.role(role: user.role))").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// A new account, created by an administrator: there is no sign-up of one's own (ADR 0009).
+struct NewUserView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let onCreated: () -> Void
+    @State private var username = ""
+    @State private var displayName = ""
+    @State private var password = ""
+    @State private var admin = false
+    @State private var busy = false
+
+    var body: some View {
+        let strings = model.strings
+        let rules = AccountRules.shared
+        let valid = rules.validUsername(username: username) && rules.validDisplayName(displayName: displayName) && rules.validPassword(password: password)
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(strings.username, text: $username)
+                        .textContentType(.username)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+                    TextField(strings.displayName, text: $displayName)
+                    SecureField(strings.password, text: $password)
+                        .textContentType(.newPassword)
+                } footer: {
+                    Text(strings.passwordHint(minimum: rules.MIN_PASSWORD_LENGTH))
+                }
+                Section {
+                    Toggle(strings.role(role: .admin), isOn: $admin)
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(strings.addUser)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(strings.cancel) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(strings.create) { Task { await create() } }.disabled(!valid || busy)
+                }
+            }
+        }
+    }
+
+    private func create() async {
+        busy = true
+        defer { busy = false }
+        await model.attempt {
+            let user = try await model.client.createUser(username: username, displayName: displayName.trimmingCharacters(in: .whitespaces),
+                                                         password: password, role: admin ? .admin : .user)
+            model.notice = model.strings.userCreated(name: user.displayName)
+            onCreated()
+            dismiss()
+        }
+    }
+}
+
+/// A new password for someone who lost theirs; their devices sign in again.
+struct ResetPasswordView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let user: User
+    @State private var password = ""
+
+    var body: some View {
+        let strings = model.strings
+        NavigationStack {
+            Form {
+                Section {
+                    SecureField(strings.newPassword, text: $password)
+                        .textContentType(.newPassword)
+                } footer: {
+                    Text(strings.resetPasswordNotice)
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(strings.resetPasswordOf(name: user.displayName))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(strings.cancel) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(strings.save) { Task { await reset() } }.disabled(!AccountRules.shared.validPassword(password: password))
+                }
+            }
+        }
+    }
+
+    private func reset() async {
+        await model.attempt {
+            try await model.client.resetPassword(userId: user.id, password: password)
+            model.notice = model.strings.passwordReset(name: user.displayName)
+            dismiss()
+        }
     }
 }

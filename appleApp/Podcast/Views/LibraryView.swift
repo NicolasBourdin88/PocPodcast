@@ -2,17 +2,37 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PodcastKit
 
-/// Library: the subscriptions, or the search of their episodes (ADR 0012).
+/// Library: the subscriptions, or the search of their episodes (ADR 0012). The switch, the search
+/// field and the menu stay the same from one to the other, so that nothing moves; only what they
+/// hold changes.
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
     @State private var showEpisodes = false
+    @State private var query = ""
+    // The subscriptions are loaded here: the menu offers their tags.
+    @State private var items: [SubscriptionItem]?
+    @State private var error: String?
+    @State private var tag: String?
+    // The episodes' other criteria.
+    @State private var status: EpisodeStatus?
+    @State private var favoritesOnly = false
+    @State private var minRating: Int32 = 0
+    @State private var importing = false
+    @State private var exported: OpmlDocument?
 
     var body: some View {
         let strings = model.strings
+        let tags = TagRules.shared.sorted(tags: (items ?? []).flatMap { $0.subscription.tags })
+        let filtered = showEpisodes ? status != nil || favoritesOnly || minRating > 0 : tag != nil
         Group {
-            if showEpisodes { EpisodeSearchView() } else { SubscriptionsView() }
+            if showEpisodes {
+                EpisodeResults(criteria: EpisodeCriteria(text: query, status: status, favoritesOnly: favoritesOnly, minRating: minRating))
+            } else {
+                SubscriptionsList(items: items, error: error, query: query, tag: tag) { Task { await load() } }
+            }
         }
         .navigationTitle(strings.destination(destination: .library))
+        .searchable(text: $query, prompt: showEpisodes ? strings.searchEpisodes : strings.filterLibrary)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker(strings.destination(destination: .library), selection: $showEpisodes) {
@@ -22,76 +42,33 @@ struct LibraryView: View {
                 .pickerStyle(.segmented)
                 .fixedSize()
             }
-        }
-        .navigationDestination(for: SubscriptionItem.self) { PodcastView(item: $0) }
-    }
-}
-
-/// The subscriptions, filtered as everywhere else (words and a tag), with OPML in and out.
-struct SubscriptionsView: View {
-    @Environment(AppModel.self) private var model
-    @State private var items: [SubscriptionItem]?
-    @State private var error: String?
-    @State private var text = ""
-    @State private var tag: String?
-    @State private var importing = false
-    @State private var exported: OpmlDocument?
-
-    var body: some View {
-        let strings = model.strings
-        let all = items ?? []
-        let shown = all.filter { $0.matches(text: text, tag: tag) }
-        let tags = TagRules.shared.sorted(tags: all.flatMap { $0.subscription.tags })
-        List(shown, id: \.subscription.id) { item in
-            NavigationLink(value: item) {
-                HStack(spacing: 12) {
-                    ArtworkView(podcast: item.podcast, size: 52)
-                    VStack(alignment: .leading, spacing: 2) {
-                        if !item.subscription.tags.isEmpty {
-                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(Color.brand)
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    if showEpisodes {
+                        Picker(strings.statusLabel, selection: $status) {
+                            Text(strings.anyStatus).tag(EpisodeStatus?.none)
+                            ForEach(EpisodeStatus.allCases, id: \.self) { Text(strings.statusFilter(status: $0)).tag(EpisodeStatus?.some($0)) }
                         }
-                        Text(item.podcast.title).font(.headline).lineLimit(1)
-                        Text(item.subscription.note.flatMap { $0.isEmpty ? nil : $0 } ?? item.podcast.author)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-        }
-        .overlay {
-            if let error {
-                EmptyState(text: error, systemImage: "wifi.exclamationmark", retry: { Task { await load() } }, retryLabel: strings.retry)
-            } else if items == nil {
-                ProgressView()
-            } else if shown.isEmpty {
-                EmptyState(text: all.isEmpty ? strings.emptyLibrary : strings.noSubscriptionFound, systemImage: "square.stack")
-            }
-        }
-        .searchable(text: $text, prompt: strings.filterLibrary)
-        .toolbar {
-            if !tags.isEmpty {
-                ToolbarItem {
-                    Menu {
+                        Toggle(strings.favoritesOnly, isOn: $favoritesOnly)
+                        Picker(strings.minRating, selection: $minRating) {
+                            Text(strings.anyRating).tag(Int32(0))
+                            ForEach(Int32(1)...Int32(5), id: \.self) { Text(strings.stars(rating: $0)).tag($0) }
+                        }
+                    } else if !tags.isEmpty {
                         Picker(strings.tags, selection: $tag) {
                             Text(strings.allTags).tag(String?.none)
                             ForEach(tags, id: \.self) { Text($0).tag(String?.some($0)) }
                         }
-                    } label: {
-                        Label(tag ?? strings.tags, systemImage: tag == nil ? "tag" : "tag.fill")
                     }
-                }
-            }
-            ToolbarItem {
-                Menu {
-                    Button { importing = true } label: { Label(strings.opmlImport, systemImage: "square.and.arrow.down") }
-                    Button { Task { await export() } } label: { Label(strings.opmlExport, systemImage: "square.and.arrow.up") }
+                    Section {
+                        Button { importing = true } label: { Label(strings.opmlImport, systemImage: "square.and.arrow.down") }
+                        Button { Task { await export() } } label: { Label(strings.opmlExport, systemImage: "square.and.arrow.up") }
+                    }
                 } label: {
-                    Label(strings.moreActions, systemImage: "ellipsis")
+                    Label(strings.moreActions, systemImage: filtered ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 }
             }
         }
-        .refreshable { await load() }
         .task(id: model.changes) { await load() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.opml, .xml]) { result in
             if case .success(let url) = result { Task { await importOpml(url) } }
@@ -100,6 +77,7 @@ struct SubscriptionsView: View {
                       contentType: .opml, defaultFilename: "podcasts.opml") { result in
             if case .success(let url) = result { model.notice = strings.opmlSaved(name: url.lastPathComponent) }
         }
+        .navigationDestination(for: SubscriptionItem.self) { PodcastView(item: $0) }
     }
 
     private func load() async {
@@ -125,6 +103,49 @@ struct SubscriptionsView: View {
             model.notice = model.strings.opmlReport(imported: report.imported, alreadySubscribed: report.alreadySubscribed, failed: Int32(report.failed.count))
             model.changed()
         }
+    }
+}
+
+/// The subscriptions, filtered as everywhere else: every word, and the tag.
+private struct SubscriptionsList: View {
+    @Environment(AppModel.self) private var model
+    let items: [SubscriptionItem]?
+    let error: String?
+    let query: String
+    let tag: String?
+    let retry: () -> Void
+
+    var body: some View {
+        let strings = model.strings
+        let all = items ?? []
+        let shown = all.filter { $0.matches(text: query, tag: tag) }
+        List(shown, id: \.subscription.id) { item in
+            NavigationLink(value: item) {
+                HStack(spacing: 12) {
+                    ArtworkView(podcast: item.podcast, size: 52)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !item.subscription.tags.isEmpty {
+                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(Color.brand)
+                        }
+                        Text(item.podcast.title).font(.headline).lineLimit(1)
+                        Text(item.subscription.note.flatMap { $0.isEmpty ? nil : $0 } ?? item.podcast.author)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+        .overlay {
+            if let error {
+                EmptyState(text: error, systemImage: "wifi.exclamationmark", retry: retry, retryLabel: strings.retry)
+            } else if items == nil {
+                ProgressView()
+            } else if shown.isEmpty {
+                EmptyState(text: all.isEmpty ? strings.emptyLibrary : strings.noSubscriptionFound, systemImage: "square.stack")
+            }
+        }
+        .refreshable { retry() }
     }
 }
 
@@ -258,22 +279,19 @@ struct SubscriptionEditor: View {
     }
 }
 
-/// The search of the user's episodes (ADR 0012): words in the search field, the other criteria
-/// in a menu; sent a moment after the last change.
-struct EpisodeSearchView: View {
-    @Environment(AppModel.self) private var model
-    @State private var text = ""
-    @State private var status: EpisodeStatus?
-    @State private var favoritesOnly = false
-    @State private var minRating: Int32 = 0
-    @State private var page: EpisodePage?
+/// The episode criteria, from the library's search field and menu.
+struct EpisodeCriteria: Equatable {
+    let text: String
+    let status: EpisodeStatus?
+    let favoritesOnly: Bool
+    let minRating: Int32
+}
 
-    private struct Criteria: Equatable {
-        let text: String
-        let status: EpisodeStatus?
-        let favoritesOnly: Bool
-        let minRating: Int32
-    }
+/// The search of the user's episodes (ADR 0012), sent a moment after the last change.
+private struct EpisodeResults: View {
+    @Environment(AppModel.self) private var model
+    let criteria: EpisodeCriteria
+    @State private var page: EpisodePage?
 
     var body: some View {
         let strings = model.strings
@@ -287,29 +305,17 @@ struct EpisodeSearchView: View {
         .overlay {
             if page == nil { ProgressView() } else if page?.items.isEmpty == true { EmptyState(text: strings.noEpisodeFound, systemImage: "magnifyingglass") }
         }
-        .searchable(text: $text, prompt: strings.searchEpisodes)
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    Picker(strings.statusLabel, selection: $status) {
-                        Text(strings.anyStatus).tag(EpisodeStatus?.none)
-                        ForEach(EpisodeStatus.allCases, id: \.self) { Text(strings.statusFilter(status: $0)).tag(EpisodeStatus?.some($0)) }
-                    }
-                    Toggle(strings.favoritesOnly, isOn: $favoritesOnly)
-                    Picker(strings.minRating, selection: $minRating) {
-                        Text(strings.anyRating).tag(Int32(0))
-                        ForEach(Int32(1)...Int32(5), id: \.self) { Text(strings.stars(rating: $0)).tag($0) }
-                    }
-                } label: {
-                    Label(strings.statusLabel, systemImage: "line.3.horizontal.decrease.circle")
-                }
-            }
-        }
-        .task(id: Criteria(text: text, status: status, favoritesOnly: favoritesOnly, minRating: minRating)) {
+        .refreshable { await search() }
+        .task(id: criteria) {
             if page != nil { try? await Task.sleep(for: .milliseconds(300)) }
             guard !Task.isCancelled else { return }
-            let query = EpisodeQuery(text: text, status: status, favoritesOnly: favoritesOnly, minRating: minRating, from: nil, to: nil, podcastId: nil, tag: nil)
-            await model.attempt { page = try await model.client.searchEpisodes(query: query, limit: 100, offset: 0) }
+            await search()
         }
+    }
+
+    private func search() async {
+        let query = EpisodeQuery(text: criteria.text, status: criteria.status, favoritesOnly: criteria.favoritesOnly, minRating: criteria.minRating,
+                                 from: nil, to: nil, podcastId: nil, tag: nil)
+        await model.attempt { page = try await model.client.searchEpisodes(query: query, limit: 100, offset: 0) }
     }
 }

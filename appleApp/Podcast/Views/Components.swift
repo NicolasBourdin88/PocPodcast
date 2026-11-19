@@ -13,29 +13,77 @@ extension Color {
     static let brand = Color(rgb: DesignTokens.shared.light.primary)
 }
 
-/// The podcast's artwork; until it loads (or without one), its initials on its color.
+#if os(iOS)
+typealias PlatformImage = UIImage
+#else
+typealias PlatformImage = NSImage
+#endif
+
+extension Image {
+    init(platformImage: PlatformImage) {
+        #if os(iOS)
+        self.init(uiImage: platformImage)
+        #else
+        self.init(nsImage: platformImage)
+        #endif
+    }
+}
+
+/// The artworks already downloaded, by address. A view created again (the mini player is, at each
+/// new position) shows its image at once, instead of the initials while it loads again.
+@MainActor
+final class ArtworkCache {
+    static let shared = ArtworkCache()
+    private let images = NSCache<NSURL, PlatformImage>()
+    private var loading: [URL: Task<PlatformImage?, Never>] = [:]
+
+    func image(for url: URL) -> PlatformImage? {
+        images.object(forKey: url as NSURL)
+    }
+
+    /// The image, downloaded once even when several views ask for it together.
+    func load(_ url: URL) async -> PlatformImage? {
+        if let image = image(for: url) { return image }
+        if let task = loading[url] { return await task.value }
+        let task = Task<PlatformImage?, Never> {
+            guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+            return PlatformImage(data: data)
+        }
+        loading[url] = task
+        let image = await task.value
+        loading[url] = nil
+        if let image { images.setObject(image, forKey: url as NSURL) }
+        return image
+    }
+}
+
+/// The podcast's artwork; without one (or until the first download), its initials on its color.
 struct ArtworkView: View {
     let podcast: Podcast
     let size: CGFloat
+    @State private var loaded: PlatformImage?
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.2, style: .continuous)
+        let url = podcast.artworkUrl.flatMap(URL.init(string:))
+        let image = loaded ?? url.flatMap { ArtworkCache.shared.image(for: $0) }
         ZStack {
-            shape.fill(Color(rgb: podcast.artworkColor))
-            Text(podcast.initials)
-                .font(.system(size: size * 0.32, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            if let url = podcast.artworkUrl.flatMap(URL.init(string:)) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color.clear
-                }
+            if let image {
+                Image(platformImage: image).resizable().scaledToFill()
+            } else {
+                shape.fill(Color(rgb: podcast.artworkColor))
+                Text(podcast.initials)
+                    .font(.system(size: size * 0.32, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
             }
         }
         .frame(width: size, height: size)
         .clipShape(shape)
         .accessibilityHidden(true)
+        .task(id: url) {
+            guard let url, loaded == nil else { return }
+            loaded = await ArtworkCache.shared.load(url)
+        }
     }
 }
 
