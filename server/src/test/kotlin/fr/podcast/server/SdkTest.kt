@@ -9,6 +9,7 @@ import fr.podcast.shared.api.userMessage
 import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.home.LoadHomeState
 import fr.podcast.shared.model.Access
+import fr.podcast.shared.model.EpisodeQuery
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.FileStatus
 import fr.podcast.shared.model.PlaylistOrder
@@ -19,6 +20,7 @@ import fr.podcast.shared.repository.RemotePodcastRepository
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
+import kotlinx.datetime.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -119,6 +121,38 @@ class SdkTest {
         val basic = "Basic " + java.util.Base64.getEncoder().encodeToString("${TestSeed.ALICE}:$password".toByteArray())
         val login = client.post("/api/2/auth/alice/login.json") { header(HttpHeaders.Authorization, basic) }
         assertEquals(HttpStatusCode.OK, login.status)
+    }
+
+    @Test
+    fun sdkSearchesTagsAndCountsListening() = testApplication {
+        podcastServer()
+        val account = AccountService(client, deviceName = "SDK test").signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
+        val repository = RemotePodcastRepository(account, client)
+
+        // Tags through the update template (ADR 0012); a change that leaves them out keeps them.
+        val kotlin = repository.subscriptionItems().single { it.podcast.title == "Talking Kotlin" }
+        val tagged = repository.updateSubscription(kotlin.subscription.id, null, autoDownload = false, tags = listOf("tech", "english"))
+        assertEquals(listOf("english", "tech"), tagged.subscription.tags)
+        assertEquals(listOf("english", "tech"), repository.updateSubscription(kotlin.subscription.id, "JetBrains", autoDownload = false).subscription.tags)
+
+        // Every criterion through the root's episodes template, page by page.
+        assertEquals(listOf("1", "9"), repository.searchEpisodes(EpisodeQuery("kotlin", status = EpisodeStatus.NEW, tag = "TECH")).items.map { it.episode.id })
+        assertEquals(listOf("3", "4"), repository.searchEpisodes(EpisodeQuery(from = LocalDate(2026, 10, 1), to = LocalDate(2026, 10, 8))).items.map { it.episode.id })
+        val first = repository.searchEpisodes(EpisodeQuery("kotlin"), limit = 2)
+        val second = repository.searchEpisodes(EpisodeQuery("kotlin"), limit = 2, offset = 2)
+        assertEquals(4, first.total)
+        assertEquals(listOf("1", "2", "5", "9"), (first.items + second.items).map { it.episode.id })
+
+        // Listening, through the me link.
+        assertEquals(0, repository.listeningStats().totalSeconds)
+        repository.updateProgress("7", positionSeconds = 15)
+        repository.updateProgress("7", positionSeconds = 30)
+        repository.markPlayed("7")
+        val stats = repository.listeningStats()
+        assertEquals(30, stats.totalSeconds)
+        assertEquals(1, stats.episodesFinished)
+        assertEquals("Fragmented", stats.byPodcast.single().podcastTitle)
+        assertEquals(12, stats.byMonth.size)
     }
 
     @Test
