@@ -141,7 +141,7 @@ fun tokenResource(token: IssuedToken): JsonObject = buildJsonObject {
     links("self" to "/auth/tokens/current", "me" to "/me")
 }
 
-fun UserAccount.toUser() = User(id.toString(), username, displayName, UserRole.valueOf(role.name))
+fun UserAccount.toUser() = User(id.toString(), username, displayName, UserRole.valueOf(role.name), avatar)
 
 /** How much the user listened (ADR 0012). */
 fun statsResource(stats: ListeningStats): JsonObject = buildJsonObject {

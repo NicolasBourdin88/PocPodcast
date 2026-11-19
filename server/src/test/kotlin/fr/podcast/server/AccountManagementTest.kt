@@ -1,5 +1,7 @@
 package fr.podcast.server
 
+import fr.podcast.shared.model.Avatar
+import kotlinx.serialization.json.JsonNull
 import fr.podcast.server.auth.Accounts
 import fr.podcast.server.auth.Role
 import io.ktor.client.HttpClient
@@ -159,6 +161,20 @@ class AccountManagementTest {
         val blank = client.send(HttpMethod.Patch, "/me", laptop, """{"displayName":"  "}""")
         assertEquals("between 1 and 100 characters", blank.json()["errors"]!!.jsonArray.single().jsonObject["message"]!!.jsonPrimitive.content)
         assertEquals("displayName", field(blank))
+
+        // The avatar (ADR 0013): none at first, one of the catalog's, offered by the template, kept with the name.
+        assertEquals(JsonNull, client.getJson("/me", laptop)["avatar"])
+        val options = client.getJson("/me", laptop)["_templates"]!!.jsonObject["update-profile"]!!.jsonObject["properties"]!!.jsonArray
+            .single { it.jsonObject["name"]!!.jsonPrimitive.content == "avatar" }.jsonObject["options"]!!.jsonObject["inline"]!!.jsonArray
+        assertEquals(Avatar.ids, options.map { it.jsonPrimitive.content })
+        val owl = client.send(HttpMethod.Patch, "/me", laptop, """{"avatar":"owl"}""").json()
+        assertEquals("owl", owl["avatar"]!!.jsonPrimitive.content)
+        assertEquals("Robert", owl["displayName"]!!.jsonPrimitive.content)
+        assertEquals("avatar", field(client.send(HttpMethod.Patch, "/me", laptop, """{"avatar":"dragon"}""")))
+        assertEquals("displayName", field(client.send(HttpMethod.Patch, "/me", laptop, "{}")))
+        // Everyone sees it.
+        val directory = client.getJson("/users", client.token())["_embedded"]!!.jsonObject["users"]!!.jsonArray.map { it.jsonObject }
+        assertEquals("owl", directory.single { it["username"]!!.jsonPrimitive.content == TestSeed.BOB }["avatar"]!!.jsonPrimitive.content)
     }
 
     @Test

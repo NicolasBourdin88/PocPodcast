@@ -1,5 +1,6 @@
 package fr.podcast.server
 
+import fr.podcast.shared.model.Avatar
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.FormDataContent
@@ -355,6 +356,27 @@ class WebTest {
         assertTrue(Regex("<code class=\"secret\">[A-Za-z0-9_-]{43}</code>").containsMatchIn(answer))
         // From then on, one of the devices.
         assertContains(alice.page("/me"), "<span class=\"title\">AntennaPod</span>")
+    }
+
+    @Test
+    fun avatarsAreChosenWithAClick() = testApplication {
+        podcastServer()
+        val alice = browser()
+        alice.login()
+
+        // Before any choice, the one taken from the username, in the header and checked in the picker.
+        val before = alice.page("/me")
+        val default = Avatar.default(TestSeed.ALICE)
+        assertContains(before, "class=\"avatar small\"")
+        assertContains(before, "value=\"${default.id}\" checked")
+        assertEquals(Avatar.entries.size, Regex("name=\"avatar\"").findAll(before).count())
+        // The picker saves as soon as one is clicked.
+        assertContains(before, "hx-trigger=\"change\"")
+
+        assertContains(alice.htmx(HttpMethod.Patch, "/me", "avatar" to "rocket").bodyAsText(), "Profil enregistré")
+        val after = alice.page("/me")
+        assertContains(after, "value=\"rocket\" checked")
+        assertContains(after, Avatar.Rocket.emoji)
     }
 
     @Test

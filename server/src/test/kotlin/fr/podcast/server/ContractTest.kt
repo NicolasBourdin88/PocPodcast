@@ -260,6 +260,8 @@ class ContractTest {
         check(get, "/me", "/me", HttpStatusCode.Unauthorized, token = null)
         check(patch, "/me", "/me", HttpStatusCode.OK, body = """{"displayName":"Alice"}""")
         check(patch, "/me", "/me", HttpStatusCode.UnprocessableEntity, body = """{"displayName":""}""")
+        check(patch, "/me", "/me", HttpStatusCode.OK, body = """{"avatar":"owl"}""")
+        check(patch, "/me", "/me", HttpStatusCode.UnprocessableEntity, body = """{"avatar":"dragon"}""")
         check(put, "/me/password", "/me/password", HttpStatusCode.NoContent,
             body = """{"currentPassword":"${TestSeed.ALICE_PASSWORD}","newPassword":"${TestSeed.ALICE_PASSWORD}"}""")
         check(put, "/me/password", "/me/password", HttpStatusCode.UnprocessableEntity, body = """{"currentPassword":"wrong","newPassword":"long-enough"}""")

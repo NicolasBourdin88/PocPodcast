@@ -18,6 +18,8 @@ data class UserAccount(
     val role: Role,
     /** Incremented by every new password: sessions carry it and expire with it. */
     val credentialsVersion: Int = 0,
+    /** An [fr.podcast.shared.model.Avatar] id, none until the user chooses (ADR 0013). */
+    val avatar: String? = null,
 )
 
 data class IssuedToken(val value: String, val deviceName: String, val createdAt: Instant)
@@ -54,11 +56,15 @@ class Accounts(private val database: ServerDatabase) {
         // Check with the parameters stored in the hash, not the configured ones (withArgon2()):
         // raising the Argon2 cost later must not lock out existing accounts.
         val matches = Password.check(password, hash).with(Argon2Function.getInstanceFromHash(hash))
-        return row?.takeIf { matches }?.let { account(it.id, it.username, it.display_name, it.password_hash, it.role, it.credentials_version) }
+        return row?.takeIf { matches }?.let { account(it.id, it.username, it.display_name, it.password_hash, it.role, it.credentials_version, it.avatar) }
     }
 
     suspend fun rename(userId: Long, displayName: String) {
         database.query { usersQueries.updateDisplayName(displayName, userId) }
+    }
+
+    suspend fun setAvatar(userId: Long, avatar: String) {
+        database.query { usersQueries.updateAvatar(avatar, userId) }
     }
 
     /** False when it would leave the server without an administrator. */
@@ -142,5 +148,5 @@ class Accounts(private val database: ServerDatabase) {
 private val TOKEN_FORMAT = Regex("[A-Za-z0-9_-]{43}")
 
 @Suppress("UNUSED_PARAMETER")
-private fun account(id: Long, username: String, displayName: String, passwordHash: String, role: String, credentialsVersion: Int) =
-    UserAccount(id, username, displayName, Role.valueOf(role), credentialsVersion)
+private fun account(id: Long, username: String, displayName: String, passwordHash: String, role: String, credentialsVersion: Int, avatar: String?) =
+    UserAccount(id, username, displayName, Role.valueOf(role), credentialsVersion, avatar)

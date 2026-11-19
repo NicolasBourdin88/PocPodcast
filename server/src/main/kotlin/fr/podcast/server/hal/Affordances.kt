@@ -1,5 +1,6 @@
 package fr.podcast.server.hal
 
+import fr.podcast.shared.model.Avatar
 import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.EpisodeStatus
@@ -56,7 +57,11 @@ object Affordances {
     val logout = Affordance("logout", HttpMethod.Delete, "/auth/tokens/current")
 
     // Accounts (ADR 0009).
-    val updateProfile = Affordance("update-profile", HttpMethod.Patch, "/me", listOf(AffordanceProperty("displayName", required = true)))
+    /** The name, the picture (one of the shared catalog's, ADR 0013), or both. */
+    val updateProfile = Affordance(
+        "update-profile", HttpMethod.Patch, "/me",
+        listOf(AffordanceProperty("displayName"), AffordanceProperty("avatar", options = Avatar.ids)),
+    )
 
     val changePassword = Affordance(
         "change-password", HttpMethod.Put, "/me/password",

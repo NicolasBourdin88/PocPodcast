@@ -5,17 +5,17 @@ RETURNING id;
 
 -- Same columns for the three queries below, so that one mapper builds an account.
 userByUsername:
-SELECT id, username, display_name, password_hash, role, credentials_version
+SELECT id, username, display_name, password_hash, role, credentials_version, avatar
 FROM users
 WHERE username = :username;
 
 userById:
-SELECT id, username, display_name, password_hash, role, credentials_version
+SELECT id, username, display_name, password_hash, role, credentials_version, avatar
 FROM users
 WHERE id = :id;
 
 allUsers:
-SELECT id, username, display_name, password_hash, role, credentials_version
+SELECT id, username, display_name, password_hash, role, credentials_version, avatar
 FROM users
 ORDER BY lower(display_name), id;
 
@@ -27,6 +27,9 @@ SELECT count(*) FROM users WHERE role = 'ADMIN';
 
 updateDisplayName:
 UPDATE users SET display_name = :displayName WHERE id = :id;
+
+updateAvatar:
+UPDATE users SET avatar = :avatar WHERE id = :id;
 
 updateRole:
 UPDATE users SET role = :role WHERE id = :id;

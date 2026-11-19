@@ -191,6 +191,9 @@ class SdkTest {
 
         assertEquals(UserRole.ADMIN, alice.me().role)
         assertEquals("Alice B.", alice.updateProfile("Alice B.").displayName)
+        // The avatar alone, through the template's options (ADR 0013); a new sign-in brings it.
+        assertEquals("owl", alice.updateProfile(avatar = "owl").avatar)
+        assertEquals("owl", service.signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD).avatar)
         val carol = alice.createUser("carol", "Carol", "carol-password")
         assertEquals(listOf("Alice B.", "Bob", "Carol"), alice.users().map { it.displayName })
         val taken = assertFailsWith<ApiException.Rejected> { alice.createUser("carol", "Carol", "carol-password") }

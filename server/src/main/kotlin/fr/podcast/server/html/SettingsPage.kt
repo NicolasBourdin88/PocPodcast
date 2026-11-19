@@ -53,6 +53,7 @@ fun HTML.settingsPage(user: UserAccount, devices: List<Device>, users: List<User
         section("settings") {
             h2 { +strings.profile }
             p("meta") { +"${user.username} · ${strings.role(user.role.toUserRole())}" }
+            avatarPicker(user, strings)
             form(classes = "fields") {
                 attributes["hx-patch"] = "/me"
                 attributes["hx-target"] = "#profile-result"
@@ -141,6 +142,7 @@ private fun FlowContent.usersSection(admin: UserAccount, users: List<UserAccount
             users.forEach { account ->
                 val self = account.id == admin.id
                 li("row") {
+                    avatar(account.picture)
                     div("card-body") {
                         span("title") { +(if (self) "${account.displayName} (${strings.you})" else account.displayName) }
                         span("meta") { +"${account.username} · ${strings.role(account.role.toUserRole())}" }

@@ -1,5 +1,6 @@
 package fr.podcast.server.api
 
+import fr.podcast.shared.model.Avatar
 import fr.podcast.server.ServerServices
 import fr.podcast.server.auth.BEARER_AUTH
 import fr.podcast.server.auth.Role
@@ -67,14 +68,20 @@ fun Route.accountRoutes(services: ServerServices) {
 
         patch("/me") {
             val user = call.mutatingUser() ?: return@patch
-            val displayName = call.receiveFields()?.stringField("displayName")?.trim()
-            if (displayName.isNullOrEmpty() || displayName.length > AccountRules.MAX_DISPLAY_NAME_LENGTH) {
-                return@patch call.respondProblem(
-                    HttpStatusCode.UnprocessableEntity, "Invalid profile",
-                    listOf(FieldError("displayName", "between 1 and ${AccountRules.MAX_DISPLAY_NAME_LENGTH} characters")),
-                )
+            val fields = call.receiveFields() ?: emptyMap()
+            // What is given changes: the name, the picture (ADR 0013), or both.
+            val displayName = fields.stringField("displayName")?.trim()
+            val avatar = fields.stringField("avatar")?.takeIf { it.isNotEmpty() }
+            val errors = buildList {
+                if (displayName != null && !AccountRules.validDisplayName(displayName)) {
+                    add(FieldError("displayName", "between 1 and ${AccountRules.MAX_DISPLAY_NAME_LENGTH} characters"))
+                }
+                if (avatar != null && Avatar.of(avatar) == null) add(FieldError("avatar", "one of ${Avatar.ids.joinToString()}"))
+                if (displayName == null && avatar == null) add(FieldError("displayName", "a name or an avatar is needed"))
             }
-            accounts.rename(user.id, displayName)
+            if (errors.isNotEmpty()) return@patch call.respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid profile", errors)
+            displayName?.let { accounts.rename(user.id, it) }
+            avatar?.let { accounts.setAvatar(user.id, it) }
             if (call.isHtmx) return@patch call.respondNotice(call.language().strings.profileSaved)
             val representation = call.representation()
             call.respondResource(meResource(accounts.user(user.id)!!, representation.forms), representation)

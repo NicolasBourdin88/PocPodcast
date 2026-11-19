@@ -87,6 +87,7 @@ fun HTML.page(
                 h1 { +title }
                 if (user != null) {
                     div("account") {
+                        avatar(user.picture, size = "small")
                         span { +strings.signedInAs(user.displayName) }
                         form(action = "/logout", method = FormMethod.post) {
                             button(classes = "link") { +strings.signOut }
@@ -149,6 +150,19 @@ private val STYLES = """
       flex: none; width: 56px; height: 56px; border-radius: 10px; display: grid; place-items: center;
       color: white; font-weight: 700;
     }
+    .avatar {
+      flex: none; width: 40px; height: 40px; border-radius: 10px; display: inline-grid; place-items: center;
+      font-size: 24px; line-height: 1;
+    }
+    .avatar.small { width: 28px; height: 28px; border-radius: 8px; font-size: 17px; }
+    .avatar.large { width: 64px; height: 64px; border-radius: 14px; font-size: 38px; }
+    .account { display: flex; align-items: center; gap: 8px; }
+    .avatars fieldset { border: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .avatars legend { color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+    .avatars label { cursor: pointer; border-radius: 18px; padding: 3px; border: 3px solid transparent; }
+    .avatars input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .avatars label:has(input:checked) { border-color: var(--accent); }
+    .avatars label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
     .section-header { display: flex; align-items: center; justify-content: space-between; }
     button { font: inherit; border: none; border-radius: 999px; background: var(--card); color: var(--text); padding: 8px 16px; cursor: pointer; }
     button.link { background: none; padding: 0; color: var(--accent); text-decoration: underline; }

@@ -119,7 +119,7 @@ paths:
     patch:
       tags: [comptes]
       operationId: updateProfile
-      summary: Changer son nom affiché (template `update-profile`)
+      summary: Changer son nom affiché ou son avatar (template `update-profile`)
       requestBody:
         required: true
         content:
@@ -1924,12 +1924,16 @@ components:
     User:
       description: Un compte. `/me` ajoute les liens `devices`, `users` et `stats`.
       type: object
-      required: [id, username, displayName, role, _links]
+      required: [id, username, displayName, role, avatar, _links]
       properties:
         id: { type: string }
         username: { type: string }
         displayName: { type: string }
         role: { type: string, enum: [USER, ADMIN] }
+        avatar:
+          description: L'avatar choisi (ADR 0013) ; null tant que l'utilisateur n'en a pas choisi, les clients en déduisent alors un de l'identifiant.
+          type: [string, "null"]
+          enum: [fox, panda, owl, octopus, frog, tiger, penguin, whale, unicorn, koala, headphones, rocket, null]
         _links:
           type: object
           required: [self]
@@ -1995,10 +1999,15 @@ components:
       additionalProperties: false
 
     ProfileUpdate:
+      description: Ce qui est donné change, le nom, l'avatar ou les deux (ADR 0013).
       type: object
-      required: [displayName]
+      minProperties: 1
       properties:
         displayName: { type: string, minLength: 1, maxLength: 100 }
+        avatar:
+          description: Un avatar du catalogue partagé (`Avatar` dans `:shared`), aussi donné par les `options` du template.
+          type: string
+          enum: [fox, panda, owl, octopus, frog, tiger, penguin, whale, unicorn, koala, headphones, rocket]
       additionalProperties: false
 
     PasswordChange:
@@ -2183,12 +2192,16 @@ components:
 
     UserSummary:
       type: object
-      required: [id, username, displayName, role]
+      required: [id, username, displayName, role, avatar]
       properties:
         id: { type: string }
         username: { type: string }
         displayName: { type: string }
         role: { type: string, enum: [USER, ADMIN] }
+        avatar:
+          description: L'avatar choisi (ADR 0013), null tant qu'il n'y en a pas.
+          type: [string, "null"]
+          enum: [fox, panda, owl, octopus, frog, tiger, penguin, whale, unicorn, koala, headphones, rocket, null]
       additionalProperties: false
 
     SubscriptionShares:
