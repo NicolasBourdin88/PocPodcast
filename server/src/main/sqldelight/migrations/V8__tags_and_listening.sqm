@@ -20,13 +20,13 @@ CREATE TABLE listening_days (
 );
 
 -- The history so far, estimated from the current state: played episodes count in full, the
--- others up to their position, on the day their state last changed.
+-- others up to their position, on the day (UTC) their state last changed.
 INSERT INTO listening_days(user_id, day, feed_url, podcast_title, seconds, finished)
-SELECT s.user_id, CAST(s.updated_at AS DATE), p.feed_url, p.title,
+SELECT s.user_id, CAST(s.updated_at AT TIME ZONE 'UTC' AS DATE), p.feed_url, p.title,
        SUM(CASE WHEN s.status = 'PLAYED' THEN e.duration_seconds ELSE s.position_seconds END),
        SUM(CASE WHEN s.status = 'PLAYED' THEN 1 ELSE 0 END)
 FROM playback_states s
 JOIN episodes e ON e.id = s.episode_id
 JOIN podcasts p ON p.id = e.podcast_id
 WHERE s.status = 'PLAYED' OR s.position_seconds > 0
-GROUP BY s.user_id, CAST(s.updated_at AS DATE), p.feed_url, p.title;
+GROUP BY s.user_id, CAST(s.updated_at AT TIME ZONE 'UTC' AS DATE), p.feed_url, p.title;
