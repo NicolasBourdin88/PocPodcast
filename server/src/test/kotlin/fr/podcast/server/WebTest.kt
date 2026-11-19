@@ -369,6 +369,8 @@ class WebTest {
         assertEquals(1, Regex("<li class=\"subscription\">").findAll(library).count())
         assertContains(library, "<span class=\"title\">Talking Kotlin</span>")
         assertContains(library, "hx-get=\"/subscriptions?tag=tech\"")
+        // The tags to filter by follow the changes too.
+        assertContains(library, "id=\"library-filters\" hx-get=\"/subscriptions?tag=tech\"")
         assertContains(library, "value=\"english, tech\"")
         // Filters that hide every subscription say so, rather than "no subscriptions yet".
         assertContains(alice.page("/subscriptions?q=nothing"), "Aucun abonnement ne correspond.")

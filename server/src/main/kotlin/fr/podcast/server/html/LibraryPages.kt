@@ -104,7 +104,12 @@ fun HTML.libraryPage(library: LibraryView, language: Language, user: UserAccount
             }
             p { id = "opml-result" }
         }
-        libraryFilters(library.filter, strings)
+        div {
+            id = "library-filters"
+            // The tags to choose from change with the subscriptions.
+            reloadOn(library.filter.path, "subscriptions-changed")
+            libraryFilters(library.filter, strings)
+        }
         // Outside the list, which reloads after each change: the answer to a share stays visible.
         result("library-notice")
         div {
