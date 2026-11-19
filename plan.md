@@ -246,9 +246,18 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 9 — Confort
 
-- [ ] Recherche et filtres multicritères (note, description, date, statut, mots-clés).
-- [ ] Notation, favoris, tags. → notation et favoris faits à l'étape 7 (ADR 0010) ; restent les tags.
-- [ ] Statistiques d'écoute.
+- [x] Recherche et filtres multicritères (note, description, date, statut, mots-clés). → `GET /episodes` et ses filtres cumulables (mots, statut, favoris, note minimale, période, podcast, étiquette), bibliothèque filtrable par mots et par étiquette (ADR 0012).
+- [x] Notation, favoris, tags. → notation et favoris faits à l'étape 7 (ADR 0010) ; étiquettes sur les abonnements, avec la note, y compris par un partage en modification.
+- [x] Statistiques d'écoute. → temps écouté en durée d'épisode (positions, actions gPodder), épisodes terminés, 12 derniers mois et podcasts les plus écoutés ; l'historique d'avant l'étape est estimé à partir de l'état.
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| C1 | Recherche d'épisodes : chaque critère, leur cumul, caractères spéciaux, pages qui gardent les filtres, refus d'un filtre invalide | `./gradlew :server:test` (`ComfortTest`, `SdkTest`, `ContractTest`) |
+| C2 | Étiquettes : règles communes, fusion des doublons, filtre de la bibliothèque, droits d'un partage | `./gradlew :server:test` (`ComfortTest`), `./gradlew :shared:jvmTest` (`FakeComfortTest`) |
+| C3 | Statistiques : sauts en avant non comptés, actions gPodder, chaque utilisateur les siennes | `./gradlew :server:test` (`ComfortTest`, `SdkTest`) |
+| C4 | Dans chaque client : onglet « Épisodes » et filtres des apps, page de recherche et bibliothèque filtrée du client léger, `podcast episodes`, `tags`, `stats` | captures `library-*` et `settings-full-*`, `WebTest`, `./gradlew :cli:test` (`ComfortTextTest`) |
 
 ## Étape 10 — Finition
 

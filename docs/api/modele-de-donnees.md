@@ -37,6 +37,8 @@ erDiagram
     users ||--o{ subscription_changes : "journal des abonnements"
     users ||--o{ episode_actions : "actions en attente"
     users ||--o{ subscription_deletions : "suppressions (Open Podcast API)"
+    subscriptions ||--o{ subscription_tags : "étiquettes"
+    users ||--o{ listening_days : "temps d'écoute"
 
     users {
         bigint id PK
@@ -197,6 +199,18 @@ erDiagram
         text feed_url
         timestamptz deleted_at
     }
+    subscription_tags {
+        bigint subscription_id PK
+        text tag PK "1 à 30 caractères"
+    }
+    listening_days {
+        bigint user_id PK
+        date day PK "UTC"
+        text feed_url PK
+        text podcast_title
+        bigint seconds "durée d'épisode"
+        int finished
+    }
     shares {
         bigint id PK
         text resource_type "SUBSCRIPTION | EPISODE | PLAYLIST"
@@ -225,6 +239,7 @@ erDiagram
 | `playback_states.favorite`, `playback_states.rating` | Favoris et notes de chaque utilisateur | Étape 7 (`V5`) |
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 (`V6`) |
 | `gpodder_devices`, `subscription_changes`, `episode_actions`, `subscription_deletions` | Synchronisation avec les clients tiers (API gPodder, Open Podcast API) | Étape 8 (`V7`) |
+| `subscription_tags`, `listening_days` | Étiquettes des abonnements, temps d'écoute par jour et par podcast | Étape 9 (`V8`) |
 
 ## Règles
 
@@ -254,4 +269,10 @@ erDiagram
   - `subscription_changes` garde, par utilisateur et par URL de flux, le dernier état d'abonnement et sa date. Tous les chemins d'abonnement l'écrivent ; la migration l'a rempli à partir des abonnements existants ;
   - `episode_actions` ne garde que les actions reçues pour un épisode encore inconnu : elles s'appliquent après la lecture suivante du flux (`podcast_key`) et disparaissent au bout de 30 jours sinon ;
   - les autres actions modifient directement `playback_states`, si leur date est postérieure à `updated_at`.
+- **Étiquettes** (ADR 0012) : celles d'un abonnement sont uniques sans tenir compte de la casse (le serveur fusionne les doublons avant d'écrire) et disparaissent avec lui.
+- **Temps d'écoute** (ADR 0012) :
+  - une nouvelle position ajoute l'écart avec la précédente, s'il est positif et d'au plus 3 fois le temps écoulé depuis, plus 30 secondes ; une action gPodder `play` ajoute `position − started` ;
+  - chaque passage à « écouté » compte un épisode terminé ; marquer de nouveau un épisode déjà écouté ne compte pas ;
+  - le podcast est désigné par son flux et son titre, sans clé étrangère : l'historique survit au podcast ; il disparaît avec le compte ;
+  - la migration `V8` a estimé l'historique à partir de `playback_states`.
 - **Mots de passe** : `credentials_version` augmente à chaque nouveau mot de passe. Une session du client léger porte la version de sa connexion et n'est plus acceptée ensuite.

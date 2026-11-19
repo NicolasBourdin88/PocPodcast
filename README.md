@@ -187,6 +187,30 @@ cli/build/install/podcast/bin/podcast playlists create Kotlin --keywords "kotlin
 
 Ensuite : `playlists` (les siennes puis celles partagées, numérotées), `playlists show 1`, `playlists play 1`, `playlists create Pour le train` puis `playlists add 2 4` (épisode n° 4 de `list`), `playlists move 2 3 1`, `playlists remove 2 1`, `playlists edit 1 --order random --limit 20`, `playlists shuffle 1`, `playlists share 1 bob --write`, `playlists feed 1` (`--renew`, `--off`), `playlists delete 1 --yes`, `favorite 3` (`--off` pour le retirer), `rate 3 4` (`0` efface la note).
 
+## Recherche, étiquettes et statistiques
+
+Voir l'[ADR 0012](docs/adr/0012-recherche-etiquettes-statistiques.md).
+
+- **Rechercher des épisodes** : parmi ceux de ses abonnements, par mots (titre, description ou nom du podcast), statut, favoris, note minimale, période de publication, podcast et étiquette. Les critères se cumulent.
+- **Étiquettes** : jusqu'à 10 par abonnement (« trajets », « tech »), modifiables avec sa note, y compris par un partage en modification. Elles filtrent la Bibliothèque et la recherche.
+- **Mon écoute** :
+  - le temps écouté au total, sur 7 et sur 30 jours ;
+  - les épisodes terminés ;
+  - les 12 derniers mois ;
+  - les podcasts les plus écoutés.
+
+  Le temps se compte en durée d'épisode : un saut en avant ne compte pas, et les écoutes rapportées par AntennaPod comptent aussi.
+- **Où** :
+  - apps : dans la Bibliothèque, onglets « Abonnements » (filtre et étiquettes) et « Épisodes » (recherche) ; page d'un podcast pour ses étiquettes ; Réglages pour « Mon écoute » ;
+  - client léger : Bibliothèque (filtre, étiquettes, bouton « Rechercher des épisodes »), Réglages ;
+  - CLI : les commandes ci-dessous.
+
+```bash
+cli/build/install/podcast/bin/podcast episodes kotlin --status new --tag tech
+```
+
+Ensuite : `episodes --favorites --min-rating 4`, `episodes --from 2026-10-01 --to 2026-10-31 --podcast 2`, `episodes kotlin --play` (lit ce qui est trouvé, dans l'ordre), `subscriptions --tag tech`, `tags 2` puis `tags 2 trajets tech` (`--clear` pour les retirer), `stats`.
+
 ## Clients tiers
 
 Le serveur parle aussi l'**API gPodder** et l'**Open Podcast API** ([ADR 0011](docs/adr/0011-synchronisation-clients-tiers.md)). Un client qui les connaît retrouve les abonnements, les positions et les épisodes écoutés, et nos clients voient ce qu'il en fait.

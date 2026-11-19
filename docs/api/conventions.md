@@ -30,9 +30,9 @@ Pages HTML existantes : l'Accueil (`/`), Explorer (`/search`), la Bibliothèque 
 
 - **Racine** : un client ne connaît que l'URL du serveur. Il lit la racine `GET /` et suit les liens. Il ne construit jamais une URL lui-même, à l'exception des liens à gabarit.
 - **Racine sans authentification** : nom du serveur, version de l'API, lien `tokens` et template `create-token` (comment se connecter).
-- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes`, `search` (gabarit `/search{?q}`), `me`, `users`, `shared`, `playlists`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`), `podcast` (`/podcasts/{id}`), `subscription` (`/subscriptions/{id}`), `share` (`/shares/{id}`) et `playlist` (`/playlists/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
+- **Racine authentifiée** : liens `subscriptions`, `queue`, `episodes` (gabarit avec les filtres de la recherche), `search` (gabarit `/search{?q}`), `me`, `users`, `shared`, `playlists`, et l'état de l'Accueil embarqué (`resume`, `latest`). Elle fournit aussi les gabarits `episode` (`/episodes/{id}`), `podcast` (`/podcasts/{id}`), `subscription` (`/subscriptions/{id}`), `share` (`/shares/{id}`) et `playlist` (`/playlists/{id}`), pour retrouver une ressource à partir de son identifiant sans construire l'URL.
 - **Liens** : `_links` contient toujours `self`. Les noms de relation sont en minuscules, avec un tiret si besoin.
-- **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?status,offset,limit}`.
+- **Liens à gabarit** : ils suivent la RFC 6570 et portent `"templated": true`, par exemple `/episodes{?q,status,favorite,minRating,from,to,podcast,tag,offset,limit}`.
 - **Ressources embarquées** : `_embedded`. Un épisode embarque son podcast, pour qu'un client puisse l'afficher sans autre requête.
 - **Ressources externes** : un lien peut pointer hors du serveur et porter `type` et `hreflang`, comme les chapitres et transcriptions Podcast 2.0 d'un épisode. Une relation qui a plusieurs liens (`transcript`) est un **tableau**, dans l'ordre de préférence de l'éditeur.
 
@@ -120,6 +120,11 @@ Quand le client doit réagir différemment selon la cause, `type` la nomme. Le S
   - une playlist embarque ses épisodes dans l'ordre d'écoute, avec l'état de l'utilisateur, et porte `kind`, `rules` (dynamique), `episodeCount`, `access` et `ownerName` (partagée) ;
   - ses templates suivent les droits : `update-playlist`, `add-episode` (statique), `shuffle` (aléatoire), `share`, `publish-feed`, `unpublish-feed`, `delete-playlist` ; ses épisodes portent `remove-from-playlist` et `move-in-playlist` dans une statique modifiable.
 - **Flux RSS de playlists** (ADR 0010) : le lien `feed` (`application/rss+xml`), visible du propriétaire une fois le flux publié, mène à `/feeds/{secret}`. Cette adresse et les enclosures `/feeds/{secret}/episodes/{id}` s'ouvrent sans authentification : le secret en tient lieu.
+- **Recherche, étiquettes et statistiques** (ADR 0012) :
+  - `GET /episodes` cherche parmi les épisodes des abonnements de l'utilisateur. Filtres facultatifs et cumulables : `q` (chaque mot dans le titre, la description ou le titre du podcast), `status`, `favorite`, `minRating` (0 à 5), `from` et `to` (dates `AAAA-MM-JJ`, bornes comprises), `podcast` (identifiant), `tag`. Un champ vide vaut « tous », comme l'envoie un formulaire ; une valeur invalide répond 400 ; les liens de page gardent les filtres ;
+  - `GET /subscriptions` accepte `q` (titre, auteur, description ou note) et `tag` ;
+  - un abonnement porte `tags`, un tableau trié sans tenir compte de la casse. Le template `update` les remplace par `tags`, tableau ou texte séparé par des virgules (formulaire) ; un champ absent les garde. Au plus 10 étiquettes de 1 à 30 caractères, sans virgule (`TagRules`), sinon 422 ;
+  - `GET /me/stats` (lien `stats` de `/me`) : `totalSeconds`, `last7DaysSeconds`, `last30DaysSeconds`, `episodesFinished`, `since`, `byPodcast` (les plus écoutés d'abord) et `byMonth` (les 12 derniers mois, `AAAA-MM`, mois vides compris). Le temps se compte en durée d'épisode.
 - **File d'attente** : `GET /queue` (lien `queue` de la racine) donne les épisodes dans l'ordre d'écoute. Chaque épisode indique `inQueue` et porte `enqueue` (hors de la file), ou `dequeue` et `move` (dans la file). `enqueue` envoie `episodeId` (pré-rempli, `readOnly`) et une `position` facultative : `0` pour « lire ensuite », absente pour la fin de la file.
 
 ## API gPodder et Open Podcast API
