@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -29,6 +28,7 @@ import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.FormDialog
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.components.Loading
 
 /**
  * Adds an episode to a static playlist the user may change: one of theirs, or one shared with them to
@@ -58,7 +58,7 @@ fun AddToPlaylistDialog(client: PodcastClient, episodeId: String, onDismiss: () 
         },
     ) {
         when (val current = choices) {
-            null -> CircularProgressIndicator(Modifier.padding(8.dp))
+            null -> Loading(Modifier.fillMaxWidth().padding(8.dp))
             else -> current.fold(
                 onSuccess = { playlists ->
                     if (playlists.isEmpty()) {

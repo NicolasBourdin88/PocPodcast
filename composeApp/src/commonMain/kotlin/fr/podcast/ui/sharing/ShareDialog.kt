@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +28,8 @@ import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.FormDialog
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.components.AppTextField
+import fr.podcast.ui.components.Loading
 
 /** The other accounts of the server, or why they could not be read. */
 private sealed interface Recipients {
@@ -73,7 +73,7 @@ fun ShareDialog(
     ) {
         Text(strings.shareWith, style = MaterialTheme.typography.titleSmall)
         when (val current = recipients) {
-            Recipients.Loading -> CircularProgressIndicator(Modifier.padding(8.dp))
+            Recipients.Loading -> Loading(Modifier.fillMaxWidth().padding(8.dp))
             is Recipients.Failed -> Text(current.error.userMessage(strings), color = MaterialTheme.colorScheme.error)
             is Recipients.Loaded -> if (current.users.isEmpty()) {
                 Text(strings.noOtherUsers, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -98,13 +98,13 @@ fun ShareDialog(
             }
         }
         if (withPermission) PermissionChoice(permission, onChange = { permission = it })
-        OutlinedTextField(
+        AppTextField(
             value = message,
             onValueChange = { message = it },
-            label = { Text(strings.shareMessage) },
+            label = strings.shareMessage,
             minLines = 2,
             isError = messageTooLong,
-            supportingText = if (messageTooLong) ({ Text(strings.messageTooLong(ShareRules.MAX_MESSAGE_LENGTH)) }) else null,
+            supportingText = if (messageTooLong) strings.messageTooLong(ShareRules.MAX_MESSAGE_LENGTH) else null,
             modifier = Modifier.fillMaxWidth(),
         )
     }

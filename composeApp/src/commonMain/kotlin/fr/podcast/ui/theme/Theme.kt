@@ -2,7 +2,8 @@ package fr.podcast.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -39,11 +40,20 @@ private fun ColorTokens.toColorScheme(dark: Boolean): ColorScheme {
     )
 }
 
+/** The colors of the user's wallpaper where the platform has them (Android 12 and later), else null. */
 @Composable
-fun PodcastTheme(language: Language = platformLanguage(), content: @Composable () -> Unit) {
+internal expect fun dynamicColorScheme(dark: Boolean): ColorScheme?
+
+/**
+ * Material 3 Expressive (ADR 0013): its springy motion, and on Android the wallpaper's colors like
+ * the system apps; elsewhere the app's own colors (DesignTokens).
+ */
+@Composable
+fun PodcastTheme(language: Language = platformLanguage(), dynamicColor: Boolean = true, content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val tokens = if (dark) DesignTokens.dark else DesignTokens.light
+    val colors = dynamicColorScheme(dark).takeIf { dynamicColor } ?: tokens.toColorScheme(dark)
     CompositionLocalProvider(LocalStrings provides language.strings) {
-        MaterialTheme(colorScheme = tokens.toColorScheme(dark), content = content)
+        MaterialExpressiveTheme(colorScheme = colors, motionScheme = MotionScheme.expressive(), content = content)
     }
 }

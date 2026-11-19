@@ -16,9 +16,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,6 +37,8 @@ import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.userMessage
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.AppTextField
+import fr.podcast.ui.components.SmallLoading
 
 /**
  * Server address, username and password. The password is only sent to get a device token
@@ -84,26 +84,26 @@ fun SignInScreen(
         Column(Modifier.widthIn(max = 400.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(strings.appName, style = MaterialTheme.typography.headlineMedium)
             Text(strings.signInTitle, style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
+            AppTextField(
                 value = server,
                 onValueChange = { server = it },
-                label = { Text(strings.serverUrl) },
+                label = strings.serverUrl,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AppTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text(strings.username) },
+                label = strings.username,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AppTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text(strings.password) },
+                label = strings.password,
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
@@ -112,7 +112,7 @@ fun SignInScreen(
             )
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             Button(onClick = ::submit, enabled = canSubmit, modifier = Modifier.fillMaxWidth()) {
-                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text(strings.signIn)
+                if (busy) SmallLoading() else Text(strings.signIn)
             }
             onDemo?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(strings.demoMode) } }
             onCancel?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(strings.cancel) } }

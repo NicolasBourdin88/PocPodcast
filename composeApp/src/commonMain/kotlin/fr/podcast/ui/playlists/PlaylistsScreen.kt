@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -45,6 +44,7 @@ import fr.podcast.ui.components.SystemBackHandler
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.library.Centered
 import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.components.Loading
 
 private sealed interface PlaylistsState {
     data object Loading : PlaylistsState
@@ -80,7 +80,7 @@ fun PlaylistsScreen(
 
     val list: @Composable (Modifier) -> Unit = { listModifier ->
         when (val current = state) {
-            PlaylistsState.Loading -> Box(listModifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+            PlaylistsState.Loading -> Loading(listModifier.fillMaxSize())
             is PlaylistsState.Failed -> Centered(current.error.userMessage(strings), listModifier, strings.retry) { reloads++ }
             is PlaylistsState.Loaded -> LazyColumn(listModifier) {
                 item(key = "new") {

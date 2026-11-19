@@ -11,15 +11,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +48,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import kotlin.time.Clock
+import fr.podcast.ui.components.AppSearchField
+import androidx.compose.foundation.layout.Column
+import fr.podcast.ui.components.Loading
 
 /** The longest results list shown; the count says how many match in all. */
 private const val MAX_RESULTS = 100
@@ -90,15 +90,15 @@ fun EpisodeSearch(client: PodcastClient, subscriptions: List<SubscriptionItem>, 
 
     LazyColumn(modifier) {
         item(key = "text") {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text(strings.searchEpisodes) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                supportingText = { Text(strings.searchEpisodesHint) },
-                singleLine = true,
-            )
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                AppSearchField(query = text, onQueryChange = { text = it }, placeholder = strings.searchEpisodes, modifier = Modifier.fillMaxWidth())
+                Text(
+                    strings.searchEpisodesHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                )
+            }
         }
         item(key = "filters") {
             FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -113,7 +113,7 @@ fun EpisodeSearch(client: PodcastClient, subscriptions: List<SubscriptionItem>, 
             }
         }
         when (val current = result) {
-            null -> item(key = "loading") { Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator() } }
+            null -> item(key = "loading") { Loading(Modifier.fillMaxWidth().padding(24.dp)) }
             else -> current.fold(
                 onSuccess = { page ->
                     item(key = "count") {

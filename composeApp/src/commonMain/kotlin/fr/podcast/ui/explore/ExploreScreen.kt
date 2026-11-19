@@ -12,19 +12,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +42,16 @@ import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.AppSearchField
+import fr.podcast.ui.components.AppTextField
+import fr.podcast.ui.components.FormDialog
+import fr.podcast.ui.components.Loading
+import fr.podcast.ui.components.SmallLoading
+import fr.podcast.shared.model.SubscriptionItem
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 
 private sealed interface SearchState {
     data object Idle : SearchState
@@ -75,6 +79,8 @@ fun ExploreScreen(
     // Per result: being subscribed, or why it was refused.
     var subscribing by remember { mutableStateOf(emptySet<String>()) }
     var refusals by remember { mutableStateOf(emptyMap<String, String>()) }
+    // The podcast just subscribed to by its address.
+    var added by remember { mutableStateOf<String?>(null) }
 
     fun runSearch() {
         val text = query.trim()
@@ -112,28 +118,26 @@ fun ExploreScreen(
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
             item(key = "search") {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text(strings.searchPlaceholder) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { runSearch() }),
-                    )
-                    Button(onClick = ::runSearch, enabled = query.trim().length >= 2) { Text(strings.search) }
+                // The keyboard's search key runs the search (ADR 0013).
+                AppSearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    placeholder = strings.searchPlaceholder,
+                    onSearch = { runSearch() },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            item(key = "add-feed") {
+                AddFeedButton(library) { item ->
+                    added = item.podcast.title
+                    onSubscribed()
                 }
             }
+            added?.let { title -> item(key = "added") { Notice(strings.subscribedTo(title), success = true) } }
             when (val state = search) {
                 SearchState.Idle -> Unit
                 SearchState.Searching -> item(key = "searching") {
-                    Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator() }
+                    Loading(Modifier.fillMaxWidth().padding(24.dp))
                 }
                 SearchState.Unavailable -> item(key = "unavailable") { Notice(strings.searchUnavailable) }
                 is SearchState.Failed -> item(key = "failed") { Notice(state.message, error = true) }
@@ -149,7 +153,6 @@ fun ExploreScreen(
                     }
                 }
             }
-            item(key = "add-feed") { AddFeed(library, onSubscribed) }
         }
     }
 }
@@ -174,69 +177,55 @@ private fun ResultRow(result: SearchResult, busy: Boolean, refusal: String?, onS
                     Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(strings.subscribed, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
-                busy -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                busy -> SmallLoading()
                 else -> FilledTonalButton(onClick = onSubscribe) { Text(strings.subscribe) }
             }
         },
     )
 }
 
-/** Subscription by address, for feeds the directories do not know. */
+/** Subscription by address, for feeds the directories do not know: a button, then a dialog. */
 @Composable
-private fun AddFeed(library: LibraryRepository, onSubscribed: () -> Unit) {
+private fun AddFeedButton(library: LibraryRepository, onSubscribed: (SubscriptionItem) -> Unit) {
     val strings = LocalStrings.current
-    val scope = rememberCoroutineScope()
-    var feedUrl by rememberSaveable { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // message, is an error
-
-    fun add() {
-        val address = feedUrl.trim()
-        if (address.isEmpty() || busy) return
-        scope.launch {
-            busy = true
-            result = attempt { library.subscribe(address) }.fold(
-                onSuccess = {
-                    feedUrl = ""
-                    onSubscribed()
-                    strings.subscribedTo(it.podcast.title) to false
-                },
-                onFailure = { it.userMessage(strings) to true },
-            )
-            busy = false
-        }
+    var open by rememberSaveable { mutableStateOf(false) }
+    FilledTonalButton(onClick = { open = true }, modifier = Modifier.padding(horizontal = 16.dp)) {
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(strings.addFeedTitle)
     }
-
-    Card(Modifier.fillMaxWidth().padding(16.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(strings.addFeedTitle, style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
+    if (open) {
+        var feedUrl by rememberSaveable { mutableStateOf("") }
+        FormDialog(
+            title = strings.addFeedTitle,
+            confirmLabel = strings.subscribe,
+            onDismiss = { open = false },
+            canConfirm = feedUrl.isNotBlank(),
+            onConfirm = { onSubscribed(library.subscribe(feedUrl.trim())) },
+        ) {
+            AppTextField(
                 value = feedUrl,
                 onValueChange = { feedUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(strings.feedUrl) },
-                placeholder = { Text("https://…/feed.xml") },
+                label = strings.feedUrl,
+                placeholder = "https://…/feed.xml",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { add() }),
+                modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = ::add, enabled = feedUrl.isNotBlank() && !busy) { Text(strings.subscribe) }
-                if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            }
-            result?.let { (message, error) ->
-                Text(message, color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            }
         }
     }
 }
 
 @Composable
-private fun Notice(text: String, error: Boolean = false) {
+private fun Notice(text: String, error: Boolean = false, success: Boolean = false) {
     Text(
         text,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = when {
+            error -> MaterialTheme.colorScheme.error
+            success -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
     )
 }
 

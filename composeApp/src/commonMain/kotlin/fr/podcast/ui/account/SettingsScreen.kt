@@ -32,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -63,6 +62,7 @@ import fr.podcast.ui.components.SectionTitle
 import fr.podcast.ui.components.attempt
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.AppTextField
 
 /** Forms stay readable on wide windows. */
 private val FORM_WIDTH = 560.dp
@@ -274,10 +274,10 @@ private fun NewAppPasswordDialog(onDismiss: () -> Unit, onCreate: suspend (Strin
         onConfirm = { onCreate(name.trim()) },
     ) {
         Text(strings.appPasswordsHint, style = MaterialTheme.typography.bodyMedium)
-        OutlinedTextField(
+        AppTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text(strings.appPasswordName) },
+            label = strings.appPasswordName,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -314,10 +314,10 @@ private fun ProfileForm(me: User, onSave: (String) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
+            AppTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text(strings.displayName) },
+                label = strings.displayName,
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
@@ -427,20 +427,20 @@ private fun AddUserDialog(onDismiss: () -> Unit, onCreate: suspend (username: St
         canConfirm = usernameValid && AccountRules.validDisplayName(displayName) && AccountRules.validPassword(password),
         onConfirm = { onCreate(username.trim(), displayName.trim(), password, if (admin) UserRole.ADMIN else UserRole.USER) },
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = username,
             onValueChange = { username = it.lowercase() },
-            label = { Text(strings.username) },
+            label = strings.username,
             singleLine = true,
             isError = username.isNotEmpty() && !usernameValid,
-            supportingText = if (username.isNotEmpty() && !usernameValid) ({ Text(strings.usernameUnavailable) }) else null,
+            supportingText = if (username.isNotEmpty() && !usernameValid) strings.usernameUnavailable else null,
             keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AppTextField(
             value = displayName,
             onValueChange = { displayName = it },
-            label = { Text(strings.displayName) },
+            label = strings.displayName,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )

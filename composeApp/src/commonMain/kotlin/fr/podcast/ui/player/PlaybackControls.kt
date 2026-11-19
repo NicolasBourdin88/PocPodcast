@@ -9,9 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -33,6 +30,10 @@ import androidx.compose.ui.unit.sp
 import fr.podcast.player.PlaybackController
 import fr.podcast.ui.components.PodcastIcons
 import fr.podcast.ui.theme.LocalStrings
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.IconButtonDefaults
 
 /** Playback of the active account (or of the demo), for every screen. */
 val LocalPlayback = staticCompositionLocalOf<PlaybackController> { error("No PlaybackController provided") }
@@ -42,7 +43,7 @@ val LocalPlayback = staticCompositionLocalOf<PlaybackController> { error("No Pla
 fun SkipButton(forward: Boolean, onClick: () -> Unit, size: Dp = 48.dp, enabled: Boolean = true) {
     val strings = LocalStrings.current
     val seconds = (if (forward) PlaybackController.SKIP_FORWARD_SECONDS else PlaybackController.SKIP_BACK_SECONDS).toInt()
-    IconButton(onClick = onClick, modifier = Modifier.size(size), enabled = enabled) {
+    IconButton(onClick = onClick, modifier = Modifier.size(size), enabled = enabled, shapes = IconButtonDefaults.shapes()) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 if (forward) PodcastIcons.Forward else PodcastIcons.Replay,
@@ -63,7 +64,7 @@ fun PlayPauseButton(playing: Boolean, buffering: Boolean, onClick: () -> Unit, s
     val strings = LocalStrings.current
     val content: @Composable () -> Unit = {
         if (buffering && playing) {
-            CircularProgressIndicator(Modifier.size(size * 0.45f), strokeWidth = 2.dp, color = LocalContentColor.current)
+            LoadingIndicator(Modifier.size(size * 0.6f), color = LocalContentColor.current)
         } else {
             Icon(
                 if (playing) PodcastIcons.Pause else Icons.Default.PlayArrow,
@@ -72,10 +73,34 @@ fun PlayPauseButton(playing: Boolean, buffering: Boolean, onClick: () -> Unit, s
             )
         }
     }
+    // Material 3 Expressive (ADR 0013): round while paused, its corners squared off while playing.
+    val shapes = IconButtonDefaults.toggleableShapes()
     if (tonal) {
-        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(size), content = content)
+        val colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+            checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        FilledTonalIconToggleButton(
+            checked = playing,
+            onCheckedChange = { onClick() },
+            modifier = Modifier.size(size),
+            shapes = shapes,
+            colors = colors,
+            content = content,
+        )
     } else {
-        FilledIconButton(onClick = onClick, modifier = Modifier.size(size), content = content)
+        val colors = IconButtonDefaults.filledIconToggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        )
+        FilledIconToggleButton(
+            checked = playing,
+            onCheckedChange = { onClick() },
+            modifier = Modifier.size(size),
+            shapes = shapes,
+            colors = colors,
+            content = content,
+        )
     }
 }
 

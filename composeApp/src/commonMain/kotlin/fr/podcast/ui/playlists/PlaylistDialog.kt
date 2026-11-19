@@ -11,7 +11,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import fr.podcast.shared.model.PlaylistRules
 import fr.podcast.ui.components.FormDialog
 import fr.podcast.ui.components.StarRating
 import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.components.AppTextField
 
 /**
  * Creates a playlist ([initial] null: static or dynamic) or changes one (its kind stays). A dynamic
@@ -74,17 +74,17 @@ fun PlaylistDialog(
         canConfirm = valid,
         onConfirm = { onSave(title.trim(), description.trim().ifEmpty { null }, newRules.takeIf { dynamic }) },
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text(strings.playlistTitle) },
+            label = strings.playlistTitle,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AppTextField(
             value = description,
             onValueChange = { description = it },
-            label = { Text(strings.description) },
+            label = strings.description,
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -96,11 +96,11 @@ fun PlaylistDialog(
             }
         }
         if (dynamic) {
-            OutlinedTextField(
+            AppTextField(
                 value = keywords,
                 onValueChange = { keywords = it },
-                label = { Text(strings.keywords) },
-                supportingText = { Text(strings.keywordsHint) },
+                label = strings.keywords,
+                supportingText = strings.keywordsHint,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -121,11 +121,11 @@ fun PlaylistDialog(
                     Choice(selected = order == choice, label = strings.playlistOrder(choice)) { order = choice }
                 }
             }
-            OutlinedTextField(
+            AppTextField(
                 value = limit,
                 onValueChange = { value -> limit = value.filter(Char::isDigit).take(3) },
-                label = { Text(strings.episodeLimit) },
-                supportingText = { Text("1 – ${PlaylistRules.MAX_LIMIT}") },
+                label = strings.episodeLimit,
+                supportingText = "1 – ${PlaylistRules.MAX_LIMIT}",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),

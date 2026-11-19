@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -62,6 +61,7 @@ import fr.podcast.ui.player.LocalPlayback
 import fr.podcast.ui.sharing.ShareDialog
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.Loading
 
 private enum class PlaylistDialogs { Edit, Share, Delete }
 
@@ -109,7 +109,7 @@ fun PlaylistScreen(
 
     val current = details
     if (current == null) {
-        Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+        Loading(modifier.fillMaxSize())
         return
     }
     val playlist = current.playlist

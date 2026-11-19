@@ -20,15 +20,10 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -76,6 +71,12 @@ import fr.podcast.ui.player.PlayerScreen
 import fr.podcast.ui.player.queueItems
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.delay
+import fr.podcast.ui.components.Loading
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.WideNavigationRail
+import androidx.compose.material3.WideNavigationRailItem
+import fr.podcast.ui.components.RefreshBox
 
 private val Destination.icon: ImageVector
     get() = when (this) {
@@ -100,10 +101,13 @@ fun MainScaffold(
     initialPlaylistId: String? = null,
 ) {
     var reloads by remember { mutableIntStateOf(0) }
+    // Pulled down by the user: the indicator stays until the new Home is there.
+    var refreshing by remember { mutableStateOf(false) }
     val state by produceState<HomeUiState>(HomeUiState.Loading, client, reloads) {
         // A reload after a library change keeps the current Home on screen until the new one is ready.
         if (value !is HomeUiState.Loaded) value = HomeUiState.Loading
         value = loadHome(client)
+        refreshing = false
     }
     // Home follows playback: another episode, a pause or an end changes "Continue listening".
     val nowPlaying by LocalPlayback.current.nowPlaying.collectAsState()
@@ -126,6 +130,11 @@ fun MainScaffold(
             initialPlaylistId = initialPlaylistId,
             settings = settings,
             onReload = { reloads++ },
+            refreshing = refreshing,
+            onRefresh = {
+                refreshing = true
+                reloads++
+            },
             onSessionExpired = onSessionExpired,
         )
     }
@@ -144,6 +153,8 @@ private fun AdaptiveScaffold(
     initialPlaylistId: String?,
     settings: @Composable (Modifier) -> Unit,
     onReload: () -> Unit,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
     onSessionExpired: () -> Unit,
 ) {
     val strings = LocalStrings.current
@@ -194,11 +205,13 @@ private fun AdaptiveScaffold(
                 // A search given at the start opens on the episodes (snapshots).
                 initialSearch = initialQuery.takeIf { initialDestination == Destination.Library && it.isNotBlank() },
             )
-            state is HomeUiState.Loading -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+            state is HomeUiState.Loading -> Loading(modifier.fillMaxSize())
             state is HomeUiState.Failed && state.error is ApiException.Unauthorized ->
                 Message(strings.sessionExpired, modifier, action = strings.signIn, onAction = onSessionExpired)
             state is HomeUiState.Failed -> Message(state.error.userMessage(strings), modifier, action = strings.retry, onAction = onReload)
-            home != null -> HomeScreen(home, twoColumns = layout == WindowLayout.CompactHeight, modifier = modifier)
+            home != null -> RefreshBox(refreshing, onRefresh, modifier) {
+                HomeScreen(home, twoColumns = layout == WindowLayout.CompactHeight, modifier = Modifier.fillMaxSize())
+            }
         }
     }
 
@@ -208,9 +221,10 @@ private fun AdaptiveScaffold(
                 bottomBar = {
                     Column {
                         playerItem?.let { MiniPlayer(it, nowPlaying, singleLine = false, onOpen = { playerOpen = true }) }
-                        NavigationBar {
+                        // Material 3 Expressive (ADR 0013): the short navigation bar.
+                        ShortNavigationBar {
                             Destination.entries.forEach { destination ->
-                                NavigationBarItem(
+                                ShortNavigationBarItem(
                                     selected = selected == destination,
                                     onClick = { select(destination) },
                                     icon = { Icon(destination.icon, contentDescription = null) },
@@ -232,9 +246,10 @@ private fun AdaptiveScaffold(
             ) { padding -> content(Modifier.padding(padding)) }
 
             layout.usesRail -> Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                NavigationRail {
+                WideNavigationRail {
                     Destination.entries.forEach { destination ->
-                        NavigationRailItem(
+                        WideNavigationRailItem(
+                            railExpanded = false,
                             selected = selected == destination,
                             onClick = { select(destination) },
                             icon = { Icon(destination.icon, contentDescription = null) },

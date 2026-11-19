@@ -49,8 +49,13 @@ class AppEnvironment(
     fun clientFor(account: Account?): PodcastClient =
         if (account == null) demoClient else clients.getOrPut("${account.id} ${account.token}") { RemotePodcastRepository(account, httpClient) }
 
+    /** The controller in use (the demo's or the account's), for the platform's own controls: desktop menu bar. */
+    var activePlayback: PlaybackController = playback
+        private set
+
     /** Only one controller plays at a time: the demo's or the account's. */
     fun stopOtherThan(active: PlaybackController) {
+        activePlayback = active
         if (active !== playback) playback.attach(null)
         if (demoStarted && active !== demoPlayback) demoPlayback.attach(null)
     }

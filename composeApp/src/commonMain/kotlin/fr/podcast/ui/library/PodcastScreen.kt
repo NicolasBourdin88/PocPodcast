@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -31,7 +30,6 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -69,6 +67,9 @@ import fr.podcast.ui.player.QueueToggleButton
 import fr.podcast.ui.sharing.ShareDialog
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.AppTextField
+import fr.podcast.ui.components.Loading
+import fr.podcast.ui.components.SmallLoading
 
 /**
  * A podcast seen through a subscription: its note and settings, then its episodes. Every change
@@ -154,7 +155,7 @@ fun PodcastScreen(
                         RefreshBadge(podcast.refreshStatus)
                     }
                     if (refreshing) {
-                        CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
+                        Box(Modifier.padding(12.dp)) { SmallLoading() }
                     } else {
                         IconButton(
                             onClick = {
@@ -183,23 +184,21 @@ fun PodcastScreen(
                     )
                 }
                 if (editable) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = note,
                         onValueChange = { note = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text(strings.note) },
-                        placeholder = { Text(strings.notePlaceholder) },
+                        label = strings.note,
+                        placeholder = strings.notePlaceholder,
                         minLines = 2,
                     )
                     val parsedTags = TagRules.parse(tags)
-                    OutlinedTextField(
+                    AppTextField(
                         value = tags,
                         onValueChange = { tags = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text(strings.tags) },
-                        supportingText = {
-                            Text(if (TagRules.valid(parsedTags)) strings.tagsHint else strings.tagsInvalid(TagRules.MAX_TAGS, TagRules.MAX_LENGTH))
-                        },
+                        label = strings.tags,
+                        supportingText = if (TagRules.valid(parsedTags)) strings.tagsHint else strings.tagsInvalid(TagRules.MAX_TAGS, TagRules.MAX_LENGTH),
                         isError = !TagRules.valid(parsedTags),
                         singleLine = true,
                     )
@@ -266,7 +265,7 @@ fun PodcastScreen(
         }
         when (val list = episodes) {
             null -> item(key = "loading") {
-                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator() }
+                Loading(Modifier.fillMaxWidth().padding(24.dp))
             }
             else -> {
                 if (list.isEmpty()) {

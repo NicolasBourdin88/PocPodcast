@@ -1,8 +1,6 @@
 package fr.podcast.ui.library
 
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
@@ -22,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -62,6 +59,12 @@ import fr.podcast.ui.components.attempt
 import fr.podcast.ui.player.EpisodePlayButton
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
+import fr.podcast.ui.components.AppSearchField
+import fr.podcast.ui.components.Loading
+import fr.podcast.ui.components.RefreshBox
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 
 private sealed interface LibraryState {
     data object Loading : LibraryState
@@ -90,12 +93,14 @@ fun LibraryScreen(
     val opml = rememberOpmlFiles()
     var state by remember(client) { mutableStateOf<LibraryState>(LibraryState.Loading) }
     var reloads by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(client, reloads) {
         if (state !is LibraryState.Loaded) state = LibraryState.Loading
         // Shared playlists are in Playlists.
         state = attempt { LibraryState.Loaded(client.subscriptionItems(), client.sharedWithMe().filter { it.playlist == null }) }
             .fold({ it }, { LibraryState.Failed(it) })
+        refreshing = false
     }
 
     fun replace(item: SubscriptionItem) {
@@ -175,21 +180,30 @@ fun LibraryScreen(
             }
             val content = Modifier.fillMaxWidth().weight(1f)
             when (val current = state) {
-                LibraryState.Loading -> Box(content, Alignment.Center) { CircularProgressIndicator() }
+                LibraryState.Loading -> Loading(content)
                 is LibraryState.Failed -> Centered(current.error.userMessage(strings), content, strings.retry) { reloads++ }
                 is LibraryState.Loaded -> if (tab == 1) {
                     EpisodeSearch(client, current.items, content, initialSearch.orEmpty())
                 } else {
-                    SubscriptionList(
-                        items = current.items,
-                        shared = current.shared,
-                        selectedPodcastId = openPodcastId.takeIf { twoPanes },
-                        onOpen = { onOpenPodcast(it.podcast.id) },
-                        onDecline = ::decline,
-                        onExport = opml?.let { { exportOpml(it) } },
-                        onImport = opml?.let { { importOpml(it) } },
+                    RefreshBox(
+                        refreshing = refreshing,
+                        onRefresh = {
+                            refreshing = true
+                            reloads++
+                        },
                         modifier = content,
-                    )
+                    ) {
+                        SubscriptionList(
+                            items = current.items,
+                            shared = current.shared,
+                            selectedPodcastId = openPodcastId.takeIf { twoPanes },
+                            onOpen = { onOpenPodcast(it.podcast.id) },
+                            onDecline = ::decline,
+                            onExport = opml?.let { { exportOpml(it) } },
+                            onImport = opml?.let { { importOpml(it) } },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
@@ -245,14 +259,20 @@ private fun SubscriptionList(
     val shown = items.filter { it.matches(text, tag) }
     LazyColumn(modifier) {
         item(key = "filter") {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text(strings.filterLibrary) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-            )
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                AppSearchField(query = text, onQueryChange = { text = it }, placeholder = strings.filterLibrary, modifier = Modifier.weight(1f))
+                // OPML, seldom used, in the overflow menu.
+                if (onExport != null && onImport != null) {
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = strings.moreActions) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text(strings.opmlExport) }, onClick = { menu = false; onExport() })
+                            DropdownMenuItem(text = { Text(strings.opmlImport) }, onClick = { menu = false; onImport() })
+                        }
+                    }
+                }
+            }
         }
         if (tags.isNotEmpty()) {
             item(key = "tags") {
@@ -264,24 +284,16 @@ private fun SubscriptionList(
                 }
             }
         }
-        if (onExport != null && onImport != null) {
-            item(key = "opml") {
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(onClick = onExport) { Text(strings.opmlExport) }
-                    OutlinedButton(onClick = onImport) { Text(strings.opmlImport) }
-                }
-            }
-        }
         if (shown.isEmpty()) {
             item(key = "empty") {
-                Text(
-                    if (items.isEmpty()) strings.emptyLibrary else strings.noSubscriptionFound,
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (items.isEmpty()) strings.emptyLibrary else strings.noSubscriptionFound,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // A new library: bring the subscriptions of another app.
+                    if (items.isEmpty() && onImport != null) OutlinedButton(onClick = onImport) { Text(strings.opmlImport) }
+                }
             }
         }
         items(shown, key = { it.subscription.id }) { item ->

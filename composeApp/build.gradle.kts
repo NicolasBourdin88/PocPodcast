@@ -9,6 +9,14 @@ plugins {
 }
 
 kotlin {
+    // Material 3 Expressive (ADR 0013): stable in Material3 1.5 except a few, such as the loading indicator.
+    compilerOptions {
+        optIn.addAll(
+            "androidx.compose.material3.ExperimentalMaterial3Api",
+            "androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+        )
+    }
+
     jvm("desktop")
 
     android {

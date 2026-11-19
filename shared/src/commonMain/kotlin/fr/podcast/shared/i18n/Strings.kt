@@ -130,6 +130,10 @@ interface Strings {
     val filterLibrary: String
     val searchEpisodes: String
     val searchEpisodesHint: String
+    val clearSearch: String
+    val playbackMenu: String
+    val playPause: String
+    val changeSpeed: String
     fun statusFilter(status: EpisodeStatus): String
     val statusLabel: String
     val anyStatus: String
