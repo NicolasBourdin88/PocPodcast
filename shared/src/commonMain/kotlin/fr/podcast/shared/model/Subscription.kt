@@ -24,7 +24,17 @@ data class Subscription(
     val tags: List<String> = emptyList(),
 )
 
-data class SubscriptionItem(val subscription: Subscription, val podcast: Podcast)
+data class SubscriptionItem(val subscription: Subscription, val podcast: Podcast) {
+    /**
+     * The library filters (ADR 0012), the same on the server and in the apps: every word of [text]
+     * in the title, the author, the description or the note, and [tag] (if any) among the tags.
+     */
+    fun matches(text: String, tag: String?): Boolean {
+        val haystack = listOf(podcast.title, podcast.author, podcast.description, subscription.note.orEmpty()).joinToString(" ").lowercase()
+        val words = text.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        return words.all { it in haystack } && (tag.isNullOrEmpty() || subscription.tags.any { it.equals(tag, ignoreCase = true) })
+    }
+}
 
 /** The tags of a subscription (ADR 0012): checked by the server, and by clients before sending. */
 object TagRules {

@@ -3,7 +3,6 @@ package fr.podcast.server.api
 import fr.podcast.server.http.respondProblem
 import fr.podcast.shared.model.EpisodeQuery
 import fr.podcast.shared.model.EpisodeStatus
-import fr.podcast.shared.model.SubscriptionItem
 import fr.podcast.shared.model.TagRules
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -39,12 +38,3 @@ internal suspend fun ApplicationCall.episodeQuery(): Pair<EpisodeQuery, Map<Stri
     return EpisodeQuery(text.orEmpty(), status, favorite, minRating, from, to, podcast, tag) to given
 }
 
-/**
- * The library filters of GET /subscriptions (ADR 0012): every word of [text] in the title, the
- * author, the description or the note, and [tag] among the subscription's tags.
- */
-internal fun SubscriptionItem.matches(text: String, tag: String): Boolean {
-    val haystack = listOf(podcast.title, podcast.author, podcast.description, subscription.note.orEmpty()).joinToString(" ").lowercase()
-    val words = text.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
-    return words.all { it in haystack } && (tag.isEmpty() || subscription.tags.any { it.equals(tag, ignoreCase = true) })
-}
