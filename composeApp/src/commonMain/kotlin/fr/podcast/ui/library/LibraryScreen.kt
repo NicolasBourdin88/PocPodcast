@@ -52,6 +52,7 @@ import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.RefreshStatus
 import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.SubscriptionItem
+import fr.podcast.shared.model.TagRules
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.shared.repository.SharedItem
 import fr.podcast.ui.components.Artwork
@@ -240,7 +241,7 @@ private fun SubscriptionList(
     // Words and a tag (ADR 0012), applied as the server does.
     var text by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf<String?>(null) }
-    val tags = items.flatMap { it.subscription.tags }.distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    val tags = TagRules.sorted(items.flatMap { it.subscription.tags })
     val shown = items.filter { it.matches(text, tag) }
     LazyColumn(modifier) {
         item(key = "filter") {

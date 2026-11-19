@@ -209,7 +209,7 @@ class FakePodcastRepository private constructor(
     override suspend fun updateSubscription(subscriptionId: String, note: String?, autoDownload: Boolean, tags: List<String>?): SubscriptionItem {
         val (followed, access) = mutex.withLock { visibleSubscription(subscriptionId) } ?: throw ApiException.NotFound("subscription $subscriptionId")
         if (access == Access.READ) throw forbidden("This subscription is shared with you read-only")
-        val newTags = tags?.let(TagRules::normalize) ?: followed.subscription.tags
+        val newTags = tags?.let(TagRules::normalize)?.let(TagRules::sorted) ?: followed.subscription.tags
         if (!TagRules.valid(newTags)) {
             throw ApiException.Rejected(422, null, "Invalid tags", listOf(FieldError("tags", "invalid")))
         }

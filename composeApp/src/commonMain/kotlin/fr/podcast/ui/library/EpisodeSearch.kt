@@ -39,6 +39,7 @@ import fr.podcast.shared.model.EpisodePage
 import fr.podcast.shared.model.EpisodeQuery
 import fr.podcast.shared.model.EpisodeStatus
 import fr.podcast.shared.model.SubscriptionItem
+import fr.podcast.shared.model.TagRules
 import fr.podcast.shared.repository.PodcastClient
 import fr.podcast.ui.components.Artwork
 import fr.podcast.ui.components.attempt
@@ -85,7 +86,7 @@ fun EpisodeSearch(client: PodcastClient, subscriptions: List<SubscriptionItem>, 
         if (result != null) delay(300)
         result = attempt { client.searchEpisodes(query, limit = MAX_RESULTS) }
     }
-    val tags = subscriptions.flatMap { it.subscription.tags }.distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    val tags = TagRules.sorted(subscriptions.flatMap { it.subscription.tags })
 
     LazyColumn(modifier) {
         item(key = "text") {

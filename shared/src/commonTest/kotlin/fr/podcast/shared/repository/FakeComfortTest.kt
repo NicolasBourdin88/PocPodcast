@@ -20,6 +20,8 @@ class FakeComfortTest {
         assertTrue(TagRules.valid(listOf("a", "b")))
         assertFalse(TagRules.valid((1..11).map { "t$it" }))
         assertFalse(TagRules.valid(listOf("x".repeat(31))))
+        // In alphabetical order, case and accents aside.
+        assertEquals(listOf("Dev", "économie", "Éducation", "english", "œuvres", "tech"), TagRules.sorted(listOf("tech", "english", "économie", "Éducation", "œuvres", "Dev", "TECH")))
     }
 
     @Test

@@ -3,8 +3,7 @@
 tagsOfSubscriptions:
 SELECT subscription_id, tag
 FROM subscription_tags
-WHERE subscription_id IN ?
-ORDER BY lower(tag);
+WHERE subscription_id IN ?;
 
 deleteTags:
 DELETE FROM subscription_tags
@@ -19,8 +18,7 @@ tagsOfUser:
 SELECT DISTINCT t.tag
 FROM subscription_tags t
 JOIN subscriptions s ON s.id = t.subscription_id
-WHERE s.user_id = :userId
-ORDER BY t.tag;
+WHERE s.user_id = :userId;
 
 -- The user's state of an episode before a change: what the new position is compared with.
 stateBefore:

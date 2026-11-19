@@ -49,6 +49,23 @@ object TagRules {
 
     fun valid(tags: List<String>): Boolean =
         tags.size <= MAX_TAGS && tags.all { it.isNotBlank() && it.length <= MAX_LENGTH && ',' !in it }
+
+    /** Alphabetical, case and accents aside ("dev", "économie", "english"), without duplicates differing by case. */
+    fun sorted(tags: Collection<String>): List<String> =
+        tags.distinctBy { it.lowercase() }.sortedWith(compareBy({ sortKey(it) }, { it }))
+
+    private const val ACCENTED = "àâäáãåçéèêëîïíìñôöóòõùûüúÿý"
+    private const val PLAIN = "aaaaaaceeeeiiiinooooouuuuyy"
+
+    private fun sortKey(tag: String): String = buildString {
+        tag.lowercase().forEach { char ->
+            when (char) {
+                'œ' -> append("oe")
+                'æ' -> append("ae")
+                else -> append(ACCENTED.indexOf(char).takeIf { it >= 0 }?.let(PLAIN::get) ?: char)
+            }
+        }
+    }
 }
 
 /** A podcast found by a search source (Podcast Index, Apple Podcasts…). */

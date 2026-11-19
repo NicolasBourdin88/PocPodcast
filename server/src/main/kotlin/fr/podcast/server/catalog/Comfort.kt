@@ -7,6 +7,7 @@ import fr.podcast.shared.model.ListeningStats
 import fr.podcast.shared.model.MonthListening
 import fr.podcast.shared.model.PodcastListening
 import fr.podcast.shared.model.SubscriptionItem
+import fr.podcast.shared.model.TagRules
 import kotlinx.datetime.toKotlinLocalDate
 import java.time.Duration
 import java.time.LocalDate
@@ -21,7 +22,7 @@ internal fun PodcastDb.tagsOf(subscriptionIds: Collection<Long>): Map<Long, List
     if (subscriptionIds.isEmpty()) {
         emptyMap()
     } else {
-        comfortQueries.tagsOfSubscriptions(subscriptionIds).executeAsList().groupBy({ it.subscription_id }, { it.tag })
+        comfortQueries.tagsOfSubscriptions(subscriptionIds).executeAsList().groupBy({ it.subscription_id }, { it.tag }).mapValues { TagRules.sorted(it.value) }
     }
 
 internal fun PodcastDb.withTags(items: List<SubscriptionItem>): List<SubscriptionItem> {

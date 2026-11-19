@@ -84,8 +84,9 @@ class ComfortTest {
         // Trimmed, merged when they only differ by case, in the order of their names.
         assertEquals(listOf("english", "tech"), tagged["tags"]!!.jsonArray.map { it.jsonPrimitive.content })
         // As a form sends them.
-        val text = client.send("PATCH", "/subscriptions/1", alice, """{"tags":"tech, java"}""").json()
-        assertEquals(listOf("java", "tech"), text["tags"]!!.jsonArray.map { it.jsonPrimitive.content })
+        val text = client.send("PATCH", "/subscriptions/1", alice, """{"tags":"tech, java, économie"}""").json()
+        // Alphabetical, accents aside.
+        assertEquals(listOf("économie", "java", "tech"), text["tags"]!!.jsonArray.map { it.jsonPrimitive.content })
         // A change of the note keeps them.
         client.send("PATCH", "/subscriptions/2", alice, """{"note":"JetBrains"}""")
         assertEquals(listOf("english", "tech"), client.getJson("/subscriptions/2", alice)["tags"]!!.jsonArray.map { it.jsonPrimitive.content })

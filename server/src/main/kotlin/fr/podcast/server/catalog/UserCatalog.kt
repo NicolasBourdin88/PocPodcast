@@ -25,6 +25,7 @@ import fr.podcast.shared.repository.PodcastRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.OffsetDateTime
+import fr.podcast.shared.model.TagRules
 
 data class Page<T>(val items: List<T>, val total: Long, val offset: Int, val limit: Int)
 
@@ -149,7 +150,7 @@ class UserCatalog(private val database: ServerDatabase, private val userId: Long
     }
 
     /** The tags of the user's own subscriptions, for the filters (ADR 0012). */
-    suspend fun tags(): List<String> = database.query { comfortQueries.tagsOfUser(userId).executeAsList() }
+    suspend fun tags(): List<String> = TagRules.sorted(database.query { comfortQueries.tagsOfUser(userId).executeAsList() })
 
     /** The episodes of the user's subscriptions matching [query], newest first (ADR 0012). */
     suspend fun search(query: EpisodeQuery, limit: Int, offset: Int): Page<EpisodeItem> = database.query {
