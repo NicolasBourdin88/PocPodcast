@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.userMessage
 import fr.podcast.shared.model.AccountRules
 import fr.podcast.shared.model.Device
+import fr.podcast.shared.model.ListeningStats
 import fr.podcast.shared.model.User
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.repository.PodcastClient
@@ -77,8 +78,11 @@ private sealed interface SettingsDialog {
 /** An app password just created: shown once (ADR 0011). */
 private data class CreatedAppPassword(val name: String, val password: String)
 
-/** What the server says about the active account: who they are, their devices, the server's accounts. */
-private data class AccountDetails(val me: User, val devices: List<Device>, val users: List<User>)
+/**
+ * What the server says about the active account: who they are, their devices, the server's
+ * accounts, and their listening (null from a server without statistics).
+ */
+private data class AccountDetails(val me: User, val devices: List<Device>, val users: List<User>, val stats: ListeningStats? = null)
 
 /**
  * Settings: the accounts saved on this device ([accounts]), then the active account as its server
@@ -104,7 +108,12 @@ fun SettingsScreen(
     LaunchedEffect(client, reloads) {
         attempt {
             val me = client.me()
-            AccountDetails(me, client.devices(), if (me.role == UserRole.ADMIN) client.users() else emptyList())
+            AccountDetails(
+                me,
+                client.devices(),
+                if (me.role == UserRole.ADMIN) client.users() else emptyList(),
+                attempt { client.listeningStats() }.getOrNull(),
+            )
         }.fold(
             onSuccess = {
                 details = it
@@ -143,7 +152,15 @@ fun SettingsScreen(
                     }
                 }
             }
-            details?.let { (me, devices, users) ->
+            details?.let { (me, devices, users, stats) ->
+                stats?.let {
+                    item(key = "listening") {
+                        Column {
+                            SectionTitle(strings.myListening)
+                            ListeningSection(it)
+                        }
+                    }
+                }
                 item(key = "profile") {
                     Column {
                         SectionTitle(strings.profile)

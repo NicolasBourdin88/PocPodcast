@@ -1,5 +1,11 @@
 package fr.podcast.ui.library
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Tab
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +81,7 @@ fun LibraryScreen(
     twoPanes: Boolean,
     onChanged: () -> Unit,
     modifier: Modifier = Modifier,
+    initialSearch: String? = null,
 ) {
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
@@ -157,20 +164,33 @@ fun LibraryScreen(
         ?: shared.firstNotNullOfOrNull { it.subscription?.takeIf { item -> item.podcast.id == openPodcastId } }
     SystemBackHandler(enabled = openPodcastId != null && !twoPanes) { onOpenPodcast(null) }
 
+    // The subscriptions, or the search of their episodes (ADR 0012).
+    var tab by rememberSaveable { mutableIntStateOf(if (initialSearch != null) 1 else 0) }
     val list: @Composable (Modifier) -> Unit = { listModifier ->
-        when (val current = state) {
-            LibraryState.Loading -> Box(listModifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryState.Failed -> Centered(current.error.userMessage(strings), listModifier, strings.retry) { reloads++ }
-            is LibraryState.Loaded -> SubscriptionList(
-                items = current.items,
-                shared = current.shared,
-                selectedPodcastId = openPodcastId.takeIf { twoPanes },
-                onOpen = { onOpenPodcast(it.podcast.id) },
-                onDecline = ::decline,
-                onExport = opml?.let { { exportOpml(it) } },
-                onImport = opml?.let { { importOpml(it) } },
-                modifier = listModifier,
-            )
+        Column(listModifier) {
+            PrimaryTabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(strings.subscriptionsTab) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(strings.episodesTab) })
+            }
+            val content = Modifier.fillMaxWidth().weight(1f)
+            when (val current = state) {
+                LibraryState.Loading -> Box(content, Alignment.Center) { CircularProgressIndicator() }
+                is LibraryState.Failed -> Centered(current.error.userMessage(strings), content, strings.retry) { reloads++ }
+                is LibraryState.Loaded -> if (tab == 1) {
+                    EpisodeSearch(client, current.items, content, initialSearch.orEmpty())
+                } else {
+                    SubscriptionList(
+                        items = current.items,
+                        shared = current.shared,
+                        selectedPodcastId = openPodcastId.takeIf { twoPanes },
+                        onOpen = { onOpenPodcast(it.podcast.id) },
+                        onDecline = ::decline,
+                        onExport = opml?.let { { exportOpml(it) } },
+                        onImport = opml?.let { { importOpml(it) } },
+                        modifier = content,
+                    )
+                }
+            }
         }
     }
     val detail: @Composable (Modifier, SubscriptionItem) -> Unit = { detailModifier, item ->
@@ -217,7 +237,32 @@ private fun SubscriptionList(
     modifier: Modifier,
 ) {
     val strings = LocalStrings.current
+    // Words and a tag (ADR 0012), applied as the server does.
+    var text by rememberSaveable { mutableStateOf("") }
+    var tag by rememberSaveable { mutableStateOf<String?>(null) }
+    val tags = items.flatMap { it.subscription.tags }.distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    val shown = items.filter { it.matches(text, tag) }
     LazyColumn(modifier) {
+        item(key = "filter") {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text(strings.filterLibrary) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+            )
+        }
+        if (tags.isNotEmpty()) {
+            item(key = "tags") {
+                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tags.forEach { each ->
+                        val selected = each.equals(tag, ignoreCase = true)
+                        FilterChip(selected = selected, onClick = { tag = if (selected) null else each }, label = { Text(each) })
+                    }
+                }
+            }
+        }
         if (onExport != null && onImport != null) {
             item(key = "opml") {
                 FlowRow(
@@ -238,12 +283,13 @@ private fun SubscriptionList(
                 )
             }
         }
-        items(items, key = { it.subscription.id }) { item ->
+        items(shown, key = { it.subscription.id }) { item ->
             val podcast = item.podcast
             ListItem(
                 modifier = Modifier.clickable { onOpen(item) },
                 colors = selectedColors(podcast.id == selectedPodcastId),
                 leadingContent = { Artwork(podcast, size = 48.dp) },
+                overlineContent = item.subscription.tags.takeIf { it.isNotEmpty() }?.let { { Text(it.joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis) } },
                 headlineContent = { Text(podcast.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 supportingContent = {
                     Text(item.subscription.note?.takeIf { it.isNotBlank() } ?: podcast.author, maxLines = 2, overflow = TextOverflow.Ellipsis)

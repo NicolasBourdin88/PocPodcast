@@ -86,6 +86,9 @@ class ResponsiveSnapshotTest {
             render("explore-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Explore, query = "kotlin") }
             render("explore-large-$tag", sizes.getValue("large")) { Home(language, Destination.Explore, query = "kotlin") }
             render("library-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library) }
+            // The search of the episodes (ADR 0012).
+            render("library-episodes-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library, query = "kotlin") }
+            render("library-episodes-large-$tag", sizes.getValue("large")) { Home(language, Destination.Library, query = "kotlin") }
             render("podcast-compact-$tag", sizes.getValue("compact")) { Home(language, Destination.Library, podcastId = "p2") }
             render("library-expanded-$tag", sizes.getValue("expanded")) { Home(language, Destination.Library, podcastId = "p2") }
             render("library-large-$tag", sizes.getValue("large")) { Home(language, Destination.Library, podcastId = "p1") }

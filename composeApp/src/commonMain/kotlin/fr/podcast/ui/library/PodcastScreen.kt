@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.podcast.shared.api.userMessage
+import fr.podcast.shared.model.TagRules
 import fr.podcast.shared.model.Access
 import fr.podcast.shared.model.Episode
 import fr.podcast.shared.model.FileStatus
@@ -96,6 +97,7 @@ fun PodcastScreen(
     val owner = subscription.access == Access.OWNER
     val editable = subscription.access != Access.READ
     var note by rememberSaveable(subscription.id) { mutableStateOf(subscription.note.orEmpty()) }
+    var tags by rememberSaveable(subscription.id) { mutableStateOf(subscription.tags.joinToString(", ")) }
     var episodes by remember(podcast.id) { mutableStateOf<List<Episode>?>(null) }
     var shares by remember(subscription.id) { mutableStateOf<List<Share>>(emptyList()) }
     var reloads by remember { mutableIntStateOf(0) }
@@ -124,8 +126,8 @@ fun PodcastScreen(
         scope.launch { snackbar.showSnackbar(message) }
     }
 
-    fun update(note: String?, autoDownload: Boolean) = act {
-        onChanged(client.updateSubscription(subscription.id, note?.takeIf { it.isNotBlank() }, autoDownload))
+    fun update(note: String?, autoDownload: Boolean, tags: List<String>? = null) = act {
+        onChanged(client.updateSubscription(subscription.id, note?.takeIf { it.isNotBlank() }, autoDownload, tags))
     }
 
     fun replaceEpisode(id: String) = act {
@@ -189,7 +191,22 @@ fun PodcastScreen(
                         placeholder = { Text(strings.notePlaceholder) },
                         minLines = 2,
                     )
+                    val parsedTags = TagRules.parse(tags)
+                    OutlinedTextField(
+                        value = tags,
+                        onValueChange = { tags = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.tags) },
+                        supportingText = {
+                            Text(if (TagRules.valid(parsedTags)) strings.tagsHint else strings.tagsInvalid(TagRules.MAX_TAGS, TagRules.MAX_LENGTH))
+                        },
+                        isError = !TagRules.valid(parsedTags),
+                        singleLine = true,
+                    )
                 } else {
+                    if (subscription.tags.isNotEmpty()) {
+                        Text("${strings.tags} · ${subscription.tags.joinToString(", ")}", style = MaterialTheme.typography.bodyMedium)
+                    }
                     subscription.note?.takeIf { it.isNotBlank() }?.let { text ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(strings.ownerNote(subscription.ownerName.orEmpty()), style = MaterialTheme.typography.labelMedium)
@@ -203,9 +220,11 @@ fun PodcastScreen(
                     itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (editable) {
+                        val newTags = TagRules.parse(tags)
                         FilledTonalButton(
-                            onClick = { update(note, subscription.autoDownload) },
-                            enabled = note.trim() != subscription.note.orEmpty().trim(),
+                            onClick = { update(note, subscription.autoDownload, newTags) },
+                            enabled = TagRules.valid(newTags) &&
+                                (note.trim() != subscription.note.orEmpty().trim() || newTags != subscription.tags),
                         ) { Text(strings.save) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = subscription.autoDownload, onCheckedChange = { update(subscription.note, it) })

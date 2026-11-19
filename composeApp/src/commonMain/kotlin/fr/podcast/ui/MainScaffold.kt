@@ -191,6 +191,8 @@ private fun AdaptiveScaffold(
                 twoPanes = layout == WindowLayout.Expanded || layout == WindowLayout.Large,
                 onChanged = onReload,
                 modifier = modifier,
+                // A search given at the start opens on the episodes (snapshots).
+                initialSearch = initialQuery.takeIf { initialDestination == Destination.Library && it.isNotBlank() },
             )
             state is HomeUiState.Loading -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             state is HomeUiState.Failed && state.error is ApiException.Unauthorized ->
