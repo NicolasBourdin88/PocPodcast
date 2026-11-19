@@ -1,5 +1,6 @@
 package fr.podcast.shared.account
 
+import fr.podcast.shared.model.Avatar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,8 +18,12 @@ data class Account(
     val displayName: String,
     /** Device token (ADR 0005); the password is never stored. */
     val token: String,
+    /** The user's [Avatar] id, kept to show the account (ADR 0013). */
+    val avatar: String? = null,
 ) {
     val id: String get() = "$username@$serverUrl"
+
+    val picture: Avatar get() = Avatar.of(avatar, username)
 }
 
 /** Small persistent storage, implemented by each platform (preferences, user defaults…). */

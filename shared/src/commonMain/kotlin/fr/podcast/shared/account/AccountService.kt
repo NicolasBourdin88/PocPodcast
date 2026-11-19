@@ -39,6 +39,7 @@ class AccountService(private val httpClient: HttpClient, private val deviceName:
             serverName = root.string("name") ?: url,
             username = username,
             displayName = me.string("displayName") ?: username,
+            avatar = me.string("avatar"),
             token = token,
         )
     }

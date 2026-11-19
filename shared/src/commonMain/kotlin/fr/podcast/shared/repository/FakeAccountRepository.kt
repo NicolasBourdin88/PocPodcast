@@ -2,6 +2,7 @@ package fr.podcast.shared.repository
 
 import fr.podcast.shared.api.ApiException
 import fr.podcast.shared.api.FieldError
+import fr.podcast.shared.model.Avatar
 import fr.podcast.shared.model.AccountRules
 import fr.podcast.shared.model.Device
 import fr.podcast.shared.model.User
@@ -35,10 +36,11 @@ internal class FakeAccountRepository : AccountRepository {
 
     override suspend fun me(): User = user(ME)!!
 
-    override suspend fun updateProfile(displayName: String): User = mutex.withLock {
-        val name = displayName.trim()
-        if (!AccountRules.validDisplayName(name)) throw invalid("displayName")
-        replace(ME) { it.copy(displayName = name) }
+    override suspend fun updateProfile(displayName: String?, avatar: String?): User = mutex.withLock {
+        val name = displayName?.trim()
+        if (name != null && !AccountRules.validDisplayName(name)) throw invalid("displayName")
+        if (avatar != null && Avatar.of(avatar) == null) throw invalid("avatar")
+        replace(ME) { it.copy(displayName = name ?: it.displayName, avatar = avatar ?: it.avatar) }
     }
 
     /** The demo has no password: only the new one is checked. */

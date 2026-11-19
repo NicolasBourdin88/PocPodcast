@@ -11,7 +11,17 @@ enum class UserRole { USER, ADMIN }
 
 /** An account of the server, as other users see it (ADR 0009). */
 @Serializable
-data class User(val id: String, val username: String, val displayName: String, val role: UserRole = UserRole.USER)
+data class User(
+    val id: String,
+    val username: String,
+    val displayName: String,
+    val role: UserRole = UserRole.USER,
+    /** An [Avatar] id; none until the user chooses one (ADR 0013). */
+    val avatar: String? = null,
+) {
+    /** The picture to show: the user's choice, or else their default one. */
+    val picture: Avatar get() = Avatar.of(avatar, username)
+}
 
 /** Rules on accounts, checked by the server and by the clients before they send (ADR 0009). */
 object AccountRules {

@@ -8,7 +8,8 @@ import fr.podcast.shared.model.UserRole
 interface AccountRepository {
     /** The signed-in user; an [UserRole.ADMIN] manages the accounts. */
     suspend fun me(): User
-    suspend fun updateProfile(displayName: String): User
+    /** Changes what is given: the name, the [fr.podcast.shared.model.Avatar] id, or both. */
+    suspend fun updateProfile(displayName: String? = null, avatar: String? = null): User
 
     /** This device stays signed in; the others must sign in again. */
     suspend fun changePassword(currentPassword: String, newPassword: String)

@@ -8,6 +8,7 @@ import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
+import fr.podcast.shared.model.Avatar
 
 object EnglishStrings : Strings {
     override fun destination(destination: Destination) = when (destination) {
@@ -180,6 +181,21 @@ object EnglishStrings : Strings {
     override val playbackMenu = "Playback"
     override val playPause = "Play or pause"
     override val changeSpeed = "Change speed"
+    override val chooseAvatar = "Choose an avatar"
+    override fun avatarName(avatar: Avatar) = when (avatar) {
+        Avatar.Fox -> "Fox"
+        Avatar.Panda -> "Panda"
+        Avatar.Owl -> "Owl"
+        Avatar.Octopus -> "Octopus"
+        Avatar.Frog -> "Frog"
+        Avatar.Tiger -> "Tiger"
+        Avatar.Penguin -> "Penguin"
+        Avatar.Whale -> "Whale"
+        Avatar.Unicorn -> "Unicorn"
+        Avatar.Koala -> "Koala"
+        Avatar.Headphones -> "Headphones"
+        Avatar.Rocket -> "Rocket"
+    }
     override val previousPage = "Previous"
     override val nextPage = "Next"
     override val tags = "Tags"

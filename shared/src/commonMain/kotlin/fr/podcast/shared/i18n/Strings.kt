@@ -10,6 +10,7 @@ import fr.podcast.shared.model.SharePermission
 import fr.podcast.shared.model.UserRole
 import fr.podcast.shared.navigation.Destination
 import kotlinx.datetime.LocalDate
+import fr.podcast.shared.model.Avatar
 
 /**
  * Every user-facing string, shared by all clients (Compose, HTML, CLI).
@@ -134,6 +135,10 @@ interface Strings {
     val playbackMenu: String
     val playPause: String
     val changeSpeed: String
+
+    // Avatars (ADR 0013)
+    val chooseAvatar: String
+    fun avatarName(avatar: Avatar): String
     fun statusFilter(status: EpisodeStatus): String
     val statusLabel: String
     val anyStatus: String

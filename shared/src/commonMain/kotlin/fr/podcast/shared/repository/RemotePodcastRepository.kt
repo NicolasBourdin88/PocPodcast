@@ -176,8 +176,13 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     override suspend fun me(): User = meResource().toUser()
 
-    override suspend fun updateProfile(displayName: String): User =
-        meResource().submit("update-profile", mapOf("displayName" to JsonPrimitive(displayName))).resource().toUser()
+    override suspend fun updateProfile(displayName: String?, avatar: String?): User {
+        val values = buildMap {
+            displayName?.let { put("displayName", JsonPrimitive(it)) }
+            avatar?.let { put("avatar", JsonPrimitive(it)) }
+        }
+        return meResource().submit("update-profile", values).resource().toUser()
+    }
 
     override suspend fun changePassword(currentPassword: String, newPassword: String) {
         meResource().submit("change-password", mapOf("currentPassword" to JsonPrimitive(currentPassword), "newPassword" to JsonPrimitive(newPassword)))
