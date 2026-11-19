@@ -94,6 +94,15 @@ class ComfortTest {
         assertEquals(HttpStatusCode.UnprocessableEntity, tooMany.status)
         assertEquals(HttpStatusCode.UnprocessableEntity, client.send("PATCH", "/subscriptions/2", alice, """{"tags":["a,b"]}""").status)
 
+        // Rights as for the note (ADR 0009): a READ share sees them, a WRITE share changes them.
+        val bob = client.token(TestSeed.BOB, TestSeed.BOB_PASSWORD)
+        val share = client.send("POST", "/subscriptions/2/shares", alice, """{"userId":"2"}""").json()["id"]!!.jsonPrimitive.content
+        assertEquals(listOf("english", "tech"), client.getJson("/subscriptions/2", bob)["tags"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(HttpStatusCode.Forbidden, client.send("PATCH", "/subscriptions/2", bob, """{"tags":["mine"]}""").status)
+        client.send("PATCH", "/shares/$share", alice, """{"permission":"WRITE"}""")
+        assertEquals(listOf("famille"), client.send("PATCH", "/subscriptions/2", bob, """{"tags":["famille"]}""").json()["tags"]!!.jsonArray.map { it.jsonPrimitive.content })
+        client.send("PATCH", "/subscriptions/2", alice, """{"tags":["english","tech"]}""")
+
         fun titles(collection: kotlinx.serialization.json.JsonObject) = collection["_embedded"]!!.jsonObject["subscriptions"]!!.jsonArray
             .map { it.jsonObject["_embedded"]!!.jsonObject["podcast"]!!.jsonObject["title"]!!.jsonPrimitive.content }
         assertEquals(listOf("Les Cast Codeurs", "Talking Kotlin"), titles(client.getJson("/subscriptions?tag=tech", alice)))
