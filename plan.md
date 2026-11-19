@@ -261,9 +261,24 @@ Chaque étude produit une note de 1 à 2 pages dans `docs/adr/` : options, crit�
 
 ## Étape 10 — Finition
 
-- [ ] Stabilisation, tests, documentation utilisateur et technique.
-- [ ] Démo finale.
-- [ ] Bonus : client SwiftUI (iOS + macOS, Liquid Glass) branché sur le SDK `:shared`.
+- [x] Stabilisation, tests, documentation utilisateur et technique.
+  - Dépendances à jour : Compose Multiplatform 1.13.0-rc01, Ktor 3.6.1, Gradle 9.9.1… Les tests communs tournent aussi sur Android et macOS.
+  - Les positions attendent le réseau ; l'OPML sur iPhone passe par l'app SwiftUI.
+  - Documentation : [ADR 0013](docs/adr/0013-composants-natifs.md), README, conventions et modèle de données.
+- [x] Composants natifs : Material 3 Expressive dans les apps Compose (couleurs du fond d'écran sur Android, barres de recherche et champs tonals, navigation et lecteur Expressive), barre de menus sur desktop (ADR 0013).
+- [x] Avatars au choix, comme sur les plateformes de streaming, sans changer l'interopérabilité (ADR 0013).
+- [ ] Démo finale. → scénario prêt dans [docs/demo.md](docs/demo.md).
+- [x] Bonus : client SwiftUI (iOS + macOS, Liquid Glass) branché sur le SDK `:shared`. → `appleApp/`, framework `PodcastKit` (`:apple`, SKIE).
+
+### Définition de « terminé »
+
+| # | Vérification | Commande |
+|---|---|---|
+| F1 | Tous les tests, sur chaque plateforme | `./gradlew :shared:allTests :player:allTests :composeApp:desktopTest :server:test :cli:test` |
+| F2 | Material 3 Expressive : écrans à chaque taille, dans chaque langue | captures `composeApp/build/snapshots/` (`explore-*`, `library-*`, `settings-*`, `avatar-picker-*`) |
+| F3 | Avatars : catalogue, API (options HAL-FORMS), client léger, apps, CLI | `./gradlew :server:test` (`AccountManagementTest`, `WebTest`, `SdkTest`), `:shared:allTests` (`AvatarTest`), `:cli:test` |
+| F4 | Positions hors ligne | `./gradlew :player:allTests` (`positionsWaitForTheNetwork`) |
+| F5 | App SwiftUI construite et lancée sur iPhone et sur Mac, branchée sur le serveur | `xcodebuild` (README) ; `podcast devices` montre ses appareils utilisés |
 
 ---
 

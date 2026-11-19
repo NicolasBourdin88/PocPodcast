@@ -1,6 +1,6 @@
 # Podcast
 
-Système de gestion et d'écoute de podcasts (projet de master). Il se compose d'un service multi-utilisateurs et de plusieurs clients : mobile, desktop, web léger, CLI/TUI. Tous partagent le même module Kotlin Multiplatform.
+Système de gestion et d'écoute de podcasts (projet de master). Il se compose d'un service multi-utilisateurs et de plusieurs clients : mobile et desktop en Compose Multiplatform, une app native SwiftUI pour iPhone, iPad et Mac, un client web léger et un CLI/TUI. Tous partagent le même module Kotlin Multiplatform.
 
 - Contexte et décisions : [CLAUDE.md](CLAUDE.md)
 - Feuille de route : [plan.md](plan.md)
@@ -11,11 +11,13 @@ Système de gestion et d'écoute de podcasts (projet de master). Il se compose d
 
 | Module | Cibles | Rôle |
 |---|---|---|
-| `:shared` | JVM, Android, iOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository` : Accueil, abonnements, recherche, OPML) |
-| `:player` | JVM, Android, iOS | Lecture audio : interface `AudioPlayer`, contrôleur partagé, Media3, AVPlayer et JavaFX Media ([ADR 0008](docs/adr/0008-lecture-audio.md)) |
-| `:composeApp` | Android, iOS, Desktop (JVM) | UI Compose Multiplatform, responsive par taille de fenêtre |
+| `:shared` | JVM, Android, iOS, macOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository` : Accueil, abonnements, recherche, OPML) |
+| `:player` | JVM, Android, iOS, macOS | Lecture audio : interface `AudioPlayer`, contrôleur partagé, Media3, AVPlayer et JavaFX Media ([ADR 0008](docs/adr/0008-lecture-audio.md)) |
+| `:composeApp` | Android, iOS, Desktop (JVM) | UI Compose Multiplatform en Material 3 Expressive, responsive par taille de fenêtre |
 | `:androidApp` | Android | Point d'entrée Android (`MainActivity`) |
 | `iosApp/` | iOS | Projet Xcode qui héberge l'UI Compose |
+| `:apple` | iOS, macOS | Framework `PodcastKit` du client SwiftUI : `:shared` et `:player` vus de Swift par SKIE ([ADR 0013](docs/adr/0013-composants-natifs.md)) |
+| `appleApp/` | iOS, iPadOS, macOS | Client SwiftUI natif (Liquid Glass) |
 | `:server` | JVM | Ktor + PostgreSQL : API hypermédia (HAL / HAL-FORMS) et client léger HTML/htmx |
 | `:cli` | JVM | Commandes Clikt et TUI Mosaic |
 
@@ -93,7 +95,17 @@ Application macOS empaquetée (`composeApp/build/compose/binaries/main/app/Podca
 ./gradlew :composeApp:createDistributable
 ```
 
-iOS : ouvrir `iosApp/iosApp.xcodeproj` dans Xcode et lancer sur un simulateur. Le serveur y est à `http://localhost:8080`.
+iOS (Compose) : ouvrir `iosApp/iosApp.xcodeproj` dans Xcode et lancer sur un simulateur. Le serveur y est à `http://localhost:8080`.
+
+iPhone, iPad et Mac (SwiftUI, [ADR 0013](docs/adr/0013-composants-natifs.md)) : ouvrir `appleApp/Podcast.xcodeproj` et lancer le schéma `Podcast` sur un simulateur ou sur « My Mac ». Xcode construit le framework Kotlin par Gradle ; sur Mac, le premier lien prend une dizaine de minutes. En ligne de commande :
+
+```bash
+xcodebuild -project appleApp/Podcast.xcodeproj -scheme Podcast -destination 'platform=macOS,arch=arm64' -derivedDataPath build/apple-derived build
+```
+
+```bash
+open build/apple-derived/Build/Products/Debug/Podcast.app
+```
 
 CLI : se connecter, puis afficher l'Accueil :
 
@@ -154,6 +166,7 @@ File d'attente : `queue`, `queue add 4` (`--next` pour le lire ensuite), `queue 
 Un administrateur crée les comptes ; chacun change ensuite son nom et son mot de passe, et peut déconnecter un appareil perdu ([ADR 0009](docs/adr/0009-comptes-et-partages.md)). Dans les données de démo, Alice est administratrice.
 
 - **Partager un abonnement** : en lecture seule, ou en lecture et modification (note, téléchargement automatique). Seul le propriétaire se désabonne ou le partage à nouveau.
+- **Avatar** : chacun choisit le sien parmi douze, comme sur les plateformes de streaming (Réglages › Profil, ou `podcast profile --avatar`) ; avant tout choix, un avatar déduit de l'identifiant.
 - **Recommander un épisode** : à un autre compte, avec un message.
 - **Partagés avec moi** : ce que les autres partagent apparaît à part, dans la Bibliothèque. On peut s'abonner soi-même au podcast partagé, ou retirer le partage.
 - **Où** :
@@ -165,7 +178,7 @@ Un administrateur crée les comptes ; chacun change ensuite son nom et son mot d
 cli/build/install/podcast/bin/podcast share 2 bob --write --message "Pour le train"
 ```
 
-Ensuite : `share 2` (avec qui il est partagé), `unshare 2 bob`, `shared` puis `shared remove 1`, `recommend 3 alice`, `profile --name …`, `passwd`, `devices` puis `devices revoke 2`, et pour un administrateur `users`, `users add carol --name Carol`, `users role 3 admin`, `users passwd 3`, `users remove 3 --yes`.
+Ensuite : `share 2` (avec qui il est partagé), `unshare 2 bob`, `shared` puis `shared remove 1`, `recommend 3 alice`, `profile --name …` et `profile --avatar fox`, `passwd`, `devices` puis `devices revoke 2`, et pour un administrateur `users`, `users add carol --name Carol`, `users role 3 admin`, `users passwd 3`, `users remove 3 --yes`.
 
 ## Playlists
 

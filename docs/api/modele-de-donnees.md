@@ -47,6 +47,7 @@ erDiagram
         text password_hash "Argon2id"
         text role "USER | ADMIN"
         int credentials_version "change avec le mot de passe"
+        text avatar "catalogue Avatar, null avant tout choix"
         timestamptz created_at
     }
     api_tokens {
@@ -242,6 +243,7 @@ erDiagram
 | `playlists`, `playlist_items`, `playlist_feeds` | Playlists statiques et dynamiques, flux RSS | Étape 7 (`V6`) |
 | `gpodder_devices`, `subscription_changes`, `episode_actions`, `subscription_deletions` | Synchronisation avec les clients tiers (API gPodder, Open Podcast API) | Étape 8 (`V7`) |
 | `subscription_tags`, `listening_days` | Étiquettes des abonnements, temps d'écoute par jour et par podcast | Étape 9 (`V8`) |
+| `users.avatar` | Avatar choisi par chaque utilisateur (ADR 0013) | Étape 10 (`V9`) |
 
 ## Règles
 
