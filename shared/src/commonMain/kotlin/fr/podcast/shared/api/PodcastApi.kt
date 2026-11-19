@@ -64,15 +64,15 @@ class PodcastApi(val serverUrl: String, private val httpClient: HttpClient, priv
 
     /**
      * Submits [template] with [values], completed with the template's default values.
-     * [self] is the target when the template has none.
+     * [resource] (the resource's own link) is the target when the template has none.
      */
-    suspend fun submit(template: HalFormsTemplate, self: String, values: Map<String, JsonElement> = emptyMap()): HttpResponse {
+    suspend fun submit(template: HalFormsTemplate, resource: String, values: Map<String, JsonElement> = emptyMap()): HttpResponse {
         val body = template.properties.associate { property ->
             val value = values[property.name] ?: property.value
             require(value != null || !property.required) { "${template.name}: ${property.name} is required" }
             property.name to (value ?: JsonNull)
         }
-        val url = resolve(template.target ?: self)
+        val url = resolve(template.target ?: resource)
         return send(url) {
             method = template.method
             accept(HalFormsJson)

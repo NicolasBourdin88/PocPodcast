@@ -1,7 +1,7 @@
 package fr.podcast.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
-import fr.podcast.player.IosAudioPlayer
+import fr.podcast.player.AppleAudioPlayer
 import fr.podcast.shared.account.UserDefaultsKeyValueStore
 import platform.UIKit.UIDevice
 
@@ -12,7 +12,7 @@ private val environment by lazy {
         deviceName = UIDevice.currentDevice.name,
         // The simulator shares the Mac's network: localhost is the development server.
         defaultServerUrl = "http://localhost:8080",
-        player = IosAudioPlayer(),
+        player = AppleAudioPlayer(),
     )
 }
 

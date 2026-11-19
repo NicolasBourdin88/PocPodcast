@@ -161,7 +161,7 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     override suspend fun clearQueue() {
         val queue = queueResource()
-        if (queue.template("clear-queue") != null) queue.submit("clear-queue", self = link("queue"))
+        if (queue.template("clear-queue") != null) queue.submit("clear-queue", resource = link("queue"))
     }
 
     override suspend fun exportOpml(): String =
@@ -366,9 +366,9 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     private fun HalResource.toPlaylistDetails(): PlaylistDetails = PlaylistDetails(toPlaylist(), embedded("episodes").map { it.asEpisodeItem() })
 
     /** Submits the resource's [template]; refused with [ApiException.NotOffered] when the server does not offer it. */
-    private suspend fun HalResource.submit(template: String, values: Map<String, JsonElement> = emptyMap(), self: String? = null): HttpResponse {
+    private suspend fun HalResource.submit(template: String, values: Map<String, JsonElement> = emptyMap(), resource: String? = null): HttpResponse {
         val action = template(template) ?: throw ApiException.NotOffered(template)
-        return api.submit(action, link("self") ?: self ?: throw ApiException.NotOffered(template), values)
+        return api.submit(action, link("self") ?: resource ?: throw ApiException.NotOffered(template), values)
     }
 
     private suspend fun HttpResponse.resource(): HalResource = halResource(api.serverUrl)
@@ -382,7 +382,7 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     private suspend fun perform(episodeId: String, template: String, values: Map<String, JsonElement> = emptyMap()) {
         val episode = episodeResource(episodeId) ?: return
         if (episode.template(template) == null) return
-        episode.submit(template, values, self = link("episode", mapOf("id" to episodeId)))
+        episode.submit(template, values, resource = link("episode", mapOf("id" to episodeId)))
     }
 
     private suspend fun episodeResource(id: String): HalResource? = orNullIfNotFound { api.get(link("episode", mapOf("id" to id))) }

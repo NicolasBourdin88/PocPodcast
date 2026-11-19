@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 class AccountService(private val httpClient: HttpClient, private val deviceName: String) {
 
     /** @throws ApiException Unreachable, NotAPodcastServer or Unauthorized (wrong credentials). */
+    @Throws(Exception::class)
     suspend fun signIn(serverUrl: String, username: String, password: String): Account {
         val url = normalizeServerUrl(serverUrl)
         val anonymous = PodcastApi(url, httpClient)
@@ -45,6 +46,7 @@ class AccountService(private val httpClient: HttpClient, private val deviceName:
     }
 
     /** Revokes the device token when the server is reachable; the caller forgets the account anyway. */
+    @Throws(Exception::class)
     suspend fun signOut(account: Account) {
         try {
             val api = PodcastApi(account.serverUrl, httpClient, account.token)

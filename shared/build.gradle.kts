@@ -20,12 +20,10 @@ kotlin {
         withHostTest {}
     }
 
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
-        target.binaries.framework {
-            baseName = "Shared"
-            isStatic = true
-        }
-    }
+    iosArm64()
+    iosSimulatorArm64()
+    // The SwiftUI client on the Mac (ADR 0013).
+    macosArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -37,7 +35,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
         }
-        iosMain.dependencies {
+        appleMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
         jvmMain.dependencies {

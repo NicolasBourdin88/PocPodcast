@@ -5,10 +5,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.AVAudioSessionModeSpokenAudio
-import platform.AVFAudio.setActive
 import platform.AVFoundation.AVAudioTimePitchAlgorithmTimeDomain
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
@@ -52,12 +48,13 @@ import platform.darwin.dispatch_get_main_queue
 import kotlin.math.abs
 
 /**
- * AVPlayer on iOS (ADR 0008). The audio session plays in the background (the app declares the
- * "audio" background mode), Now Playing feeds the lock screen and Control Center, and the remote
- * commands (headphones, lock screen) act on this player. Everything runs on the main thread.
+ * AVPlayer on iOS and macOS (ADR 0008, 0013). On iOS the audio session plays in the background (the
+ * app declares the "audio" background mode); Now Playing feeds the lock screen, Control Center and
+ * the Mac's menu bar, and the remote commands (headphones, media keys) act on this player.
+ * Everything runs on the main thread.
  */
 @OptIn(ExperimentalForeignApi::class)
-class IosAudioPlayer : AudioPlayer {
+class AppleAudioPlayer : AudioPlayer {
     private val player = AVPlayer()
     private val mutableState = MutableStateFlow(PlayerState())
     override val state: StateFlow<PlayerState> = mutableState.asStateFlow()
@@ -76,8 +73,7 @@ class IosAudioPlayer : AudioPlayer {
 
     init {
         onMain {
-            val session = AVAudioSession.sharedInstance()
-            session.setCategory(AVAudioSessionCategoryPlayback, mode = AVAudioSessionModeSpokenAudio, options = 0u, error = null)
+            configureAudioSession()
             // AVPlayer does not report every change: read its state twice a second.
             timer = NSTimer.scheduledTimerWithTimeInterval(0.5, repeats = true) { _ -> publish() }
             remoteCommands()
@@ -89,7 +85,7 @@ class IosAudioPlayer : AudioPlayer {
         this.media = media
         ended = false
         wantsToPlay = play
-        AVAudioSession.sharedInstance().setActive(true, error = null)
+        activateAudioSession()
         val item = AVPlayerItem(uRL = url)
         item.setAudioTimePitchAlgorithm(AVAudioTimePitchAlgorithmTimeDomain) // suited to speech at 1.5×
         endObserver?.let { NSNotificationCenter.defaultCenter.removeObserver(it) }
@@ -247,3 +243,8 @@ class IosAudioPlayer : AudioPlayer {
         const val TIMESCALE = 600
     }
 }
+
+/** iOS: spoken audio that keeps playing in the background; nothing to do on the Mac. */
+internal expect fun configureAudioSession()
+
+internal expect fun activateAudioSession()

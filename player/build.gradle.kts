@@ -33,6 +33,8 @@ kotlin {
 
     iosArm64()
     iosSimulatorArm64()
+    // The SwiftUI client on the Mac (ADR 0013).
+    macosArm64()
 
     sourceSets {
         commonMain.dependencies {
