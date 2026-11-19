@@ -18,6 +18,8 @@ import fr.podcast.ui.player.LocalPlayback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import fr.podcast.ui.account.SettingsScreen
+import fr.podcast.ui.components.AvatarPickerDialog
+import fr.podcast.shared.model.Avatar
 import fr.podcast.ui.account.SignInScreen
 import fr.podcast.ui.account.accountsSection
 import fr.podcast.ui.theme.PodcastTheme
@@ -76,6 +78,10 @@ class ResponsiveSnapshotTest {
             render("settings-compact-${language.tag}", sizes.getValue("compact")) { Home(language, Destination.Settings) }
             // Tall enough for every section: devices and, for an administrator, the users (ADR 0009).
             render("settings-full-${language.tag}", 1000 to 1700) { Home(language, Destination.Settings) }
+            // The avatars to choose from (ADR 0013).
+            render("avatar-picker-compact-${language.tag}", sizes.getValue("compact")) {
+                PodcastTheme(language) { Surface { AvatarPickerDialog(Avatar.Owl, onChoose = {}, onDismiss = {}) } }
+            }
         }
     }
 

@@ -8,23 +8,29 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.prompt
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
+import fr.podcast.shared.model.Avatar
 import fr.podcast.shared.model.User
 import fr.podcast.shared.model.UserRole
 import kotlinx.coroutines.runBlocking
 
-/** `podcast profile [--name …]`: the account as the server knows it (ADR 0009). */
+/** `podcast profile [--name …] [--avatar …]`: the account as the server knows it (ADR 0009, 0013). */
 class ProfileCommand : ServerCommand("profile") {
     private val name by option("--name", help = systemLanguage.strings.displayName)
+    private val avatar by option("--avatar", help = systemLanguage.strings.chooseAvatar)
+        .choice(*Avatar.entries.map { it.id to it }.toTypedArray())
 
     override fun help(context: Context) = systemLanguage.strings.cliProfileDescription
     override fun run() {
-        val newName = name
-        val me = if (newName == null) {
+        val newName = name?.trim()
+        val newAvatar = avatar
+        val me = if (newName == null && newAvatar == null) {
             call { client().me() }
         } else {
-            call { client().updateProfile(newName.trim()) }.also { updated ->
-                // The account saved on this computer shows the new name too.
-                if (!cli.demo) cli.accounts.state.value.active?.let { cli.accounts.update(it.copy(displayName = updated.displayName)) }
+            call { client().updateProfile(newName, newAvatar?.id) }.also { updated ->
+                // The account saved on this computer shows the change too.
+                if (!cli.demo) {
+                    cli.accounts.state.value.active?.let { cli.accounts.update(it.copy(displayName = updated.displayName, avatar = updated.avatar)) }
+                }
                 echo(cli.strings.profileSaved)
             }
         }

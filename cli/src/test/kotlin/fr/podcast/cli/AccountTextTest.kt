@@ -15,7 +15,8 @@ class AccountTextTest {
     fun devicesAndUsersAreNumbered() = runBlocking<Unit> {
         val repository = FakePodcastRepository()
 
-        assertEquals("Demo — demo · Administrateur", renderProfileText(repository.me(), strings))
+        // Before any choice, the avatar taken from the username (ADR 0013).
+        assertEquals("🐳 Demo — demo · Administrateur · Baleine", renderProfileText(repository.me(), strings))
         assertEquals(
             listOf(
                 " 1. MacBook Air — Cet appareil",
@@ -26,12 +27,13 @@ class AccountTextTest {
         )
         assertEquals(
             listOf(
-                " 1. Alice — alice · Utilisateur",
-                " 2. Bob — bob · Utilisateur",
-                " 3. Demo (vous) — demo · Administrateur",
+                " 1. 🦊 Alice — alice · Utilisateur",
+                " 2. 🐼 Bob — bob · Utilisateur",
+                " 3. 🐳 Demo (vous) — demo · Administrateur",
             ).joinToString("\n"),
             renderUsersText(repository.users(), repository.me(), strings),
         )
+        assertEquals("🦉 Demo — demo · Administrateur · Hibou", renderProfileText(repository.updateProfile(avatar = "owl"), strings))
     }
 
     @Test

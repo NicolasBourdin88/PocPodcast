@@ -10,7 +10,8 @@ import fr.podcast.shared.repository.SharedItem
 import kotlinx.datetime.TimeZone
 
 /** `podcast profile`: the user as the active server knows them. */
-fun renderProfileText(me: User, strings: Strings): String = "${me.displayName} — ${me.username} · ${strings.role(me.role)}"
+fun renderProfileText(me: User, strings: Strings): String =
+    "${me.picture.emoji} ${me.displayName} — ${me.username} · ${strings.role(me.role)} · ${strings.avatarName(me.picture)}"
 
 /** Numbered devices for `podcast devices`; `devices revoke <n>` uses the numbers. */
 fun renderDevicesText(devices: List<Device>, strings: Strings, timeZone: TimeZone = TimeZone.currentSystemDefault()): String = buildString {
@@ -25,7 +26,7 @@ fun renderDevicesText(devices: List<Device>, strings: Strings, timeZone: TimeZon
 fun renderUsersText(users: List<User>, me: User, strings: Strings): String = buildString {
     users.forEachIndexed { index, user ->
         val self = if (user.id == me.id) " (${strings.you})" else ""
-        appendLine("${number(index)} ${user.displayName}$self — ${user.username} · ${strings.role(user.role)}")
+        appendLine("${number(index)} ${user.picture.emoji} ${user.displayName}$self — ${user.username} · ${strings.role(user.role)}")
     }
 }.trimEnd()
 

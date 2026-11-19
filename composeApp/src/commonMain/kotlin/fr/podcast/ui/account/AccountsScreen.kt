@@ -21,6 +21,11 @@ import fr.podcast.shared.account.Account
 import fr.podcast.shared.account.AccountsState
 import fr.podcast.ui.components.SectionTitle
 import fr.podcast.ui.theme.LocalStrings
+import fr.podcast.ui.components.AvatarImage
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.style.TextOverflow
 
 /** Settings › Accounts: the accounts saved on this device, one per server or several on one; one is active (ADR 0006). */
 fun LazyListScope.accountsSection(
@@ -45,9 +50,19 @@ fun LazyListScope.accountsSection(
     items(state.accounts, key = { it.id }) { account ->
         ListItem(
             modifier = Modifier.clickable { onSelect(account) },
-            leadingContent = { RadioButton(selected = !demo && account.id == state.activeId, onClick = { onSelect(account) }) },
+            leadingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = !demo && account.id == state.activeId, onClick = { onSelect(account) })
+                    AvatarImage(account.picture, size = 40.dp)
+                }
+            },
             headlineContent = { Text(account.displayName) },
-            supportingContent = { Text("${account.username} · ${account.serverName}\n${account.serverUrl}") },
+            supportingContent = {
+                Column {
+                    Text("${account.username} · ${account.serverName}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(account.serverUrl, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            },
             trailingContent = { TextButton(onClick = { onSignOut(account) }) { Text(LocalStrings.current.signOut) } },
         )
     }

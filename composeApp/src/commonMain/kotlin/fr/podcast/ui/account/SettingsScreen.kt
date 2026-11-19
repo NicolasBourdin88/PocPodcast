@@ -63,6 +63,9 @@ import fr.podcast.ui.components.attempt
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.launch
 import fr.podcast.ui.components.AppTextField
+import fr.podcast.ui.components.AvatarImage
+import fr.podcast.ui.components.AvatarPickerDialog
+import androidx.compose.foundation.clickable
 
 /** Forms stay readable on wide windows. */
 private val FORM_WIDTH = 560.dp
@@ -164,8 +167,8 @@ fun SettingsScreen(
                 item(key = "profile") {
                     Column {
                         SectionTitle(strings.profile)
-                        ProfileForm(me) { name ->
-                            act(strings.profileSaved) { onProfileChanged(client.updateProfile(name)) }
+                        ProfileForm(me) { name, avatar ->
+                            act(strings.profileSaved) { onProfileChanged(client.updateProfile(name, avatar)) }
                         }
                     }
                 }
@@ -304,15 +307,32 @@ private fun AppPasswordDialog(created: CreatedAppPassword, onDismiss: () -> Unit
 }
 
 @Composable
-private fun ProfileForm(me: User, onSave: (String) -> Unit) {
+private fun ProfileForm(me: User, onSave: (name: String?, avatar: String?) -> Unit) {
     val strings = LocalStrings.current
     var name by rememberSaveable(me.id, me.displayName) { mutableStateOf(me.displayName) }
+    var picking by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.widthIn(max = FORM_WIDTH).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "${me.username} · ${strings.role(me.role)}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // The avatar (ADR 0013): tap it to choose another one, saved at once.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            AvatarImage(
+                me.picture,
+                size = 72.dp,
+                contentDescription = "${strings.chooseAvatar} · ${strings.avatarName(me.picture)}",
+                modifier = Modifier.clickable { picking = true },
+            )
+            Column {
+                Text(me.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${me.username} · ${strings.role(me.role)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = { picking = true }, contentPadding = PaddingValues(0.dp)) { Text(strings.chooseAvatar) }
+            }
+        }
+        if (picking) {
+            AvatarPickerDialog(me.picture, onChoose = { onSave(null, it.id) }, onDismiss = { picking = false })
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AppTextField(
                 value = name,
@@ -322,7 +342,7 @@ private fun ProfileForm(me: User, onSave: (String) -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             FilledTonalButton(
-                onClick = { onSave(name.trim()) },
+                onClick = { onSave(name.trim(), null) },
                 enabled = AccountRules.validDisplayName(name) && name.trim() != me.displayName,
             ) { Text(strings.save) }
         }
@@ -374,6 +394,7 @@ private fun UserItem(user: User, self: Boolean, onRole: (UserRole) -> Unit, onRe
     val strings = LocalStrings.current
     var menu by remember { mutableStateOf(false) }
     ListItem(
+        leadingContent = { AvatarImage(user.picture, size = 40.dp) },
         headlineContent = { Text(if (self) "${user.displayName} (${strings.you})" else user.displayName) },
         supportingContent = { Text("${user.username} · ${strings.role(user.role)}") },
         trailingContent = if (self) {

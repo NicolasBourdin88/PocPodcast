@@ -82,7 +82,7 @@ private fun AppRoot(environment: AppEnvironment) {
                 SettingsScreen(
                     client = repository,
                     // The device keeps the name shown for the account up to date.
-                    onProfileChanged = { user -> active?.let { store.update(it.copy(displayName = user.displayName)) } },
+                    onProfileChanged = { user -> active?.let { store.update(it.copy(displayName = user.displayName, avatar = user.avatar)) } },
                     modifier = modifier,
                 ) {
                     accountsSection(

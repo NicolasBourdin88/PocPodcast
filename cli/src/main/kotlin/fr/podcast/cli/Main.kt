@@ -224,7 +224,7 @@ class AccountsCommand : ServerCommand("accounts") {
         if (state.accounts.isEmpty()) echo(cli.strings.noAccount)
         state.accounts.forEachIndexed { index, account ->
             val marker = if (account.id == state.activeId) "*" else " "
-            echo("$marker ${index + 1}. ${account.displayName} — ${account.username} · ${account.serverName} (${account.serverUrl})")
+            echo("$marker ${index + 1}. ${account.picture.emoji} ${account.displayName} — ${account.username} · ${account.serverName} (${account.serverUrl})")
         }
     }
 }
