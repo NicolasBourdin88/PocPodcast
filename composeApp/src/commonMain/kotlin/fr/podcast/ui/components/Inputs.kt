@@ -26,6 +26,9 @@ import fr.podcast.ui.theme.LocalStrings
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.LoadingIndicatorDefaults
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * A text field of the app (ADR 0013): filled, rounded and tonal, as in Material 3 Expressive,
@@ -120,8 +123,8 @@ fun SmallLoading(size: Dp = 24.dp) {
 }
 
 /**
- * Pull down to load again, with the Material 3 Expressive indicator. [refreshing] stays true
- * until the new data is there.
+ * Pull down to load again, with the Material 3 Expressive indicator, bare. [refreshing] stays
+ * true until the new data is there.
  */
 @Composable
 fun RefreshBox(refreshing: Boolean, onRefresh: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -132,7 +135,21 @@ fun RefreshBox(refreshing: Boolean, onRefresh: () -> Unit, modifier: Modifier = 
         modifier = modifier,
         state = state,
         indicator = {
-            PullToRefreshDefaults.LoadingIndicator(state = state, isRefreshing = refreshing, modifier = Modifier.align(Alignment.TopCenter))
+            // The bare indicator, as the app's other loadings: no round container, no shadow.
+            PullToRefreshDefaults.LoadingIndicator(
+                state = state,
+                isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = Color.Transparent,
+                color = LoadingIndicatorDefaults.indicatorColor,
+                elevation = 0.dp,
+            )
         },
-    ) { content() }
+    ) {
+        // Without a container, the indicator needs its own room: the content comes down with the
+        // pull, as far as the indicator, and goes back up once loaded.
+        Box(Modifier.graphicsLayer { translationY = state.distanceFraction.coerceIn(0f, 1f) * PullToRefreshDefaults.IndicatorMaxDistance.toPx() }) {
+            content()
+        }
+    }
 }

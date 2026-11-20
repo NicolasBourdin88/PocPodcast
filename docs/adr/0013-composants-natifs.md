@@ -28,7 +28,7 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
   - L'ajout d'un flux RSS passe dans une boîte de dialogue.
 - **Navigation** : la barre de navigation courte (`ShortNavigationBar`) sur téléphone, le rail large (`WideNavigationRail`) ailleurs ; le tiroir permanent reste sur les grandes fenêtres, pour la liste des abonnements.
 - **Composants** :
-  - l'indicateur de chargement Expressive et le tirer-pour-rafraîchir (Accueil, Bibliothèque) ;
+  - l'indicateur de chargement Expressive et le tirer-pour-rafraîchir (Accueil, Bibliothèque) : l'indicateur sans pastille, le contenu descendant avec le geste pour lui laisser sa place ;
   - un bouton de lecture qui passe du rond au carré ; une ligne de progression plate dans le mini-lecteur (la vague d'Expressive dit qu'une chose charge, pas où en est l'écoute) ;
   - le lecteur dans une feuille modale (`ModalBottomSheet`) qui glisse depuis le bas, comme les lecteurs des plateformes, et se ferme en la tirant vers le bas, par le geste retour ou par son chevron ;
   - l'OPML dans le menu de débordement de la Bibliothèque.

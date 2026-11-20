@@ -27,6 +27,10 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import fr.podcast.ui.components.RefreshBox
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 
 /**
  * Renders the screens at each window size, in every language, and writes PNGs to build/snapshots,
@@ -78,6 +82,10 @@ class ResponsiveSnapshotTest {
             render("settings-compact-${language.tag}", sizes.getValue("compact")) { Home(language, Destination.Settings) }
             // Tall enough for every section: devices and, for an administrator, the users (ADR 0009).
             render("settings-full-${language.tag}", 1000 to 1700) { Home(language, Destination.Settings) }
+            // Pulled down to load again: the bare indicator over the list (ADR 0013).
+            render("refresh-compact-${language.tag}", sizes.getValue("compact")) {
+                PodcastTheme(language) { Surface { RefreshBox(refreshing = true, onRefresh = {}) { Box(Modifier.fillMaxSize()) } } }
+            }
             // The avatars to choose from (ADR 0013).
             render("avatar-picker-compact-${language.tag}", sizes.getValue("compact")) {
                 PodcastTheme(language) { Surface { AvatarPickerDialog(Avatar.Owl, onChoose = {}, onDismiss = {}) } }
