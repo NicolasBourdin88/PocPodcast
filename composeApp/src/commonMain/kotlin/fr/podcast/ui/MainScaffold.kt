@@ -39,6 +39,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import fr.podcast.ui.components.LocalArtworkImages
+import fr.podcast.ui.components.ArtworkImages
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -117,26 +121,31 @@ fun MainScaffold(
         delay(1_500) // once the position has reached the server
         reloads++
     }
-    BoxWithConstraints {
-        AdaptiveScaffold(
-            layout = WindowLayout.from(maxWidth, maxHeight),
-            client = client,
-            state = state,
-            accountLabel = accountLabel,
-            initialDestination = initialDestination,
-            initialPodcastId = initialPodcastId,
-            initialQuery = initialQuery,
-            initialPlayerOpen = initialPlayerOpen,
-            initialPlaylistId = initialPlaylistId,
-            settings = settings,
-            onReload = { reloads++ },
-            refreshing = refreshing,
-            onRefresh = {
-                refreshing = true
-                reloads++
-            },
-            onSessionExpired = onSessionExpired,
-        )
+    // The account's artwork, kept while the scaffold shows this account.
+    val scope = rememberCoroutineScope()
+    val artwork = remember(client) { ArtworkImages(client, scope) }
+    CompositionLocalProvider(LocalArtworkImages provides artwork) {
+        BoxWithConstraints {
+            AdaptiveScaffold(
+                layout = WindowLayout.from(maxWidth, maxHeight),
+                client = client,
+                state = state,
+                accountLabel = accountLabel,
+                initialDestination = initialDestination,
+                initialPodcastId = initialPodcastId,
+                initialQuery = initialQuery,
+                initialPlayerOpen = initialPlayerOpen,
+                initialPlaylistId = initialPlaylistId,
+                settings = settings,
+                onReload = { reloads++ },
+                refreshing = refreshing,
+                onRefresh = {
+                    refreshing = true
+                    reloads++
+                },
+                onSessionExpired = onSessionExpired,
+            )
+        }
     }
 }
 
