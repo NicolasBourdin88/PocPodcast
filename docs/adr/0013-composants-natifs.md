@@ -47,6 +47,10 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
   - boutons en verre (`glass`, `glassProminent`), graphique Swift Charts pour « Mon écoute » ;
   - sélecteurs de fichiers du système pour l'OPML, ce qui règle le point ouvert de l'étape 8 ;
   - menu « Lecture » sur Mac.
+- **Couleurs** : comme les apps d'Apple, une seule couleur d'accent (`AccentColor` du catalogue d'assets), déclinée pour le clair, le sombre et le contraste élevé, comme les couleurs système (le bleu système vaut `#007AFF` en clair et `#0A84FF` en sombre). Elle teinte les commandes ; textes et fonds sont les couleurs sémantiques du système.
+  - Le violet de la marque (`#6750A4`) ne tient en sombre que 2,6:1 sur le fond : l'accent sombre est `#9678E8`, le contraste élevé `#4D3486` et `#B497FF`.
+  - Ces valeurs sont dans les jetons partagés (`DesignTokens.appleAccent`). Un test vérifie leur contraste (WCAG : 4,5:1 en texte, 7:1 en contraste élevé, 3:1 pour un symbole blanc sur un bouton plein) et que le catalogue les reprend.
+- **Listes sur Mac** : style « plain » pour les listes de contenu. Le style par défaut (« inset ») garde chaque ligne à la hauteur d'une ligne de texte et coupait les épisodes.
 - **Construction** : Xcode lance Gradle. Sur iOS, le framework de débogage habituel (`embedAndSignAppleFrameworkForXcode`).
   - Sur Mac, le framework de production (`linkReleaseFrameworkMacosArm64`), car les caches précompilés de Kotlin/Native 2.4.21 pour macOS demandent un SDK plus récent que celui de Xcode 26.3. Lié d'un bloc, il ne garde que ce que l'app utilise. Le premier lien prend une dizaine de minutes.
   - Les arguments par défaut de SKIE sont désactivés : ils ne se lient pas avec les bibliothèques en cache, et l'app Swift passe tous les arguments.
