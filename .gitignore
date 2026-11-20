@@ -1,5 +1,6 @@
-# Server data (production defaults)
+# Server data (production defaults: MEDIA_DIR relative to where the server runs)
 server/media/
+/media/
 
 # Gradle
 .gradle/
@@ -27,3 +28,18 @@ iosApp/Pods/
 
 # OS
 .DS_Store
+
+# Local settings and secrets: never in the repository
+.claude/settings.local.json
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.pem
+*.mobileprovision
+
+# JVM crash and heap dumps
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
