@@ -1,254 +1,124 @@
+<div align="center">
+
 # Podcast
 
-Système de gestion et d'écoute de podcasts (projet de master). Il se compose d'un service multi-utilisateurs et de plusieurs clients : mobile et desktop en Compose Multiplatform, une app native SwiftUI pour iPhone, iPad et Mac, un client web léger et un CLI/TUI. Tous partagent le même module Kotlin Multiplatform.
+**Un service de podcasts multi-utilisateurs, et six clients sur la même API.**<br>
+Web · Android · iPhone, iPad et Mac · desktop · terminal
 
-- Contexte et décisions : [CLAUDE.md](CLAUDE.md)
-- Feuille de route : [plan.md](plan.md)
-- Décisions d'architecture : [docs/adr/](docs/adr/)
-- Contrat de l'API (spécification OpenAPI, conventions, modèle de données) : [docs/api/](docs/api/README.md)
+<sub>Projet de master · Kotlin Multiplatform · Ktor · Compose Multiplatform · SwiftUI</sub>
 
-## Modules
+</div>
+
+![L'Accueil du compte d'Alice sur les six clients : client web, Mac, desktop, Android, iPhone et terminal](docs/images/accueil.webp)
+
+<p align="center"><sub>Le même compte, au même instant, sur les six clients : mêmes épisodes à reprendre, même file d'attente, mêmes nouveautés.</sub></p>
+
+## En bref
+
+- **Un service** (Ktor et PostgreSQL) suit les flux, garde les fichiers audio et les pochettes, et retient pour chaque utilisateur sa position, sa file d'attente, ses favoris et ses playlists.
+- **Une API hypermédia** : du JSON HAL-FORMS pour les apps et du HTML (htmx) pour le navigateur, sur les mêmes routes. Les clients suivent les liens et les formulaires que le serveur leur propose ; ils ne construisent aucune adresse.
+- **Un SDK Kotlin partagé** (`:shared`) : modèles, client de l'API, textes français et anglais. Les apps Compose, l'app SwiftUI et le terminal s'en servent tous.
+- **Ouvert aux autres applis** : AntennaPod et les clients gPodder se synchronisent avec le serveur ; l'OPML et le flux RSS d'une playlist marchent partout.
+
+## Fonctionnalités par application
+
+| | Web | Android · desktop<br><sub>Compose</sub> | iPhone · iPad · Mac<br><sub>SwiftUI</sub> | Terminal<br><sub>CLI et TUI</sub> |
+|---|:-:|:-:|:-:|:-:|
+| S'abonner : recherche (Apple Podcasts, Podcast Index) ou adresse RSS | ✓ | ✓ | ✓ | ✓ |
+| Import et export OPML | ✓ | ✓ | ✓ | ✓ |
+| Note et étiquettes d'un abonnement, bibliothèque filtrée | ✓ | ✓ | ✓ | ✓ |
+| Recherche multicritère des épisodes | ✓ | ✓ | ✓ | ✓ |
+| Écouter, reprendre au même endroit sur un autre client | ✓ | ✓ | ✓ | ✓ |
+| File d'attente | ✓ | ✓ | ✓ | ✓ |
+| Lecture en arrière-plan, écran verrouillé | | ✓ | ✓ | |
+| Chapitres et transcription (Podcast 2.0) | | ✓ | | |
+| Téléchargement sur le serveur, épisode gardé | ✓ | ✓ | | |
+| Favoris et notes | ✓ | ✓ | | ✓ |
+| Playlists statiques et dynamiques | ✓ | ✓ | écoute | ✓ |
+| Flux RSS d'une playlist | ✓ | ✓ | | ✓ |
+| Partager un abonnement ou une playlist, recommander un épisode | ✓ | ✓ | | ✓ |
+| Mon écoute (statistiques) | ✓ | ✓ | ✓ | ✓ |
+| Profil et avatar | ✓ | ✓ | ✓ | ✓ |
+| Mot de passe, appareils, mots de passe d'application | ✓ | ✓ | | ✓ |
+| Comptes du serveur (administrateur) | ✓ | ✓ | ✓ | ✓ |
+| Plusieurs comptes, sur plusieurs serveurs | | ✓ | ✓ | ✓ |
+
+Ce que chaque client ajoute :
+
+- **Web** : rien à installer ; le lecteur continue d'une page à l'autre ; sur un grand écran, la file d'attente reste à côté des épisodes.
+- **Android** (Compose) : Material 3 Expressive, couleurs du fond d'écran, notification et écran verrouillé.
+- **Desktop** (Compose) : macOS, Windows et Linux ; menu « Lecture » et raccourcis clavier.
+- **iPhone, iPad et Mac** (SwiftUI) : Liquid Glass, mini-lecteur au-dessus des onglets, Centre de contrôle, graphique Swift Charts. C'est le client Apple recommandé.
+- **Terminal** : listes numérotées réutilisables d'une commande à l'autre, TUI Mosaic qui lit les épisodes, statistiques en barres.
+
+L'UI Compose tourne aussi sur iOS (`iosApp/`), pour montrer qu'elle est partagée ; sur iPhone, iPad et Mac, le client recommandé reste l'app SwiftUI.
+
+Le serveur relit les flux en arrière-plan, télécharge les épisodes demandés une seule fois pour tous et purge les anciens. Seuls les administrateurs créent les comptes : il n'y a pas d'inscription libre ([ADR 0009](docs/adr/0009-comptes-et-partages.md)).
+
+## Captures
+
+![La Bibliothèque du compte d'Alice sur les six clients](docs/images/bibliotheque.webp)
+
+<p align="center"><sub>Les mêmes abonnements, étiquettes et notes ; dans le terminal, le filtre par étiquette. Cliquer sur une image l'ouvre en taille réelle.</sub></p>
+
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img alt="Architecture : les six clients, le SDK Kotlin partagé, le serveur Ktor, PostgreSQL et les fichiers" src="docs/images/architecture-light.svg">
+</picture>
 
 | Module | Cibles | Rôle |
 |---|---|---|
-| `:shared` | JVM, Android, iOS, macOS | Modèles, textes traduits, SDK client (comptes, `RemotePodcastRepository` : Accueil, abonnements, recherche, OPML) |
-| `:player` | JVM, Android, iOS, macOS | Lecture audio : interface `AudioPlayer`, contrôleur partagé, Media3, AVPlayer et JavaFX Media ([ADR 0008](docs/adr/0008-lecture-audio.md)) |
-| `:composeApp` | Android, iOS, Desktop (JVM) | UI Compose Multiplatform en Material 3 Expressive, responsive par taille de fenêtre |
-| `:androidApp` | Android | Point d'entrée Android (`MainActivity`) |
-| `iosApp/` | iOS | Projet Xcode qui héberge l'UI Compose |
-| `:apple` | iOS, macOS | Framework `PodcastKit` du client SwiftUI : `:shared` et `:player` vus de Swift par SKIE ([ADR 0013](docs/adr/0013-composants-natifs.md)) |
-| `appleApp/` | iOS, iPadOS, macOS | Client SwiftUI natif (Liquid Glass) |
-| `:server` | JVM | Ktor + PostgreSQL : API hypermédia (HAL / HAL-FORMS) et client léger HTML/htmx |
+| `:shared` | JVM, Android, iOS, macOS | Modèles, SDK (comptes, client qui suit les liens), textes FR/EN, jetons de design |
+| `:player` | JVM, Android, iOS, macOS | Lecture audio : Media3, AVPlayer, JavaFX Media, contrôleur partagé |
+| `:composeApp` | Android, iOS, desktop | UI Compose Multiplatform, responsive selon la taille de la fenêtre |
+| `:androidApp`, `iosApp/` | Android, iOS | Points d'entrée de l'UI Compose |
+| `:apple`, `appleApp/` | iOS, iPadOS, macOS | Framework `PodcastKit` (SKIE) et app SwiftUI |
+| `:server` | JVM | Ktor : API hypermédia, client web, API gPodder et Open Podcast API ; PostgreSQL (Flyway, SQLDelight) |
 | `:cli` | JVM | Commandes Clikt et TUI Mosaic |
 
-## Langues
+Les décisions sont expliquées dans les [ADR](docs/adr/) : format hypermédia ([0003](docs/adr/0003-format-hypermedia.md)), persistance ([0004](docs/adr/0004-persistance.md)), authentification et droits ([0005](docs/adr/0005-authentification-et-droits.md)), multiserveur ([0006](docs/adr/0006-comptes-et-multiserveur.md)), lecture ([0008](docs/adr/0008-lecture-audio.md)), clients tiers ([0011](docs/adr/0011-synchronisation-clients-tiers.md)), composants natifs ([0013](docs/adr/0013-composants-natifs.md)).
 
-L'interface existe en français et en anglais. Les textes, les couleurs et la navigation sont définis une seule fois dans `:shared` (voir l'[ADR 0002](docs/adr/0002-chaines-et-ressources-partagees.md)). Chaque client choisit sa langue ainsi :
+## Démarrer
 
-- Compose : langue du système, ou langue de l'app dans les réglages Android 13 et plus ;
-- client léger : en-tête `Accept-Language` du navigateur ;
-- CLI : `podcast --lang en list` (par défaut, la langue du système).
-
-## Prérequis
-
-- JDK 17 ou plus récent (21 recommandé)
-- Android SDK (Android Studio), avec `sdk.dir` dans `local.properties`
-- Xcode 26 sur un Mac Apple Silicon pour iOS
-- Ni Docker ni PostgreSQL ne sont nécessaires en développement : le serveur et les tests utilisent un PostgreSQL embarqué.
-
-## Lancer le serveur
+Il faut un JDK 17 ou plus récent (21 recommandé), le SDK Android, et Xcode 26 sur un Mac Apple Silicon pour iOS et macOS. Ni Docker ni PostgreSQL : le serveur de développement et les tests utilisent un PostgreSQL embarqué.
 
 ```bash
 ./gradlew :server:run
 ```
 
-- http://localhost:8080 : client léger (page de connexion, puis Accueil, Explorer, Bibliothèque, Playlists et Réglages)
-- http://localhost:8080/docs : documentation de l'API (Swagger UI)
+- http://localhost:8080 : le client web ; http://localhost:8080/docs : la documentation de l'API.
+- Les données de démo viennent de vrais flux. Les comptes Alice (administratrice) et Bob sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt).
+- Depuis cette machine seulement, http://localhost:8080/dev/login/alice connecte le navigateur sans mot de passe.
 
-Au premier lancement, un PostgreSQL embarqué est créé dans `server/build/dev-postgres-8080`, avec des données de démo lues dans de **vrais flux** (Les Cast Codeurs, Talking Kotlin, Fragmented, Podnews Weekly Review, qui a des chapitres et des transcriptions). Sans réseau, les podcasts sont créés vides et lus plus tard. Les **comptes de démo** sont décrits dans [DevSeed.kt](server/src/dev/kotlin/fr/podcast/server/dev/DevSeed.kt) : Alice est abonnée aux quatre podcasts, Bob à deux, chacun avec sa propre progression. Les fichiers téléchargés vont dans `server/build/dev-media-8080`.
+| Client | Commande |
+|---|---|
+| Android | `./gradlew :androidApp:installDebug` (serveur : `http://10.0.2.2:8080` depuis l'émulateur) |
+| Desktop | `./gradlew :composeApp:run` |
+| iPhone, iPad, Mac | ouvrir `appleApp/Podcast.xcodeproj`, schéma `Podcast` |
+| iOS (Compose) | ouvrir `iosApp/iosApp.xcodeproj` |
+| Terminal | `./gradlew :cli:installDist`, puis `cli/build/install/podcast/bin/podcast login` |
 
-Sans mot de passe, depuis cette machine seulement, http://localhost:8080/dev/login/alice (ou `bob`) connecte le navigateur au compte de démo ; `?next=/playlists` choisit la page d'arrivée. Ce lien n'existe que sur le serveur de développement (source set `dev`), pas dans la distribution.
+Le [guide d'utilisation](docs/guide.md) détaille chaque client : écoute, comptes et partages, playlists, recherche, AntennaPod et newsboat.
 
-Pour repartir de zéro, on arrête le serveur et on supprime ces deux dossiers.
-
-Pour essayer le multiserveur, on lance un second serveur, avec sa propre base, dans un autre terminal :
-
-```bash
-PORT=8081 SERVER_NAME="Serveur B" ./gradlew :server:run
-```
+## Configuration
 
 En production, le point d'entrée `fr.podcast.server.ApplicationKt` exige une vraie base (`DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`) et active les cookies `Secure`.
-
-Variables d'environnement (voir les ADR [0007](docs/adr/0007-flux-telechargements-et-purge.md) et [0009](docs/adr/0009-comptes-et-partages.md)) :
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `PORT`, `SERVER_NAME` | `8080`, `Podcast` | Port d'écoute et nom affiché aux clients |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | aucune | Crée le premier administrateur au démarrage, seulement si la base n'a aucun compte (8 caractères au moins pour le mot de passe) |
-| `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | aucune | Ajoute Podcast Index à la recherche (clés gratuites sur api.podcastindex.org) ; sans elles, seul Apple Podcasts est interrogé |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | aucune | Crée le premier administrateur, seulement si la base n'a aucun compte |
+| `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | aucune | Ajoute Podcast Index à la recherche (sinon, Apple Podcasts seul) |
 | `REFRESH_INTERVAL_MINUTES` | `60` | Délai avant de relire un flux |
-| `MEDIA_DIR` | `media` | Dossier des fichiers audio téléchargés et des pochettes réduites |
-| `MEDIA_RETENTION_DAYS` | `30` | Âge à partir duquel un fichier est purgé (sauf épisode gardé ou en cours d'écoute) |
-| `MEDIA_MAX_GB` | aucun | Quota disque : au-delà, les fichiers les plus anciens sont purgés |
-| `AUTO_DOWNLOAD_LATEST` | `1` | Nombre d'épisodes récents téléchargés pour un abonnement en téléchargement automatique |
-| `ALLOW_PRIVATE_FEEDS` | `false` | Autorise les flux sur un réseau privé (développement seulement : protection SSRF) |
+| `MEDIA_DIR` | `media` | Dossier des fichiers audio et des pochettes réduites |
+| `MEDIA_RETENTION_DAYS` | `30` | Âge à partir duquel un fichier est purgé (sauf épisode gardé ou en cours) |
+| `MEDIA_MAX_GB` | aucun | Quota disque : au-delà, les fichiers les plus anciens partent |
+| `AUTO_DOWNLOAD_LATEST` | `1` | Épisodes récents téléchargés pour un abonnement en téléchargement automatique |
+| `ALLOW_PRIVATE_FEEDS` | `false` | Autorise les flux d'un réseau privé (développement seulement : protection SSRF) |
 
-## Lancer les clients
-
-Au premier lancement, chaque app demande l'adresse du serveur et un compte. On peut aussi choisir les données de démo. Les autres comptes s'ajoutent dans **Réglages**, éventuellement sur d'autres serveurs, et l'on passe de l'un à l'autre d'un toucher.
-
-Android (émulateur ou appareil branché) ; depuis l'émulateur, le serveur est à `http://10.0.2.2:8080` :
-
-```bash
-./gradlew :androidApp:installDebug
-```
-
-Desktop :
-
-```bash
-./gradlew :composeApp:run
-```
-
-Application macOS empaquetée (`composeApp/build/compose/binaries/main/app/Podcast.app`) :
-
-```bash
-./gradlew :composeApp:createDistributable
-```
-
-iOS (Compose) : ouvrir `iosApp/iosApp.xcodeproj` dans Xcode et lancer sur un simulateur. Le serveur y est à `http://localhost:8080`.
-
-iPhone, iPad et Mac (SwiftUI, [ADR 0013](docs/adr/0013-composants-natifs.md)) : ouvrir `appleApp/Podcast.xcodeproj` et lancer le schéma `Podcast` sur un simulateur ou sur « My Mac ». Xcode construit le framework Kotlin par Gradle ; sur Mac, le premier lien prend une dizaine de minutes. En ligne de commande :
-
-```bash
-xcodebuild -project appleApp/Podcast.xcodeproj -scheme Podcast -destination 'platform=macOS,arch=arm64' -derivedDataPath build/apple-derived build
-```
-
-```bash
-open build/apple-derived/Build/Products/Debug/Podcast.app
-```
-
-CLI : se connecter, puis afficher l'Accueil :
-
-```bash
-./gradlew :cli:installDist
-```
-
-```bash
-cli/build/install/podcast/bin/podcast login
-```
-
-```bash
-cli/build/install/podcast/bin/podcast list
-```
-
-Les autres commandes sont `accounts`, `use 2`, `logout` et `tui` (la TUI a besoin d'un vrai terminal, pas de `./gradlew :cli:run`). L'option `--demo` utilise les données de démo sans serveur.
-
-Abonnements : les listes sont numérotées, et les commandes suivantes reprennent ces numéros.
-
-```bash
-cli/build/install/podcast/bin/podcast search kotlin
-```
-
-```bash
-cli/build/install/podcast/bin/podcast subscribe 2
-```
-
-Ensuite : `subscriptions`, `note 3 À écouter dans le train` (sans texte, la note est effacée), `unsubscribe 3`, `opml export podcasts.opml` et `opml import podcasts.opml`. `subscribe` accepte aussi l'adresse d'un flux.
-
-## Écouter
-
-La position d'écoute suit l'utilisateur d'un client à l'autre, ainsi que la file d'attente : un épisode commencé sur le téléphone reprend au même endroit sur l'ordinateur ([ADR 0008](docs/adr/0008-lecture-audio.md)).
-
-- **Apps** :
-  - ▶ sur un épisode (Accueil, page d'un podcast) le lance, et ≡+ l'ajoute à la file d'attente ;
-  - le mini-lecteur, ou la barre de lecture sur grand écran, ouvre le lecteur plein écran ;
-  - Android et iOS continuent en arrière-plan (notification, écran verrouillé, casque) ;
-  - en mode démo, la lecture est simulée, sans son.
-- **Client léger** : ▶ sur l'Accueil ; le lecteur reste en bas de page quand on change de page.
-- **CLI** : `play` reprend l'épisode en cours, ou le premier de la file ; avec un numéro de `list`, il lance cet épisode.
-
-```bash
-cli/build/install/podcast/bin/podcast play 3
-```
-
-Dans la TUI (`play` ou `tui`) :
-- `entrée` lit l'épisode sélectionné ;
-- `espace` met en pause ou reprend ;
-- `←` / `→` reculent de 15 s ou avancent de 30 s ;
-- `+` / `-` changent la vitesse ;
-- `n` passe à l'épisode suivant de la file, `a` y ajoute l'épisode sélectionné ;
-- `q` quitte, après avoir envoyé la position.
-
-File d'attente : `queue`, `queue add 4` (`--next` pour le lire ensuite), `queue remove 1`, `queue clear`.
-
-## Comptes et partages
-
-Un administrateur crée les comptes ; chacun change ensuite son nom et son mot de passe, et peut déconnecter un appareil perdu ([ADR 0009](docs/adr/0009-comptes-et-partages.md)). Dans les données de démo, Alice est administratrice.
-
-- **Partager un abonnement** : en lecture seule, ou en lecture et modification (note, téléchargement automatique). Seul le propriétaire se désabonne ou le partage à nouveau.
-- **Avatar** : chacun choisit le sien parmi douze, comme sur les plateformes de streaming (Réglages › Profil, ou `podcast profile --avatar`) ; avant tout choix, un avatar déduit de l'identifiant.
-- **Recommander un épisode** : à un autre compte, avec un message.
-- **Partagés avec moi** : ce que les autres partagent apparaît à part, dans la Bibliothèque. On peut s'abonner soi-même au podcast partagé, ou retirer le partage.
-- **Où** :
-  - apps : Réglages (profil, mot de passe, appareils, comptes du serveur pour un administrateur), Bibliothèque et page d'un podcast ;
-  - client léger : Réglages, Bibliothèque, et « Recommander » sous les nouveaux épisodes de l'Accueil ;
-  - CLI : les commandes ci-dessous.
-
-```bash
-cli/build/install/podcast/bin/podcast share 2 bob --write --message "Pour le train"
-```
-
-Ensuite : `share 2` (avec qui il est partagé), `unshare 2 bob`, `shared` puis `shared remove 1`, `recommend 3 alice`, `profile --name …` et `profile --avatar fox`, `passwd`, `devices` puis `devices revoke 2`, et pour un administrateur `users`, `users add carol --name Carol`, `users role 3 admin`, `users passwd 3`, `users remove 3 --yes`.
-
-## Playlists
-
-Une playlist est **statique** (on choisit ses épisodes et leur ordre) ou **dynamique** : des règles choisissent parmi les abonnements de son propriétaire (mots-clés, favoris, note minimale, non écoutés), du plus récent au plus ancien ou au hasard ([ADR 0010](docs/adr/0010-playlists.md)).
-
-- **Favoris et notes** : le cœur et les étoiles d'un épisode sont propres à chaque compte ; les playlists dynamiques s'en servent.
-- **Tout lire** : lance le premier épisode et place les suivants en tête de la file d'attente.
-- **Partager** : comme un abonnement, en lecture seule ou en modification (titre, règles, épisodes). Seul le propriétaire la partage, publie son flux ou la supprime.
-- **Flux RSS** : le propriétaire publie la playlist à une adresse secrète, à donner à n'importe quelle appli de podcasts. « Nouvelle adresse » rend l'ancienne inutilisable.
-- **Purge** : un épisode d'une playlist statique n'est jamais retiré du serveur.
-- **Où** :
-  - apps : onglet Playlists ; sur chaque épisode et dans le lecteur, le cœur, les étoiles et « Ajouter à une playlist » ;
-  - client léger : Playlists dans le menu ; sur l'Accueil, le cœur, la note et « Ajouter à une playlist » sous chaque épisode ;
-  - CLI : les commandes ci-dessous.
-
-```bash
-cli/build/install/podcast/bin/podcast playlists create Kotlin --keywords "kotlin, ktor" --unplayed
-```
-
-Ensuite : `playlists` (les siennes puis celles partagées, numérotées), `playlists show 1`, `playlists play 1`, `playlists create Pour le train` puis `playlists add 2 4` (épisode n° 4 de `list`), `playlists move 2 3 1`, `playlists remove 2 1`, `playlists edit 1 --order random --limit 20`, `playlists shuffle 1`, `playlists share 1 bob --write`, `playlists feed 1` (`--renew`, `--off`), `playlists delete 1 --yes`, `favorite 3` (`--off` pour le retirer), `rate 3 4` (`0` efface la note).
-
-## Recherche, étiquettes et statistiques
-
-Voir l'[ADR 0012](docs/adr/0012-recherche-etiquettes-statistiques.md).
-
-- **Rechercher des épisodes** : parmi ceux de ses abonnements, par mots (titre, description ou nom du podcast), statut, favoris, note minimale, période de publication, podcast et étiquette. Les critères se cumulent.
-- **Étiquettes** : jusqu'à 10 par abonnement (« trajets », « tech »), modifiables avec sa note, y compris par un partage en modification. Elles filtrent la Bibliothèque et la recherche.
-- **Mon écoute** :
-  - le temps écouté au total, sur 7 et sur 30 jours ;
-  - les épisodes terminés ;
-  - les 12 derniers mois ;
-  - les podcasts les plus écoutés.
-
-  Le temps se compte en durée d'épisode : un saut en avant ne compte pas, et les écoutes rapportées par AntennaPod comptent aussi.
-- **Où** :
-  - apps : dans la Bibliothèque, onglets « Abonnements » (filtre et étiquettes) et « Épisodes » (recherche) ; page d'un podcast pour ses étiquettes ; Réglages pour « Mon écoute » ;
-  - client léger : Bibliothèque (filtre, étiquettes, bouton « Rechercher des épisodes »), Réglages ;
-  - CLI : les commandes ci-dessous.
-
-```bash
-cli/build/install/podcast/bin/podcast episodes kotlin --status new --tag tech
-```
-
-Ensuite : `episodes --favorites --min-rating 4`, `episodes --from 2026-10-01 --to 2026-10-31 --podcast 2`, `episodes kotlin --play` (lit ce qui est trouvé, dans l'ordre), `subscriptions --tag tech`, `tags 2` puis `tags 2 trajets tech` (`--clear` pour les retirer), `stats`.
-
-## Clients tiers
-
-Le serveur parle aussi l'**API gPodder** et l'**Open Podcast API** ([ADR 0011](docs/adr/0011-synchronisation-clients-tiers.md)). Un client qui les connaît retrouve les abonnements, les positions et les épisodes écoutés, et nos clients voient ce qu'il en fait.
-
-**AntennaPod** :
-1. Dans les Réglages d'un de nos clients, créer un **mot de passe d'application** (« AntennaPod »). Il n'est montré qu'une fois ; le terminal le fait aussi, avec `podcast devices add AntennaPod`.
-2. Dans AntennaPod : Settings › Synchronization › Choose synchronization provider › gpodder.net.
-3. Saisir l'adresse du serveur, `http://10.0.2.2:8080` depuis l'émulateur Android, l'identifiant et le mot de passe d'application.
-4. Créer l'appareil, puis Synchronize now.
-
-Ce qui suit : les abonnements, les positions et l'état « écouté ». La file d'attente, les favoris, les notes et les playlists ne passent pas, car ces API n'ont pas d'équivalent ; une playlist s'écoute en revanche dans n'importe quelle appli par son flux RSS (« Add podcast by RSS address »). Le mot de passe d'application apparaît parmi les appareils et se révoque comme eux.
-
-**Open Podcast API** : `/v1/subscriptions` avec un jeton (`Bearer`) ou un mot de passe d'application (`Basic`). Les formats sont dans la documentation de l'API (http://localhost:8080/docs).
-
-**OPML et flux de playlist dans un autre client**, par exemple newsboat :
-
-```bash
-cli/build/install/podcast/bin/podcast opml export podcasts.opml
-```
-
-```bash
-newsboat -i podcasts.opml
-```
-
-L'adresse du flux d'une playlist (`podcast playlists feed 1`) s'ajoute au fichier `urls` de newsboat, ou dans toute appli de podcasts.
+Un second serveur, pour essayer le multiserveur : `PORT=8081 SERVER_NAME="Serveur B" ./gradlew :server:run`.
 
 ## Tests
 
@@ -256,9 +126,14 @@ L'adresse du flux d'une playlist (`podcast playlists feed 1`) s'ajoute au fichie
 ./gradlew :shared:allTests :player:jvmTest :composeApp:desktopTest :server:test :cli:test
 ```
 
-- `:server:test` démarre un PostgreSQL embarqué et contient trois garde-fous :
-  - `ContractTest` vérifie que la spécification OpenAPI et les routes correspondent, et que chaque réponse respecte son schéma ;
-  - `SdkTest` fait tourner le SDK de `:shared` contre le vrai serveur ;
-  - `ApiTest` et `WebTest` couvrent l'API et le client léger.
-- `:player:jvmTest` vérifie le contrôleur de lecture avec un lecteur factice : envoi de la position, épisode suivant de la file, nouvel essai après une erreur.
-- `:composeApp:desktopTest` rend les écrans à chaque taille de fenêtre et dans chaque langue, dans `composeApp/build/snapshots/`.
+- `ContractTest` vérifie que la spécification OpenAPI et les routes correspondent, et que chaque réponse respecte son schéma.
+- `SdkTest` fait tourner le SDK de `:shared` contre le vrai serveur ; `ApiTest` et `WebTest` couvrent l'API et le client web.
+- `:composeApp:desktopTest` dessine chaque écran à chaque taille de fenêtre et dans chaque langue, dans `composeApp/build/snapshots/`.
+
+## Documentation
+
+- [Guide d'utilisation](docs/guide.md) : chaque client, pas à pas.
+- [Contrat de l'API](docs/api/README.md) : spécification OpenAPI, conventions, modèle de données.
+- [Décisions d'architecture](docs/adr/) et [plan du projet](plan.md).
+- [Scénario de la démo](docs/demo.md).
+- [AGENTS.md](AGENTS.md) : consignes pour les agents de code qui travaillent sur ce dépôt.
