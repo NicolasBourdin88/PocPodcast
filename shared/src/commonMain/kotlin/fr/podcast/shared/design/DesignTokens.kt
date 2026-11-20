@@ -66,7 +66,8 @@ val Podcast.artworkColor: Int
 
 /** Up to two initials shown on the placeholder artwork. */
 val Podcast.initials: String
-    get() = title.split(' ').filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
+    get() = title.split(' ').filter { word -> word.any { it.isLetterOrDigit() } }.take(2)
+        .joinToString("") { word -> word.first { it.isLetterOrDigit() }.uppercase() }
 
 /** "#RRGGBB" for CSS. */
 fun Int.toCssHex(): String = "#" + toString(16).padStart(6, '0')

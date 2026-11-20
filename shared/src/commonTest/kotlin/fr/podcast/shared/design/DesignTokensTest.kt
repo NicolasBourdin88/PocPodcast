@@ -1,10 +1,23 @@
 package fr.podcast.shared.design
 
+import fr.podcast.shared.model.Podcast
 import kotlin.math.pow
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DesignTokensTest {
+
+    @Test
+    fun initialsSkipWordsWithoutLetters() {
+        fun initials(title: String) = Podcast(id = "1", title = title, author = "", feedUrl = "").initials
+        assertEquals("FA", initials("Fragmented - AI Developer Podcast"))
+        assertEquals("LC", initials("Les Cast Codeurs Podcast"))
+        assertEquals("9I", initials("99% Invisible"))
+        assertEquals("LP", initials("(Les) Pieds sur terre"))
+        assertEquals("T", initials("Tech"))
+        assertEquals("", initials("— · —"))
+    }
 
     /** WCAG 2 AA for normal text: every text color on every background, in both themes. */
     @Test
