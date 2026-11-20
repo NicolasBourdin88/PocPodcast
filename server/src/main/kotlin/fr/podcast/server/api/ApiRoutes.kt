@@ -13,6 +13,7 @@ import fr.podcast.server.hal.episodeResource
 import fr.podcast.server.hal.podcastResource
 import fr.podcast.server.hal.rootResource
 import fr.podcast.server.hal.tokenResource
+import fr.podcast.server.html.artworkPlaceholderSvg
 import fr.podcast.server.html.homePage
 import fr.podcast.server.http.FieldError
 import fr.podcast.server.http.HalJson
@@ -130,6 +131,20 @@ fun Route.apiRoutes(services: ServerServices) {
             val podcast = catalog(call).podcast(call.parameters["id"]!!) ?: return@get call.respondNotFound("Podcast")
             val representation = call.representation()
             call.respondResource(podcastResource(podcast, representation.forms), representation)
+        }
+
+        // Kept square and small by the server; the initials when the feed's image cannot be had (ADR 0013).
+        get("/podcasts/{id}/artwork") {
+            val podcast = catalog(call).podcast(call.parameters["id"]!!) ?: return@get call.respondNotFound("Podcast")
+            val file = podcast.artworkUrl?.let { services.artwork.thumbnail(it) }
+            if (file != null) {
+                call.response.header(HttpHeaders.CacheControl, "private, max-age=86400")
+                call.respond(LocalPathContent(file, ContentType.Image.JPEG))
+            } else {
+                // Asked for again soon: the image may be readable later.
+                call.response.header(HttpHeaders.CacheControl, "private, max-age=600")
+                call.respondText(artworkPlaceholderSvg(podcast), ContentType.Image.SVG)
+            }
         }
 
         post("/podcasts/{id}/refresh") {

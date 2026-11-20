@@ -180,6 +180,12 @@ class WebTest {
         assertContains(library, "hx-patch=\"/subscriptions/1\"")
         assertContains(library, "href=\"/subscriptions/opml\"")
 
+        // Artwork comes from this server, never from the feed's host (ADR 0013).
+        TestDatabase.execute("UPDATE podcasts SET artwork_url = 'https://cdn.test/artwork.png' WHERE id = 1")
+        val withArtwork = browser.get("/subscriptions") { header(HttpHeaders.Accept, "text/html") }.bodyAsText()
+        assertContains(withArtwork, "src=\"/podcasts/1/artwork\"")
+        assertTrue("cdn.test" !in withArtwork)
+
         val explore = browser.get("/search?q=kotlin") {
             header(HttpHeaders.Accept, "text/html")
             header(HttpHeaders.AcceptLanguage, "fr")

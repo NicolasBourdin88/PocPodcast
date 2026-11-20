@@ -300,6 +300,11 @@ class ContractTest {
 
         check(get, "/podcasts/1", "/podcasts/{podcastId}", HttpStatusCode.OK)
         check(get, "/podcasts/999", "/podcasts/{podcastId}", HttpStatusCode.NotFound)
+        check(get, "/podcasts/1/artwork", "/podcasts/{podcastId}/artwork", HttpStatusCode.OK, accept = ContentType.Any)
+        TestDatabase.execute("UPDATE podcasts SET artwork_url = 'https://cdn.test/artwork.png' WHERE id = 2")
+        check(get, "/podcasts/2/artwork", "/podcasts/{podcastId}/artwork", HttpStatusCode.OK, accept = ContentType.Any)
+        check(get, "/podcasts/1/artwork", "/podcasts/{podcastId}/artwork", HttpStatusCode.Unauthorized, token = null)
+        check(get, "/podcasts/999/artwork", "/podcasts/{podcastId}/artwork", HttpStatusCode.NotFound)
         check(get, "/podcasts/1/episodes?limit=1", "/podcasts/{podcastId}/episodes", HttpStatusCode.OK)
         check(get, "/podcasts/1/episodes?limit=0", "/podcasts/{podcastId}/episodes", HttpStatusCode.BadRequest)
         check(get, "/podcasts/999/episodes", "/podcasts/{podcastId}/episodes", HttpStatusCode.NotFound)

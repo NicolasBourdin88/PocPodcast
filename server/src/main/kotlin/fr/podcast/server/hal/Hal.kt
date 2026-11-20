@@ -202,6 +202,7 @@ fun podcastResource(podcast: Podcast, forms: Boolean = false): JsonObject = buil
         "self" to "/podcasts/${podcast.id}",
         "episodes" to "/podcasts/${podcast.id}/episodes{?offset,limit}",
         "feed" to podcast.feedUrl,
+        "artwork" to "/podcasts/${podcast.id}/artwork",
     )
     templates(forms, Affordances.forPodcast(podcast))
 }

@@ -23,6 +23,7 @@ import fr.podcast.server.feeds.FeedFetcher
 import fr.podcast.server.feeds.FeedRefresher
 import fr.podcast.server.feeds.UrlGuard
 import fr.podcast.server.media.AudioLinks
+import fr.podcast.server.media.ArtworkService
 import fr.podcast.server.media.MediaService
 import fr.podcast.server.media.MediaStore
 import fr.podcast.server.sync.GpodderSync
@@ -130,6 +131,8 @@ class ServerServices(
     /** Signed audio links (ADR 0008); the key is read, or created, once at startup. */
     val audioLinks: AudioLinks = runBlocking { AudioLinks.load(database) }
     val media = MediaService(database, outgoing, guard, MediaStore(config.mediaDirectory), config.maxFileBytes, config.autoDownloadLatest)
+    /** Podcast artwork kept square and small, for the thin client (ADR 0013). */
+    val artwork = ArtworkService(outgoing, guard, config.mediaDirectory)
     val refresher = FeedRefresher(database, FeedFetcher(outgoing, guard)) { podcastId ->
         media.scheduleAutomatic(podcastId)
         // Actions of gPodder clients that were waiting for these episodes (ADR 0011).

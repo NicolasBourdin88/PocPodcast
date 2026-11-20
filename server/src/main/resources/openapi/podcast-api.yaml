@@ -528,6 +528,34 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /podcasts/{podcastId}/artwork:
+    parameters:
+      - $ref: "#/components/parameters/podcastId"
+    get:
+      tags: [podcasts]
+      operationId: getPodcastArtwork
+      summary: Pochette du podcast, carrée et réduite (lien `artwork`)
+      description: |
+        L'image du flux (`artworkUrl`), lue une fois par le serveur, coupée au carré, réduite à
+        256 pixels et gardée en JPEG. Le navigateur ne demande ainsi que ce serveur : ni un
+        bloqueur de contenu ni la protection contre le hotlinking de l'hébergeur ne la cachent,
+        et une image de 3000 pixels n'est pas chargée pour une vignette (ADR 0013).
+        Quand l'image ne peut pas être lue, ou que le podcast n'en a pas, une vignette SVG :
+        les initiales du podcast sur sa couleur, comme dans les apps (`DesignTokens`).
+      responses:
+        "200":
+          description: Pochette (un jour en cache), ou vignette aux initiales (dix minutes)
+          headers:
+            Cache-Control:
+              schema: { type: string }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/svg+xml:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /podcasts/{podcastId}/refresh:
     parameters:
       - $ref: "#/components/parameters/podcastId"
@@ -2092,13 +2120,16 @@ components:
           format: date-time
         _links:
           type: object
-          required: [self, episodes, feed]
+          required: [self, episodes, feed, artwork]
           properties:
             self: { $ref: "#/components/schemas/Link" }
             episodes:
               description: "Gabarit `/podcasts/{id}/episodes{?offset,limit}`."
               $ref: "#/components/schemas/Link"
             feed: { $ref: "#/components/schemas/Link" }
+            artwork:
+              description: Pochette carrée servie par ce serveur (`/podcasts/{id}/artwork`).
+              $ref: "#/components/schemas/Link"
           additionalProperties: false
         _templates:
           type: object

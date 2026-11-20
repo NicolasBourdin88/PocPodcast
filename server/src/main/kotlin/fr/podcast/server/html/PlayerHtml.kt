@@ -1,16 +1,12 @@
 package fr.podcast.server.html
 
 import fr.podcast.server.media.AudioLinks
-import fr.podcast.shared.design.artworkColor
-import fr.podcast.shared.design.initials
-import fr.podcast.shared.design.toCssHex
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.i18n.Strings
 import fr.podcast.shared.model.EpisodeStatus
 import kotlinx.html.BODY
 import kotlinx.html.FlowContent
 import kotlinx.html.HTMLTag
-import kotlinx.html.aside
 import kotlinx.html.audio
 import kotlinx.html.button
 import kotlinx.html.div
@@ -193,10 +189,3 @@ fun FlowContent.queueSection(queue: List<EpisodeItem>, strings: Strings, audio: 
 fun queueFragmentHtml(queue: List<EpisodeItem>, strings: Strings, audio: AudioLinks): String =
     createHTML(prettyPrint = false).div { queueSection(queue, strings, audio) }.removePrefix("<div>").removeSuffix("</div>")
 
-internal fun FlowContent.artwork(item: EpisodeItem) {
-    aside("artwork") {
-        attributes["style"] = "background: ${item.podcast.artworkColor.toCssHex()}"
-        attributes["aria-hidden"] = "true"
-        +item.podcast.initials
-    }
-}

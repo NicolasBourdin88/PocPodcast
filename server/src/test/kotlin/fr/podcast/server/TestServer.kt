@@ -83,6 +83,19 @@ val testConfig = ServerConfig(
 val testAudio = ByteArray(200_000) { (it % 251).toByte() }
 
 /**
+ * The artwork served by https://cdn.test/artwork.png: 600 × 400 pixels, its centered square blue,
+ * the bands left and right of it red (pixels set one by one: no graphics environment).
+ */
+val testArtwork: ByteArray = run {
+    val image = java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_RGB)
+    for (x in 0 until 600) for (y in 0 until 400) image.setRGB(x, y, if (x in 100 until 500) 0x0000FF else 0xFF0000)
+    java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(image, "png", it) }.toByteArray()
+}
+
+/** How many times the server fetched https://cdn.test/artwork.png. */
+val testArtworkRequests = java.util.concurrent.atomic.AtomicInteger()
+
+/**
  * The outside world seen by the server in tests: https://feeds.test serves the fixtures of
  * src/test/resources/feeds, Apple Podcasts and Podcast Index serve src/test/resources/search
  * (the query "panne" breaks both, "demi-panne" only Podcast Index), everything else is unknown.
@@ -102,6 +115,12 @@ fun testFeeds(): HttpClient = HttpClient(
                 respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://cdn.test/files/seed-1.mp3"))
             request.url.host == "cdn.test" && request.url.encodedPath == "/files/seed-1.mp3" ->
                 respond(ByteReadChannel(testAudio), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "audio/mpeg"))
+            request.url.host == "cdn.test" && request.url.encodedPath == "/artwork.png" -> {
+                testArtworkRequests.incrementAndGet()
+                respond(ByteReadChannel(testArtwork), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "image/png"))
+            }
+            request.url.host == "cdn.test" && request.url.encodedPath == "/not-an-image.png" ->
+                respond("<html>Not found</html>", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html"))
             request.url.host == "itunes.apple.com" ->
                 if (query == "panne") respond("", HttpStatusCode.ServiceUnavailable) else search("apple")
             request.url.host == "api.podcastindex.org" -> {

@@ -7,9 +7,6 @@ import fr.podcast.server.catalog.SharedEntry
 import fr.podcast.server.media.AudioLinks
 import fr.podcast.server.search.SearchHit
 import fr.podcast.server.search.normalizedFeed
-import fr.podcast.shared.design.artworkColor
-import fr.podcast.shared.design.initials
-import fr.podcast.shared.design.toCssHex
 import fr.podcast.shared.i18n.Language
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.shared.i18n.Strings
@@ -434,19 +431,6 @@ fun opmlReportFragment(report: OpmlImportReport, strings: Strings): String =
 
 /** What was done, in a sentence. */
 fun noticeFragment(message: String): String = createHTML(prettyPrint = false).span("notice") { +message }
-
-private fun FlowContent.artwork(podcast: Podcast) {
-    val image = podcast.artworkUrl
-    if (image != null) {
-        img(src = image, alt = "", classes = "artwork") { attributes["loading"] = "lazy" }
-    } else {
-        aside("artwork") {
-            attributes["style"] = "background: ${podcast.artworkColor.toCssHex()}"
-            attributes["aria-hidden"] = "true"
-            +podcast.initials
-        }
-    }
-}
 
 private fun FlowContent.hitArtwork(hit: SearchHit) {
     val image = hit.artworkUrl
