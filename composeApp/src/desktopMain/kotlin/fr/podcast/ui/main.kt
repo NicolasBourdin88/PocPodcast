@@ -1,5 +1,18 @@
 package fr.podcast.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import fr.podcast.shared.navigation.Destination
+import kotlinx.coroutines.delay
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
+import java.io.File
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,10 +59,50 @@ fun main() = application {
         },
         visible = !closing,
         title = "Podcast",
-        state = rememberWindowState(width = 1280.dp, height = 800.dp),
+        state = rememberWindowState(width = Debug.windowSize.first.dp, height = Debug.windowSize.second.dp),
     ) {
         PlaybackMenu(environment)
-        App(environment)
+        Snapshot(Debug.snapshot) {
+            App(environment, initialDestination = Debug.destination)
+        }
+    }
+}
+
+/**
+ * Development: environment variables to check the app without clicking through it, as the
+ * SwiftUI app's launch arguments do.
+ * - `PODCAST_TAB=library` opens a tab;
+ * - `PODCAST_WINDOW=1440x900` sizes the window;
+ * - `PODCAST_SNAPSHOT=<file.png>` saves the window's content once loaded (after
+ *   `PODCAST_SNAPSHOT_DELAY` seconds, 8 by default): no screen recording permission needed.
+ */
+private object Debug {
+    val destination = System.getenv("PODCAST_TAB")
+        ?.let { tab -> Destination.entries.firstOrNull { it.name.equals(tab, ignoreCase = true) } }
+        ?: Destination.Home
+    val windowSize = System.getenv("PODCAST_WINDOW")?.split('x')?.mapNotNull { it.trim().toIntOrNull() }
+        ?.takeIf { it.size == 2 }?.let { it[0] to it[1] }
+        ?: (1280 to 800)
+    val snapshot: String? = System.getenv("PODCAST_SNAPSHOT")
+    val snapshotDelay = System.getenv("PODCAST_SNAPSHOT_DELAY")?.toLongOrNull()?.seconds ?: 8.seconds
+}
+
+/** Draws [content], and with a [path] records it into a layer saved as a PNG once loaded. */
+@Composable
+private fun Snapshot(path: String?, content: @Composable () -> Unit) {
+    if (path == null) return content()
+    val layer = rememberGraphicsLayer()
+    Box(
+        Modifier.fillMaxSize().drawWithContent {
+            layer.record { this@drawWithContent.drawContent() }
+            drawLayer(layer)
+        },
+    ) { content() }
+    LaunchedEffect(layer) {
+        delay(Debug.snapshotDelay)
+        val image = Image.makeFromBitmap(layer.toImageBitmap().asSkiaBitmap())
+        File(path).writeBytes(requireNotNull(image.encodeToData(EncodedImageFormat.PNG)).bytes)
+        println("snapshot: $path")
     }
 }
 

@@ -1,5 +1,6 @@
 package fr.podcast.ui
 
+import fr.podcast.shared.navigation.Destination
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -26,10 +27,10 @@ import fr.podcast.ui.theme.platformLanguage
 import kotlinx.coroutines.launch
 
 @Composable
-fun App(environment: AppEnvironment, language: Language = platformLanguage()) {
+fun App(environment: AppEnvironment, language: Language = platformLanguage(), initialDestination: Destination = Destination.Home) {
     PodcastTheme(language) {
         Surface(Modifier.fillMaxSize()) {
-            AppRoot(environment)
+            AppRoot(environment, initialDestination)
         }
     }
 }
@@ -39,7 +40,7 @@ fun App(environment: AppEnvironment, language: Language = platformLanguage()) {
  * whole app through a RemotePodcastRepository; Settings switches between accounts (ADR 0006).
  */
 @Composable
-private fun AppRoot(environment: AppEnvironment) {
+private fun AppRoot(environment: AppEnvironment, initialDestination: Destination) {
     val strings = LocalStrings.current
     val store = remember { AccountStore(environment.keyValueStore) }
     val service = remember { AccountService(environment.httpClient, environment.deviceName) }
@@ -78,6 +79,7 @@ private fun AppRoot(environment: AppEnvironment) {
             client = repository,
             accountLabel = active?.let { "${it.displayName} · ${it.serverName}" } ?: strings.demoAccount,
             onSessionExpired = { active?.let { store.remove(it.id) } },
+            initialDestination = initialDestination,
             settings = { modifier ->
                 SettingsScreen(
                     client = repository,
