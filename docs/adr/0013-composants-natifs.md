@@ -29,7 +29,8 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
 - **Navigation** : la barre de navigation courte (`ShortNavigationBar`) sur téléphone, le rail large (`WideNavigationRail`) ailleurs ; le tiroir permanent reste sur les grandes fenêtres, pour la liste des abonnements.
 - **Composants** :
   - l'indicateur de chargement Expressive et le tirer-pour-rafraîchir (Accueil, Bibliothèque) ;
-  - un bouton de lecture qui passe du rond au carré, une ligne de progression qui ondule pendant la lecture ;
+  - un bouton de lecture qui passe du rond au carré ; une ligne de progression plate dans le mini-lecteur (la vague d'Expressive dit qu'une chose charge, pas où en est l'écoute) ;
+  - le lecteur dans une feuille modale (`ModalBottomSheet`) qui glisse depuis le bas, comme les lecteurs des plateformes, et se ferme en la tirant vers le bas, par le geste retour ou par son chevron ;
   - l'OPML dans le menu de débordement de la Bibliothèque.
 - **Desktop** : une barre de menus native « Lecture » (lire ou mettre en pause, reculer, avancer, épisode suivant, vitesse), avec des raccourcis qui laissent l'édition de texte tranquille (⌘[ et ⌘], comme précédent et suivant dans un navigateur).
 

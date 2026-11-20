@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.dp
 import fr.podcast.player.NowPlaying
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.ui.components.Artwork
-import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.graphics.StrokeCap
 
 /**
  * Narrow windows: the episode being played (or the one to resume) above the navigation.
@@ -30,12 +31,13 @@ fun MiniPlayer(item: EpisodeItem, nowPlaying: NowPlaying?, singleLine: Boolean, 
     val state = nowPlaying?.state
     Surface(modifier.fillMaxWidth().clickable(onClick = onOpen), tonalElevation = 3.dp) {
         Column {
-            // Material 3 Expressive (ADR 0013): the line waves while the episode plays.
-            val playing = state?.playing == true
-            LinearWavyProgressIndicator(
+            // The position, a plain line from edge to edge (the wave says something loads).
+            LinearProgressIndicator(
                 progress = { nowPlaying?.progress ?: item.episode.progress },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                amplitude = { if (playing) 1f else 0f },
+                modifier = Modifier.fillMaxWidth(),
+                strokeCap = StrokeCap.Butt,
+                gapSize = 0.dp,
+                drawStopIndicator = {},
             )
             Row(
                 Modifier.padding(horizontal = 12.dp, vertical = if (singleLine) 4.dp else 8.dp),

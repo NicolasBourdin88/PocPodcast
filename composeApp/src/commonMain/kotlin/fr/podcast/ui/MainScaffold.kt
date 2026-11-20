@@ -67,7 +67,7 @@ import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.ui.player.LocalPlayback
 import fr.podcast.ui.player.MiniPlayer
 import fr.podcast.ui.player.PlayerBar
-import fr.podcast.ui.player.PlayerScreen
+import fr.podcast.ui.player.PlayerSheet
 import fr.podcast.ui.player.queueItems
 import fr.podcast.ui.theme.LocalStrings
 import kotlinx.coroutines.delay
@@ -329,12 +329,12 @@ private fun AdaptiveScaffold(
             }
         }
         if (playerOpen && playerItem != null) {
-            PlayerScreen(
+            PlayerSheet(
                 client = client,
                 item = playerItem,
                 nowPlaying = nowPlaying,
                 twoColumns = layout != WindowLayout.Compact && layout != WindowLayout.Medium,
-                onClose = { playerOpen = false },
+                onDismiss = { playerOpen = false },
             )
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp))

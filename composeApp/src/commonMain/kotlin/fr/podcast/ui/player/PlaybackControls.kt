@@ -74,9 +74,12 @@ fun PlayPauseButton(playing: Boolean, buffering: Boolean, onClick: () -> Unit, s
         }
     }
     // Material 3 Expressive (ADR 0013): round while paused, its corners squared off while playing.
+    // Both states name their colors: a checked color left out is the text's, unreadable on the fill.
     val shapes = IconButtonDefaults.toggleableShapes()
     if (tonal) {
         val colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         )
@@ -92,6 +95,8 @@ fun PlayPauseButton(playing: Boolean, buffering: Boolean, onClick: () -> Unit, s
         val colors = IconButtonDefaults.filledIconToggleButtonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
+            checkedContainerColor = MaterialTheme.colorScheme.primary,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimary,
         )
         FilledIconToggleButton(
             checked = playing,

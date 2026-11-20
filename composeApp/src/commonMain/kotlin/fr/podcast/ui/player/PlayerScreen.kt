@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +19,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -37,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import fr.podcast.player.NowPlaying
 import fr.podcast.shared.home.EpisodeItem
 import fr.podcast.ui.components.Artwork
-import fr.podcast.ui.components.SystemBackHandler
 import fr.podcast.ui.theme.LocalStrings
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,13 +43,40 @@ import fr.podcast.ui.components.FavoriteButton
 import fr.podcast.ui.components.StarRating
 import fr.podcast.ui.components.attempt
 import kotlinx.coroutines.launch
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 
 internal const val SKIP_BACK = fr.podcast.player.PlaybackController.SKIP_BACK_SECONDS
 internal const val SKIP_FORWARD = fr.podcast.player.PlaybackController.SKIP_FORWARD_SECONDS
 
 /**
- * Full-screen player, over everything. One column on narrow windows (controls, then the queue);
- * two on wide or landscape ones (controls beside the queue).
+ * The player in a sheet (ADR 0013): it slides up from the bottom over everything, as the
+ * platforms' own players do, and closes when dragged down, with the back gesture or its chevron.
+ */
+@Composable
+fun PlayerSheet(client: PodcastClient, item: EpisodeItem, nowPlaying: NowPlaying?, twoColumns: Boolean, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        // The whole width on tablets and desktops too: the player takes the window.
+        sheetMaxWidth = Dp.Unspecified,
+    ) {
+        PlayerScreen(
+            client = client,
+            item = item,
+            nowPlaying = nowPlaying,
+            twoColumns = twoColumns,
+            // The chevron slides the sheet down as a drag does.
+            onClose = { scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) onDismiss() } },
+        )
+    }
+}
+
+/**
+ * The player's content. One column on narrow windows (controls, then the queue); two on wide or
+ * landscape ones (controls beside the queue).
  */
 @Composable
 fun PlayerScreen(
@@ -68,33 +90,31 @@ fun PlayerScreen(
     val strings = LocalStrings.current
     val playback = LocalPlayback.current
     val queue by playback.queue.collectAsState()
-    SystemBackHandler(enabled = true, onBack = onClose)
 
-    Surface(modifier.fillMaxSize()) {
-        Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-                IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = strings.close) }
-                Text(strings.nowPlaying, style = MaterialTheme.typography.titleMedium)
-            }
-            if (twoColumns) {
-                Row(Modifier.fillMaxSize()) {
-                    BoxWithConstraints(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
-                        // A phone in landscape has no room for the artwork: the controls come first.
-                        val artwork = if (maxHeight < 420.dp) null else minOf(maxHeight * 0.45f, maxWidth * 0.6f, 280.dp)
-                        Column(Modifier.verticalScroll(rememberScrollState())) {
-                            NowPlayingPane(client, item, nowPlaying, artwork, queueEmpty = queue.isEmpty())
-                        }
+    // The sheet gives the surface, the window insets and the back gesture.
+    Column(modifier.fillMaxSize()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+            IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = strings.close) }
+            Text(strings.nowPlaying, style = MaterialTheme.typography.titleMedium)
+        }
+        if (twoColumns) {
+            Row(Modifier.fillMaxSize()) {
+                BoxWithConstraints(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
+                    // A phone in landscape has no room for the artwork: the controls come first.
+                    val artwork = if (maxHeight < 420.dp) null else minOf(maxHeight * 0.45f, maxWidth * 0.6f, 280.dp)
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        NowPlayingPane(client, item, nowPlaying, artwork, queueEmpty = queue.isEmpty())
                     }
-                    VerticalDivider()
-                    LazyColumn(Modifier.weight(1f).fillMaxSize()) { queueItems(queue, playback, strings) }
                 }
-            } else {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val artworkSize = minOf(maxWidth * 0.7f, 300.dp)
-                    LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        item(key = "now-playing") { NowPlayingPane(client, item, nowPlaying, artworkSize, queueEmpty = queue.isEmpty()) }
-                        queueItems(queue, playback, strings)
-                    }
+                VerticalDivider()
+                LazyColumn(Modifier.weight(1f).fillMaxSize()) { queueItems(queue, playback, strings) }
+            }
+        } else {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val artworkSize = minOf(maxWidth * 0.7f, 300.dp)
+                LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    item(key = "now-playing") { NowPlayingPane(client, item, nowPlaying, artworkSize, queueEmpty = queue.isEmpty()) }
+                    queueItems(queue, playback, strings)
                 }
             }
         }

@@ -125,6 +125,10 @@ class ResponsiveSnapshotTest {
                 Home(language, Destination.Home, playing = "e2", playerOpen = true)
             }
             render("player-bar-large-$tag", sizes.getValue("large")) { Home(language, Destination.Home, playing = "e2") }
+            // Playing: the play button checked, its pause symbol on the fill (ADR 0013).
+            render("player-playing-compact-$tag", sizes.getValue("compact")) {
+                Home(language, Destination.Home, playing = "e2", playerOpen = true, keepPlaying = true)
+            }
         }
     }
 
@@ -137,9 +141,10 @@ class ResponsiveSnapshotTest {
         playing: String? = null,
         playerOpen: Boolean = false,
         playlistId: String? = null,
+        keepPlaying: Boolean = false,
     ) {
         val repository = remember { FakePodcastRepository() }
-        // The demo player, paused on [playing], with two episodes in the queue.
+        // The demo player on [playing] (paused unless [keepPlaying]), with two episodes in the queue.
         val playback = remember {
             val scope = CoroutineScope(Dispatchers.Unconfined)
             PlaybackController(SimulatedAudioPlayer(scope), scope).apply {
@@ -148,7 +153,7 @@ class ResponsiveSnapshotTest {
                 enqueue("e3")
                 playing?.let {
                     play(it)
-                    pause()
+                    if (!keepPlaying) pause()
                 }
             }
         }
@@ -178,7 +183,9 @@ class ResponsiveSnapshotTest {
         val scene = ImageComposeScene(size.first, size.second, Density(1f), content = content)
         try {
             scene.render(0) // first frame launches the state loading
-            val image = scene.render(1_000_000_000)
+            // Then a second of frames: an animation (the player's sheet) runs to its end.
+            for (frame in 1..30) scene.render(frame * 33_333_333L)
+            val image = scene.render(2_000_000_000)
             val data = requireNotNull(image.encodeToData(EncodedImageFormat.PNG))
             File(outDir, "$name.png").writeBytes(data.bytes)
         } finally {
