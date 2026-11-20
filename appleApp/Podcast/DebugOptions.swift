@@ -40,6 +40,7 @@ enum DebugOptions {
         default: break
         }
         guard let path = UserDefaults.standard.string(forKey: "snapshot") else { return }
+        var report = ""
         let delay = UserDefaults.standard.double(forKey: "snapshotDelay")
         try? await Task.sleep(for: .seconds(delay > 0 ? delay : 5))
         // `-click x,y;x,y`: clicks, in points from the window's top left, as a person would make them.
@@ -52,20 +53,54 @@ enum DebugOptions {
                 let parts = click.split(separator: ",").compactMap { Double($0) }
                 guard parts.count == 2 else { continue }
                 let point = NSPoint(x: parts[0], y: window.frame.height - parts[1])
-                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                    if let event = NSEvent.mouseEvent(
+                // Into the app's event queue, as the window server delivers a click: a tracking
+                // loop started by the mouse down takes the mouse up from the queue.
+                func mouse(_ type: NSEvent.EventType) -> NSEvent? {
+                    NSEvent.mouseEvent(
                         with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
-                    ) {
-                        NSApp.sendEvent(event)
-                    }
-                    try? await Task.sleep(for: .milliseconds(80))
+                        windowNumber: window.windowNumber, context: nil, eventNumber: 1,
+                        clickCount: type == .mouseMoved ? 0 : 1, pressure: type == .leftMouseDown ? 1 : 0
+                    )
+                }
+                if let moved = mouse(.mouseMoved) { NSApp.postEvent(moved, atStart: false) }
+                try? await Task.sleep(for: .milliseconds(150))
+                if let down = mouse(.leftMouseDown), let up = mouse(.leftMouseUp) {
+                    NSApp.postEvent(down, atStart: false)
+                    NSApp.postEvent(up, atStart: false)
                 }
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+        // `-keys tab,down,return`: keys pressed in the key window, through the event queue.
+        if let keys = UserDefaults.standard.string(forKey: "keys"),
+           let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 300 }) {
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(500))
+            let codes: [String: (UInt16, String)] = [
+                "tab": (48, "\t"), "return": (36, "\r"), "space": (49, " "), "escape": (53, "\u{1b}"),
+                "down": (125, String(UnicodeScalar(NSDownArrowFunctionKey)!)), "up": (126, String(UnicodeScalar(NSUpArrowFunctionKey)!)),
+                "left": (123, String(UnicodeScalar(NSLeftArrowFunctionKey)!)), "right": (124, String(UnicodeScalar(NSRightArrowFunctionKey)!)),
+            ]
+            for name in keys.split(separator: ",").map(String.init) {
+                guard let (code, characters) = codes[name] else { continue }
+                let arrows: NSEvent.ModifierFlags = code >= 123 ? [.numericPad, .function] : []
+                for type in [NSEvent.EventType.keyDown, .keyUp] {
+                    if let event = NSEvent.keyEvent(
+                        with: type, location: .zero, modifierFlags: arrows, timestamp: ProcessInfo.processInfo.systemUptime,
+                        windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
+                        isARepeat: false, keyCode: code
+                    ) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
+                }
+                try? await Task.sleep(for: .milliseconds(700))
+            }
+            try? await Task.sleep(for: .seconds(1))
+            report += "first responder after keys: \(String(describing: window.firstResponder.map { type(of: $0) }))\n"
+        }
         if scrollToBottom {
-            var report = "player bar: \(model.playerItem?.episode.title ?? "none")\n"
+            report += "player bar: \(model.playerItem?.episode.title ?? "none")\n"
             for window in NSApp.windows where window.isVisible {
                 for scrollView in scrollViews(in: window.contentView) {
                     guard let document = scrollView.documentView, document.frame.height > scrollView.contentView.bounds.height else { continue }
@@ -84,9 +119,9 @@ enum DebugOptions {
                     report += "scroll view: content \(Int(document.frame.height)), visible \(Int(scrollView.contentView.bounds.height)), insets top \(Int(insets.top)) bottom \(Int(insets.bottom))\n"
                 }
             }
-            try? report.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
             try? await Task.sleep(for: .seconds(1))
         }
+        try? report.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
         do {
             let content = try await SCShareableContent.currentProcess
             // The app's own windows only (not the desktop behind them): the main one first, then sheets.
