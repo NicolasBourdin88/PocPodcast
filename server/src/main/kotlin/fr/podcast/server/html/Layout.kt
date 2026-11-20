@@ -120,7 +120,7 @@ private val STYLES = """
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    main { padding: 16px 16px 200px; max-width: 960px; }
+    main { padding: 16px 16px 200px; }
     main > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
     h1 { font-size: 1.5rem; margin: 8px 0 16px; }
     h2 { font-size: 1.05rem; margin: 24px 0 12px; }
@@ -197,7 +197,7 @@ private val STYLES = """
     .badge.warning, .error { color: var(--error); }
     .subscribed, .notice { font-size: .85rem; color: var(--accent); }
     button.danger { color: var(--error); }
-    img.artwork { object-fit: cover; }
+    img.artwork { object-fit: cover; background: var(--card); }
     .results .episode { align-items: center; }
     .empty { color: var(--muted); }
 
@@ -258,5 +258,26 @@ private val STYLES = """
       main { margin-left: 240px; padding: 24px 32px 120px; }
       .cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
       .player { left: 240px; bottom: 0; }
+    }
+
+    /* Large windows: the width goes to columns, each row keeping a readable length. */
+    @media (min-width: 1200px) {
+      main { padding: 24px 40px 120px; }
+      ul.episodes, ul.subscriptions, ul.results, ul.rows {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); column-gap: 40px;
+      }
+      #queue ul.episodes, .settings ul.rows { display: block; }
+      .search, .add-feed, section.feed { max-width: 720px; }
+      /* Home: the queue beside the episodes, in view while they scroll. */
+      #home { display: grid; grid-template-columns: minmax(0, 1fr) 360px; column-gap: 40px; }
+      #home > section { grid-column: 1; }
+      #home > #queue {
+        grid-column: 2; grid-row: 1 / span 2; align-self: start; position: sticky; top: 24px;
+        max-height: calc(100vh - 120px); overflow-y: auto; background: var(--surface); border-radius: 16px; padding: 0 16px 8px;
+      }
+      /* Settings: the sections side by side. */
+      main:has(> .settings) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; align-items: start; }
+      main:has(> .settings) > header { grid-column: 1 / -1; }
+      .settings { max-width: none; }
     }
 """.trimIndent()
