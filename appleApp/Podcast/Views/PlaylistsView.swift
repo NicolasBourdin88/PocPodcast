@@ -23,7 +23,7 @@ struct PlaylistsView: View {
             if playlists == nil { ProgressView() } else if playlists?.isEmpty == true { EmptyState(text: strings.emptyPlaylists, systemImage: "music.note.list") }
         }
         .navigationTitle(strings.destination(destination: .playlists))
-        .navigationDestination(for: Playlist.self) { PlaylistView(playlist: $0) }
+        .navigationDestination(for: Playlist.self) { PlaylistView(playlist: $0).playerBar() }
         .refreshable { await load() }
         .task(id: model.changes) { await load() }
     }

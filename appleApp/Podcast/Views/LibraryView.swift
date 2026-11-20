@@ -77,7 +77,7 @@ struct LibraryView: View {
                       contentType: .opml, defaultFilename: "podcasts.opml") { result in
             if case .success(let url) = result { model.notice = strings.opmlSaved(name: url.lastPathComponent) }
         }
-        .navigationDestination(for: SubscriptionItem.self) { PodcastView(item: $0) }
+        .navigationDestination(for: SubscriptionItem.self) { PodcastView(item: $0).playerBar() }
     }
 
     private func load() async {

@@ -12,7 +12,7 @@ struct PodcastApp: App {
             RootView()
                 .environment(model)
                 #if DEBUG && os(macOS)
-                .task { await DebugOptions.run() }
+                .task { await DebugOptions.run(model) }
                 #endif
         }
         #if os(macOS)
