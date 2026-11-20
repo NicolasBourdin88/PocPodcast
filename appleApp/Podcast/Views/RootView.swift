@@ -14,7 +14,6 @@ struct RootView: View {
                 NavigationStack { SignInView(onDemo: model.startDemo) }
             }
         }
-        .tint(Color.brand)
         .alert(model.notice ?? "", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button("OK", role: .cancel) {}
         }
@@ -23,13 +22,21 @@ struct RootView: View {
 
 enum AppTab: Hashable {
     case home, library, playlists, settings, explore
+
+    static var initial: AppTab {
+        #if DEBUG
+        DebugOptions.tab ?? .home
+        #else
+        .home
+        #endif
+    }
 }
 
 /// The tabs (ADR 0013): on iPhone a tab bar in Liquid Glass, search apart and the mini player
 /// above it; a sidebar on iPad and Mac.
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var tab: AppTab = .home
+    @State private var tab: AppTab = .initial
 
     var body: some View {
         @Bindable var model = model
@@ -52,6 +59,13 @@ struct MainView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        #if DEBUG
+        .task {
+            guard DebugOptions.openPlayer else { return }
+            try? await Task.sleep(for: .seconds(2))
+            model.playerOpen = true
+        }
+        #endif
         #if os(iOS)
         .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory(isEnabled: model.playerItem != nil) {
@@ -62,7 +76,8 @@ struct MainView: View {
         .safeAreaInset(edge: .bottom) {
             if let item = model.playerItem { PlayerBar(item: item) }
         }
-        .sheet(isPresented: $model.playerOpen) { PlayerView().frame(minWidth: 460, minHeight: 680) }
+        // The player scrolls: a sheet no taller than the window it hangs from.
+        .sheet(isPresented: $model.playerOpen) { PlayerView().frame(minWidth: 460, idealWidth: 520, minHeight: 520, idealHeight: 600) }
         #endif
     }
 }

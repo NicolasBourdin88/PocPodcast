@@ -28,7 +28,7 @@ struct ExploreView: View {
                         }
                         Spacer(minLength: 0)
                         if result.subscribed {
-                            Label(strings.subscribed, systemImage: "checkmark").labelStyle(.iconOnly).foregroundStyle(Color.brand)
+                            Label(strings.subscribed, systemImage: "checkmark").labelStyle(.iconOnly).foregroundStyle(.tint)
                                 .accessibilityLabel(strings.subscribed)
                         } else if subscribing.contains(result.feedUrl) {
                             ProgressView()
@@ -40,6 +40,7 @@ struct ExploreView: View {
                 }
             }
         }
+        .contentListStyle()
         .overlay {
             if searching {
                 ProgressView()
@@ -85,9 +86,9 @@ struct ExploreView: View {
             searched = text
             unavailable = found == nil
             results = found
-        } catch {
+        } catch where !AppModel.isCancellation(error) {
             model.notice = model.message(error)
-        }
+        } catch {}
     }
 
     private func subscribe(_ feedUrl: String) async {

@@ -11,6 +11,9 @@ struct PodcastApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                #if DEBUG && os(macOS)
+                .task { await DebugOptions.run() }
+                #endif
         }
         #if os(macOS)
         .defaultSize(width: 1100, height: 760)

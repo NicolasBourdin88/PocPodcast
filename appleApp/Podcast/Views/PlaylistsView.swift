@@ -18,6 +18,7 @@ struct PlaylistsView: View {
                 }
             }
         }
+        .contentListStyle()
         .overlay {
             if playlists == nil { ProgressView() } else if playlists?.isEmpty == true { EmptyState(text: strings.emptyPlaylists, systemImage: "music.note.list") }
         }
@@ -47,6 +48,7 @@ struct PlaylistView: View {
             }
             ForEach(episodes, id: \.episode.id) { EpisodeRow(item: $0) }
         }
+        .contentListStyle()
         .overlay {
             if details == nil { ProgressView() } else if episodes.isEmpty { EmptyState(text: strings.emptyPlaylist, systemImage: "music.note.list") }
         }

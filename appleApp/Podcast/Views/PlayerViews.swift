@@ -117,13 +117,20 @@ struct PlayerView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
+    /// Smaller in a Mac sheet, so that every control shows without scrolling.
+    #if os(macOS)
+    private static let artworkSize: CGFloat = 180
+    #else
+    private static let artworkSize: CGFloat = 260
+    #endif
+
     var body: some View {
         let strings = model.strings
         NavigationStack {
             if let item = model.playerItem {
                 ScrollView {
                     VStack(spacing: 22) {
-                        ArtworkView(podcast: item.podcast, size: 260)
+                        ArtworkView(podcast: item.podcast, size: Self.artworkSize)
                             .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
                             .padding(.top, 8)
                         VStack(spacing: 6) {
@@ -193,8 +200,13 @@ struct PlayerView: View {
                 #endif
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
+                        #if os(iOS)
                         Button { dismiss() } label: { Image(systemName: "chevron.down") }
                             .accessibilityLabel(strings.close)
+                        #else
+                        // A Mac sheet closes with a word at its foot, and with Escape.
+                        Button(strings.close) { dismiss() }
+                        #endif
                     }
                 }
             } else {

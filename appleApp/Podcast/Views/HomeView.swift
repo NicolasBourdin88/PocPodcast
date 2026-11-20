@@ -16,11 +16,14 @@ struct HomeView: View {
                         ForEach(home.resume, id: \.episode.id) { EpisodeRow(item: $0) }
                     }
                 }
-                Section(strings.latestEpisodes) {
-                    ForEach(home.latest, id: \.episode.id) { EpisodeRow(item: $0) }
+                if !home.latest.isEmpty {
+                    Section(strings.latestEpisodes) {
+                        ForEach(home.latest, id: \.episode.id) { EpisodeRow(item: $0) }
+                    }
                 }
             }
         }
+        .contentListStyle()
         .overlay {
             if let error {
                 EmptyState(text: error, systemImage: "wifi.exclamationmark", retry: { Task { await load() } }, retryLabel: strings.retry)
@@ -41,8 +44,8 @@ struct HomeView: View {
             home = state
             error = nil
             model.resumeItem = state.resume.first
-        } catch {
+        } catch where !AppModel.isCancellation(error) {
             if home == nil { self.error = model.message(error) }
-        }
+        } catch {}
     }
 }

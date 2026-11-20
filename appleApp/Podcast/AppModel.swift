@@ -159,13 +159,19 @@ final class AppModel {
         changed()
     }
 
-    /// Runs [action]; a failure becomes the sentence to show.
+    /// Runs [action]; a failure becomes the sentence to show, a cancellation nothing.
     func attempt(_ action: () async throws -> Void) async {
         do {
             try await action()
-        } catch {
+        } catch where !Self.isCancellation(error) {
             notice = message(error)
-        }
+        } catch {}
+    }
+
+    /// A request cancelled because its screen went away or loads again: nothing to tell.
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        return (error as NSError).userInfo["KotlinException"] is KotlinCancellationException
     }
 
     /// The sentence for a failure, from the shared texts when it comes from Kotlin.

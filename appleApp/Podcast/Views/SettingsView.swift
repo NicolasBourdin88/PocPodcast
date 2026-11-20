@@ -21,7 +21,7 @@ struct SettingsView: View {
         Form {
             Section(strings.accounts) {
                 if model.demo {
-                    LabeledContent(strings.demoAccount) { Image(systemName: "checkmark").foregroundStyle(Color.brand) }
+                    LabeledContent(strings.demoAccount) { Image(systemName: "checkmark").foregroundStyle(.tint) }
                     Button(strings.signOut) { model.leaveDemo() }
                 }
                 ForEach(model.accounts.accounts, id: \.id) { account in
@@ -34,7 +34,7 @@ struct SettingsView: View {
                             }
                             Spacer()
                             if model.activeAccount?.id == account.id {
-                                Image(systemName: "checkmark").foregroundStyle(Color.brand)
+                                Image(systemName: "checkmark").foregroundStyle(.tint)
                             }
                         }
                         .contentShape(Rectangle())
@@ -183,7 +183,7 @@ struct ListeningView: View {
                     x: .value(strings.byMonth, monthLabel(month)),
                     y: .value(strings.listeningTime, Double(month.seconds) / 3600)
                 )
-                .foregroundStyle(Color.brand.gradient)
+                .foregroundStyle(Color.accentColor.gradient)
                 .cornerRadius(4)
             }
             .chartYAxis(.hidden)
@@ -228,7 +228,7 @@ struct AvatarPicker: View {
                                 .padding(5)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                        .strokeBorder(avatar == current ? Color.brand : .clear, lineWidth: 3)
+                                        .strokeBorder(avatar == current ? Color.accentColor : .clear, lineWidth: 3)
                                 }
                         }
                         .buttonStyle(.plain)

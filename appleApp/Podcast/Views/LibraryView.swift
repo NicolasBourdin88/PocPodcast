@@ -84,9 +84,9 @@ struct LibraryView: View {
         do {
             items = try await model.client.subscriptionItems()
             error = nil
-        } catch {
+        } catch where !AppModel.isCancellation(error) {
             if items == nil { self.error = model.message(error) }
-        }
+        } catch {}
     }
 
     private func export() async {
@@ -125,7 +125,7 @@ private struct SubscriptionsList: View {
                     ArtworkView(podcast: item.podcast, size: 52)
                     VStack(alignment: .leading, spacing: 2) {
                         if !item.subscription.tags.isEmpty {
-                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(Color.brand)
+                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(.tint)
                         }
                         Text(item.podcast.title).font(.headline).lineLimit(1)
                         Text(item.subscription.note.flatMap { $0.isEmpty ? nil : $0 } ?? item.podcast.author)
@@ -136,6 +136,7 @@ private struct SubscriptionsList: View {
                 }
             }
         }
+        .contentListStyle()
         .overlay {
             if let error {
                 EmptyState(text: error, systemImage: "wifi.exclamationmark", retry: retry, retryLabel: strings.retry)
@@ -169,7 +170,7 @@ struct PodcastView: View {
                         Text(podcast.title).font(.title3.bold())
                         Text(podcast.author).foregroundStyle(.secondary)
                         if !item.subscription.tags.isEmpty {
-                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(Color.brand)
+                            Text(item.subscription.tags.joined(separator: " · ")).font(.caption).foregroundStyle(.tint)
                         }
                     }
                 }
@@ -184,6 +185,7 @@ struct PodcastView: View {
                 ForEach(episodes ?? [], id: \.id) { EpisodeRow(item: EpisodeItem(episode: $0, podcast: podcast)) }
             }
         }
+        .contentListStyle()
         .overlay { if episodes == nil { ProgressView() } }
         .navigationTitle(podcast.title)
         #if os(iOS)
@@ -302,6 +304,7 @@ private struct EpisodeResults: View {
                 }
             }
         }
+        .contentListStyle()
         .overlay {
             if page == nil { ProgressView() } else if page?.items.isEmpty == true { EmptyState(text: strings.noEpisodeFound, systemImage: "magnifyingglass") }
         }

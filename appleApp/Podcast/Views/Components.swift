@@ -9,8 +9,6 @@ extension Color {
         self.init(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
     }
 
-    /// The app's color (DesignTokens), for the controls.
-    static let brand = Color(rgb: DesignTokens.shared.light.primary)
 }
 
 #if os(iOS)
@@ -125,7 +123,7 @@ struct EpisodeRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if episode.progress > 0 && episode.progress < 1 {
-                    ProgressView(value: Double(episode.progress)).tint(Color.brand)
+                    ProgressView(value: Double(episode.progress))
                 }
             }
             Spacer(minLength: 0)
@@ -155,6 +153,19 @@ struct EpisodeRow: View {
             Button { model.enqueue(item) } label: { Label(strings.addToQueue, systemImage: "text.badge.plus") }
             Button { Task { await model.markPlayed(item) } } label: { Label(strings.action(name: "mark-played"), systemImage: "checkmark.circle") }
         }
+    }
+}
+
+extension View {
+    /// The lists of content (episodes, podcasts, playlists). On the Mac, the plain style: the
+    /// inset one keeps every row at the height of one line and cuts the rest. On iOS, the
+    /// system's default.
+    @ViewBuilder func contentListStyle() -> some View {
+        #if os(macOS)
+        listStyle(.plain)
+        #else
+        self
+        #endif
     }
 }
 
