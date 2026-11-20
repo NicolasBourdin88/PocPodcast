@@ -42,6 +42,28 @@ enum DebugOptions {
         guard let path = UserDefaults.standard.string(forKey: "snapshot") else { return }
         let delay = UserDefaults.standard.double(forKey: "snapshotDelay")
         try? await Task.sleep(for: .seconds(delay > 0 ? delay : 5))
+        // `-click x,y;x,y`: clicks, in points from the window's top left, as a person would make them.
+        if let clicks = UserDefaults.standard.string(forKey: "click"),
+           let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 300 }) {
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(500))
+            for click in clicks.split(separator: ";") {
+                let parts = click.split(separator: ",").compactMap { Double($0) }
+                guard parts.count == 2 else { continue }
+                let point = NSPoint(x: parts[0], y: window.frame.height - parts[1])
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    if let event = NSEvent.mouseEvent(
+                        with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+                    ) {
+                        NSApp.sendEvent(event)
+                    }
+                    try? await Task.sleep(for: .milliseconds(80))
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         if scrollToBottom {
             var report = "player bar: \(model.playerItem?.episode.title ?? "none")\n"
             for window in NSApp.windows where window.isVisible {
