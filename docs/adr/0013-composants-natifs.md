@@ -78,6 +78,7 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
   - Le navigateur ne demande plus que notre serveur. Un bloqueur de contenu, ou la protection contre le hotlinking d'un hébergeur, cachait certaines pochettes (celle de Fragmented, sur `image.simplecastcdn.com`). Et une vignette de 56 pixels ne charge plus une image de 3000 pixels.
   - Sans image lisible : une vignette SVG, les initiales du podcast sur sa couleur, comme dans les apps. L'image est redemandée au plus une fois par heure.
   - Les résultats d'Explorer gardent l'adresse donnée par l'annuaire : les servir demanderait un proxy ouvert à n'importe quelle adresse.
+  - Les apps Compose, qui n'affichaient que des initiales, prennent les mêmes pochettes par le SDK (`PodcastRepository.artwork`, qui suit le lien `artwork`), avec le jeton du compte. Une image de 256 pixels pèse peu sur un réseau mobile et en mémoire.
 - **Grandes fenêtres** (1200 pixels et plus, comme la classe « Large » des apps) : plus de largeur maximale.
   - Les listes passent en colonnes d'au moins 440 pixels.
   - Sur l'Accueil, la file d'attente devient un panneau à droite, qui reste visible pendant le défilement.
@@ -95,6 +96,6 @@ Il reste aussi deux points ouverts de l'étape 8 : l'OPML dans l'app iOS et l'en
 - Une modification du Kotlin relance sur Mac un lien d'une dizaine de minutes. Avec un Xcode plus récent, le framework de débogage suffirait.
 - Les positions en attente vivent en mémoire : si l'app est fermée hors ligne, elles sont perdues. Le serveur prend toujours la dernière écriture, et l'API ne transmet pas l'heure de la mesure.
 - L'app SwiftUI gère aussi les comptes du serveur pour un administrateur (créer, rendre administrateur, réinitialiser un mot de passe, supprimer) : il n'y a pas d'inscription libre (ADR 0009).
-- Les apps chargent toujours l'image du flux elles-mêmes : leurs chargeurs d'images n'envoient pas de jeton, et aucun bloqueur de contenu ne les filtre.
+- L'app SwiftUI charge toujours l'image du flux elle-même (`ArtworkCache`) : aucun bloqueur de contenu ne la filtre.
 - Les pochettes gardées ne sont jamais purgées : quelques dizaines de kilo-octets par podcast.
 - Hors périmètre : tests d'interface automatisés de l'app SwiftUI, partages et édition des playlists dans l'app SwiftUI. Le client léger et les apps Compose les offrent.
