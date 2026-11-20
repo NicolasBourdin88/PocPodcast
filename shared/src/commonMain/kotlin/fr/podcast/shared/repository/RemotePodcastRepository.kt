@@ -29,6 +29,8 @@ import fr.podcast.shared.model.UserRole
 import io.ktor.client.HttpClient
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -44,6 +46,8 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
 
     // The root's links do not change during a session; its embedded Home does.
     private var root: HalResource? = null
+    private val artworkLinks = mutableMapOf<String, String?>()
+    private val artworkLinksLock = Mutex()
 
     private suspend fun root(refresh: Boolean = false): HalResource =
         (if (refresh) null else root) ?: api.get("/").also { root = it }
@@ -58,6 +62,21 @@ class RemotePodcastRepository(account: Account, httpClient: HttpClient) : Podcas
     override suspend fun subscriptions(): List<Podcast> = subscriptionItems().map { it.podcast }
 
     override suspend fun podcast(id: String): Podcast? = orNullIfNotFound { api.get(link("podcast", mapOf("id" to id))).toPodcast() }
+
+    override suspend fun artwork(podcastId: String): ByteArray? = orNullIfNotFound {
+        val href = artworkLink(podcastId) ?: return null
+        val (type, bytes) = api.getBytes(href, ContentType.Image.Any)
+        // Without an image the server draws the podcast's initials: the client draws the same ones.
+        bytes.takeIf { it.isNotEmpty() && type?.match(ContentType.Image.SVG) != true }
+    }
+
+    /** The artwork link of a podcast's resource, read once (it does not change). */
+    private suspend fun artworkLink(podcastId: String): String? {
+        artworkLinksLock.withLock { if (podcastId in artworkLinks) return artworkLinks[podcastId] }
+        val href = api.get(link("podcast", mapOf("id" to podcastId))).link("artwork")
+        artworkLinksLock.withLock { artworkLinks[podcastId] = href }
+        return href
+    }
 
     override suspend fun episode(id: String): Episode? = episodeResource(id)?.asEpisode()
 

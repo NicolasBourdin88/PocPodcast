@@ -23,4 +23,11 @@ interface PodcastRepository {
     suspend fun markPlayed(episodeId: String)
     @Throws(Exception::class)
     suspend fun markUnplayed(episodeId: String)
+
+    /**
+     * The podcast's square artwork as its server keeps it (link `artwork`, ADR 0013), encoded
+     * (JPEG); null without an image, when the client draws the initials itself.
+     */
+    @Throws(Exception::class)
+    suspend fun artwork(podcastId: String): ByteArray? = null
 }

@@ -24,6 +24,7 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -121,6 +122,21 @@ class SdkTest {
         val basic = "Basic " + java.util.Base64.getEncoder().encodeToString("${TestSeed.ALICE}:$password".toByteArray())
         val login = client.post("/api/2/auth/alice/login.json") { header(HttpHeaders.Authorization, basic) }
         assertEquals(HttpStatusCode.OK, login.status)
+    }
+
+    @Test
+    fun sdkLoadsTheArtworkKeptByTheServer() = testApplication {
+        podcastServer()
+        val account = AccountService(client, deviceName = "SDK test").signIn("http://localhost", TestSeed.ALICE, TestSeed.ALICE_PASSWORD)
+        val repository = RemotePodcastRepository(account, client)
+        TestDatabase.execute("UPDATE podcasts SET artwork_url = 'https://cdn.test/artwork.png' WHERE id = 1")
+
+        // The square JPEG of the `artwork` link (ADR 0013).
+        val image = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(assertNotNull(repository.artwork("1"))))
+        assertEquals(256 to 256, image.width to image.height)
+        // Without an image the app draws the initials itself; an unknown podcast has none.
+        assertNull(repository.artwork("2"))
+        assertNull(repository.artwork("999"))
     }
 
     @Test

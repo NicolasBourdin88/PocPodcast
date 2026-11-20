@@ -9,6 +9,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -90,6 +91,15 @@ class PodcastApi(val serverUrl: String, private val httpClient: HttpClient, priv
             method = HttpMethod.Get
             accept(accept)
         }.bodyAsText()
+    }
+
+    /** A binary representation (e.g. an image) and its media type. */
+    suspend fun getBytes(href: String, accept: ContentType): Pair<ContentType?, ByteArray> {
+        val response = send(resolve(href)) {
+            method = HttpMethod.Get
+            accept(accept)
+        }
+        return response.contentType() to response.readRawBytes()
     }
 
     /** Posts a raw body (e.g. an OPML file) and reads the HAL answer. */
