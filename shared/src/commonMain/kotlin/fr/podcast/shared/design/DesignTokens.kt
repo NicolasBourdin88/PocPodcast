@@ -22,6 +22,13 @@ data class ColorTokens(
     val error: Int,
 )
 
+/**
+ * An accent in Apple's way (ADR 0013): one color per appearance, legible as text and icons on the
+ * system's backgrounds, with a white symbol legible on it when it fills a button. Increased
+ * contrast takes its own pair, as Apple's system colors do.
+ */
+data class AccentTokens(val light: Int, val dark: Int, val lightHighContrast: Int, val darkHighContrast: Int)
+
 object DesignTokens {
     val light = ColorTokens(
         background = 0xFDF7FF,
@@ -42,6 +49,12 @@ object DesignTokens {
         primary = 0xD0BCFF,
         error = 0xF2B8B5,
     )
+
+    /**
+     * The accent of the SwiftUI client, the asset catalog's AccentColor. The light one is the brand;
+     * the Material primary of [dark] is made for dark text on it, so the dark accent is its own.
+     */
+    val appleAccent = AccentTokens(light = 0x6750A4, dark = 0x9678E8, lightHighContrast = 0x4D3486, darkHighContrast = 0xB497FF)
 
     /** Placeholder artwork backgrounds, until real images are loaded. */
     val artworkColors = listOf(0x6750A4, 0x0B6E4F, 0xB3261E, 0x1F5FA8, 0x8A5A00)
