@@ -67,7 +67,7 @@ Variables d'environnement (voir les ADR [0007](docs/adr/0007-flux-telechargement
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | aucune | Crée le premier administrateur au démarrage, seulement si la base n'a aucun compte (8 caractères au moins pour le mot de passe) |
 | `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | aucune | Ajoute Podcast Index à la recherche (clés gratuites sur api.podcastindex.org) ; sans elles, seul Apple Podcasts est interrogé |
 | `REFRESH_INTERVAL_MINUTES` | `60` | Délai avant de relire un flux |
-| `MEDIA_DIR` | `media` | Dossier des fichiers audio téléchargés |
+| `MEDIA_DIR` | `media` | Dossier des fichiers audio téléchargés et des pochettes réduites |
 | `MEDIA_RETENTION_DAYS` | `30` | Âge à partir duquel un fichier est purgé (sauf épisode gardé ou en cours d'écoute) |
 | `MEDIA_MAX_GB` | aucun | Quota disque : au-delà, les fichiers les plus anciens sont purgés |
 | `AUTO_DOWNLOAD_LATEST` | `1` | Nombre d'épisodes récents téléchargés pour un abonnement en téléchargement automatique |
