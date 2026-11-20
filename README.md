@@ -48,7 +48,7 @@ Ce que chaque client ajoute :
 - **Web** : rien à installer ; le lecteur continue d'une page à l'autre ; sur un grand écran, la file d'attente reste à côté des épisodes.
 - **Android** (Compose) : Material 3 Expressive, couleurs du fond d'écran, notification et écran verrouillé.
 - **Desktop** (Compose) : macOS, Windows et Linux ; menu « Lecture » et raccourcis clavier.
-- **iPhone, iPad et Mac** (SwiftUI) : Liquid Glass, mini-lecteur au-dessus des onglets, Centre de contrôle, graphique Swift Charts. C'est le client Apple recommandé.
+- **iPhone, iPad et Mac** (SwiftUI) : Liquid Glass, mini-lecteur au-dessus des onglets, Centre de contrôle, graphique Swift Charts.
 - **Terminal** : listes numérotées réutilisables d'une commande à l'autre, TUI Mosaic qui lit les épisodes, statistiques en barres.
 
 L'UI Compose tourne aussi sur iOS (`iosApp/`), pour montrer qu'elle est partagée ; sur iPhone, iPad et Mac, le client recommandé reste l'app SwiftUI.
