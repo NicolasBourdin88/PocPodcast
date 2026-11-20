@@ -66,7 +66,7 @@ Projet de master, d'octobre à mars : un système de gestion et d'écoute de pod
 - **`:shared` ne dépend d'aucune plateforme** : le code spécifique passe par `expect`/`actual` ou par des interfaces injectées.
 - **Aucun texte visible en dur dans un client** : un nouveau texte est un membre de `Strings`, en français et en anglais (ADR 0002). Couleurs et palette des pochettes : `DesignTokens`.
 - **Code en anglais, documentation en français.** Les décisions importantes vont dans `docs/adr/` (un fichier numéroté par décision).
-- **Commits** : petits, logiques, au format Conventional Commits en anglais (`feat(server): …`, `fix(app): …`, `docs: …`) ; chaque commit compile. Dépôt local, sans remote : ne rien pousser.
+- **Commits** : petits, logiques, au format Conventional Commits en anglais (`feat(server): …`, `fix(app): …`, `docs: …`) ; chaque commit compile. Le dépôt est public sur GitHub (`origin`, [NicolasBourdin88/PocPodcast](https://github.com/NicolasBourdin88/PocPodcast)) : ne pousser que sur demande, et jamais de secret ni de réglage local (voir `.gitignore`). La CI lance les tests et le build Android à chaque push sur `main`.
 - **Dépendances** : les versions les plus récentes, vérifiées plutôt que supposées (l'API de Mosaic a changé plusieurs fois).
 - Package racine `fr.podcast`.
 

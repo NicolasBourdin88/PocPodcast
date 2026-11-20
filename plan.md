@@ -69,7 +69,7 @@ Le plan est découpé en **étapes**. Chaque étape a un objectif, des tâches e
 - [x] Renommer / réorganiser les modules en `:shared`, `:composeApp`, `:server`, et ajouter `:cli`. *(Plus `:androidApp`, imposé par AGP 9 : voir ADR 0001.)*
 - [x] Centraliser les versions dans `gradle/libs.versions.toml` (versions les plus récentes au moment de la création).
 - [x] Activer les accesseurs typés (`projects.shared`).
-- [ ] Créer le dépôt Git, protéger `main`, ajouter une CI GitHub Actions qui build JVM + Android. *(Dépôt local et CI faits ; reste à créer le dépôt GitHub et protéger `main`.)*
+- [ ] Créer le dépôt Git, protéger `main`, ajouter une CI GitHub Actions qui build JVM + Android. *(Dépôt GitHub [NicolasBourdin88/PocPodcast](https://github.com/NicolasBourdin88/PocPodcast) publié le 20 novembre 2026, avec sa CI ; reste à protéger `main`.)*
 
 ### 1.2 Module partagé `:shared`
 
